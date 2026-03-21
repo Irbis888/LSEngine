@@ -79,37 +79,37 @@ private:
 	std::wstring GetCamSpeed() override;
 	void UpdateCamera(const GameTimer& gt);
 
-	void AnimateMaterials(const GameTimer& gt);
-	void UpdateObjectCBs(const GameTimer& gt);
-	void UpdateMaterialCBs(const GameTimer& gt);
-	void UpdateMainPassCB(const GameTimer& gt);
+	void AnimateMaterials(const GameTimer& gt);    // useless
+	void UpdateObjectCBs(const GameTimer& gt);     // |
+	void UpdateMaterialCBs(const GameTimer& gt);   // |gpu stuff
+	void UpdateMainPassCB(const GameTimer& gt);    // |
 	// Работа с данными
 
 
-	void LoadAllTextures(); // загрузка из файла
+	void LoadAllTextures(); // resource
 	void LoadTexture(const std::string& name); // и это тоже
-	void BuildLODs();
-	void BuildRootSignature();
-	void BuildDescriptorHeaps();
-	void BuildShadersAndInputLayout();
-	void BuildShapeGeometry();
+	void BuildLODs(); // specific
+	void BuildRootSignature(); // gpu stuff
+	void BuildDescriptorHeaps(); //also
+	void BuildShadersAndInputLayout(); //also
+	void BuildShapeGeometry(); // resource
 	void BuildTerrainGeometry(UINT terrainSize,      // например 1025
 		UINT tileCountX,       // например 8
 		UINT tileCountZ,       // например 8
-		UINT tileResolution);
-	void BuildScreenQuadGeometry();
-	void BuildPSOs();
-	void BuildFrameResources();
-	void CreateMaterial(std::string _name, int _CBIndex, int _SRVDiffIndex, int _SRVNMapIndex, XMFLOAT4 _DiffuseAlbedo, XMFLOAT3 _FresnelR0, float _Roughness);
-	void BuildMaterials();
-	void RenderCustomMesh(std::string unique_name, std::string meshname, std::string materialName, XMMATRIX Scale, XMMATRIX Rotation, XMMATRIX Translation, bool terrain);
-	void RenderShapeMesh(std::string unique_name, std::string meshname, std::string materialName, XMMATRIX Scale, XMMATRIX Rotation, XMMATRIX Translation, bool terrain);
-	void BuildCustomMeshGeometry(std::string name, UINT& meshVertexOffset, UINT& meshIndexOffset, UINT& prevVertSize, UINT& prevIndSize, std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, MeshGeometry* Geo);
-	void BuildRenderItems();
-	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems, bool height, bool fc);
-	void DrawDebugGBuffer(ID3D12GraphicsCommandList* cmdList);
-	void GetLOD();
-	XMFLOAT2 GenerateJitter(int frame);
+		UINT tileResolution);                      ////// resource
+	void BuildScreenQuadGeometry();              // specific
+	void BuildPSOs();                // gpu stuff
+	void BuildFrameResources();      // gpu stuff
+	void CreateMaterial(std::string _name, int _CBIndex, int _SRVDiffIndex, int _SRVNMapIndex, XMFLOAT4 _DiffuseAlbedo, XMFLOAT3 _FresnelR0, float _Roughness); // resource?
+	void BuildMaterials();  // resource
+	void RenderCustomMesh(std::string unique_name, std::string meshname, std::string materialName, XMMATRIX Scale, XMMATRIX Rotation, XMMATRIX Translation, bool terrain); // render
+	void RenderShapeMesh(std::string unique_name, std::string meshname, std::string materialName, XMMATRIX Scale, XMMATRIX Rotation, XMMATRIX Translation, bool terrain); // render
+	void BuildCustomMeshGeometry(std::string name, UINT& meshVertexOffset, UINT& meshIndexOffset, UINT& prevVertSize, UINT& prevIndSize, std::vector<Vertex>& vertices, std::vector<std::uint16_t>& indices, MeshGeometry* Geo);  //resource
+	void BuildRenderItems(); // resource
+	void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems, bool height, bool fc); // render
+	void DrawDebugGBuffer(ID3D12GraphicsCommandList* cmdList); // render
+	void GetLOD();                       // specific
+	XMFLOAT2 GenerateJitter(int frame); // technical
 
 	void BeginFrame();
 	void GeometryPass();
