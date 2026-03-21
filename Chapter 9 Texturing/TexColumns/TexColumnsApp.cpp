@@ -10,6 +10,7 @@
 #include "FrameResource.h"
 #include "CustomBuffer.h"
 #include <iostream>
+#include <entt/entt.hpp>
 
 
 
@@ -404,11 +405,6 @@ void TexColumnsApp::Update(const GameTimer& gt)
 			XMMATRIX a = XMLoadFloat4x4(&rItem->TexTransform);
 			XMStoreFloat4x4(&rItem->TexTransform, a * XMMatrixTranslation(-0.5, -0.5, 0) * XMMatrixRotationRollPitchYaw(0, 0, gt.DeltaTime() * 3) * XMMatrixTranslation(0.5, 0.5, 0));
 			rItem->NumFramesDirty = gNumFrameResources;
-		}
-		if (rItem->Name == "abbox")
-		{
-			//XMStoreFloat4x4(&rItem->World, XMMatrixScaling(3, 3, 3) * XMMatrixTranslation(cosf(gt.TotalTime()*3), 40, sinf(gt.TotalTime()*3)) * worldHead);
-			//rItem->NumFramesDirty = gNumFrameResources;
 		}
 	}
 	// Cycle through the circular frame resource array.
