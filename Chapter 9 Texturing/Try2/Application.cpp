@@ -5,6 +5,7 @@
 using Microsoft::WRL::ComPtr;
 using namespace std;
 
+
 LRESULT CALLBACK
 MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -65,11 +66,14 @@ void Application::Set4xMsaaState(bool value)
 	}
 }
 
+const float fixed_dt = 1.0f / 60.0f;
+
 int Application::Run()
 {
 	MSG msg = { 0 };
 
 	mTimer.Reset();
+	float accumulator = 0.0f; // physics timer
 	while (msg.message != WM_QUIT)
 	{
 		// If there are Window messages then process them.
@@ -82,6 +86,18 @@ int Application::Run()
 		else
 		{
 			mTimer.Tick();
+			float dt = mTimer.DeltaTime();
+			dt = min(dt, 0.1f);
+			accumulator += dt;
+			int steps = 0;
+			const int maxSteps = 5;
+
+			while (accumulator >= fixed_dt && steps < maxSteps)
+			{
+				PhysicsUpdate(fixed_dt);
+				accumulator -= fixed_dt;
+				steps++;
+			}
 
 			if (true)
 			{
@@ -134,6 +150,7 @@ bool Application::Initialize()
 		//return false;
 
 	// Do the initial resize code.
+	mEngine.Init();
 	OnResize();
 
 	return true;

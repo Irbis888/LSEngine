@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Commons.h>
+#include "Engine.h"
 
 
 class Application
@@ -29,6 +30,7 @@ protected:
 
     virtual void OnResize();
     virtual void Update(const GameTimer& gt) = 0;
+    virtual void PhysicsUpdate(float dt) = 0;
     virtual void Draw(const GameTimer& gt) = 0;
 
     // Convenience overrides for handling mouse input.
@@ -81,7 +83,10 @@ protected:
 
     // Derived class should set these in derived constructor to customize starting values.
     std::wstring mMainWndCaption = L"LS Engine";
-    int mClientWidth = 1440;
-    int mClientHeight = 900;
+    int mClientWidth = 800;
+    int mClientHeight = 600;
+
+protected:
+	Engine mEngine;
 };
 

@@ -89,7 +89,7 @@ int D3DApp::Run()
         {	
 			mTimer.Tick();
 
-			if(true )
+			if(true)
 			{
 				if (GetAsyncKeyState('W') & 0x8000)
 				{

@@ -14,9 +14,26 @@
 #include <iostream>
 #include <GameTimer.h>
 #include <windows.h>
+#include <glm/glm.hpp>
 
+using MeshID = uint32_t;
+using MaterialID = uint32_t;
+using TextureID = uint32_t;
 
-class Commons
+struct TransformComponent
 {
+	glm::vec3 position;
+	glm::vec3 rotation;
+	glm::vec3 scale;
 };
+struct TagComponent
+{
+	std::string tag;
+};
+struct MeshComponent
+{
+	MeshID meshID;
+};
+
+class Commons{};
 
