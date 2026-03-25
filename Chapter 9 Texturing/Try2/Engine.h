@@ -2,6 +2,7 @@
 
 #include "Commons.h"
 #include "World.h"
+#include "ResourceManager.h"
 
 class IRenderAdapter
 {
@@ -12,8 +13,8 @@ public:
     virtual void EndFrame() = 0;
 
     virtual void DrawMesh(
-        const TransformComponent& transform,
-        MeshComponent mesh
+        const MeshComponent mesh,
+        TransformComponent& transform
     ) = 0;
 };
 
@@ -28,7 +29,7 @@ public:
     {
         std::cout << "=== End Frame ===\n\n";
     }
-    void DrawMesh(const TransformComponent& transform, MeshComponent mesh) override
+    void DrawMesh(const MeshComponent mesh, TransformComponent& transform) override
     {
         std::cout << "Drawing mesh '" << mesh.meshID
             << "' at (" << transform.position.x << ", "
@@ -54,14 +55,20 @@ public:
 	void Update(entt::registry& reg, float dt) override
 	{
 		mAdapter->BeginFrame();
+        
 		reg.view<TransformComponent, MeshComponent>().each([this](auto& transform, auto& mesh)
 			{
-				mAdapter->DrawMesh(transform, mesh);
+                //auto& mesh = mResourceManager->GetMesh(MeshComponent.mesh);
+                //auto& material = mResourceManager->GetMaterial(MeshComponent.material);
+
+                // Передаём RenderAdapter
+				mAdapter->DrawMesh(mesh, transform);
             });
 		mAdapter->EndFrame();
 	}
 private:
     IRenderAdapter* mAdapter;
+	ResourceManager* mResourceManager;
 };
 
 class Engine
@@ -74,6 +81,7 @@ private:
 	std::vector<std::unique_ptr<ISystem>> renderSystems;
 
 	ConsoleRenderAdapter mRenderAdapter;
+	ResourceManager mResourceManager;
 public:
 	void Init();
 	void Update(const GameTimer& gt);

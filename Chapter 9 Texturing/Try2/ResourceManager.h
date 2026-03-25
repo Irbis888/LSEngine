@@ -1,5 +1,8 @@
 #pragma once
 #include "Commons.h"
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 
 struct Vertex
@@ -36,14 +39,27 @@ struct Mesh
 {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
+
+    struct Submesh
+    {
+        uint32_t indexOffset;
+        uint32_t indexCount;
+        MaterialID material;
+    };
+
+    std::vector<Submesh> submeshes;
 };
 
 struct Material
 {
     std::string name;
-    // позже:
-    // TextureID albedo;
-    // ShaderID shader;
+
+    TextureID albedo = 0;
+    TextureID normal = 0;
+
+    // простые параметры (пока)
+    glm::vec3 color = glm::vec3(1.0f);
+    float roughness = 0.5f;
 };
 
 struct Texture
@@ -65,6 +81,13 @@ public:
 
     Mesh& GetMesh(MeshID id);
     Material& GetMaterial(MaterialID id);
+
+    TextureID LoadTexture(const std::wstring& filename);
+    Texture& ResourceManager::GetTexture(TextureID id);
+
+    void PrintAllMeshes() const;
+    void PrintAllMaterials() const;
+    void PrintAllTextures() const;
 
 private:
     std::unordered_map<MeshID, Mesh> mMeshes;

@@ -35,6 +35,7 @@ TestApp::TestApp(HINSTANCE hInstance)
 }
 void TestApp::PhysicsUpdate(float dt)
 {
+    
     //std::cout << "Physics tick: " << dt << " seconds\n";
     mEngine.PhysicsUpdate(dt);
 }

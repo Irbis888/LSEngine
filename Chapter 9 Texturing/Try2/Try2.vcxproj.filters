@@ -36,6 +36,9 @@
     <ClCompile Include="Engine.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="ResourceManager.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Common\GameTimer.h">
@@ -51,6 +54,9 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="Engine.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceManager.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
