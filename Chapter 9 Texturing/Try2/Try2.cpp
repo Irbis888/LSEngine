@@ -6,11 +6,11 @@
 #include "Application.h"
 #include <string>
 
-struct DxException
-{
-    int ErrorCode = 0;
-    std::wstring Message = L"Stub";
-};
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxgi.lib")
+
+
 
 class TestApp : public Application
 {
@@ -37,17 +37,17 @@ void TestApp::PhysicsUpdate(float dt)
 {
     
     //std::cout << "Physics tick: " << dt << " seconds\n";
-    mEngine.PhysicsUpdate(dt);
+    mEngine->PhysicsUpdate(dt);
 }
 void TestApp::Update(const GameTimer& gt)
 {
-	mEngine.Update(gt);
+	mEngine->Update(gt);
     //std::cout << "Update: " << gt.DeltaTime() << " seconds\n";
 }
 void TestApp::Draw(const GameTimer& gt)
 {
     //std::cout << "Draw: " << gt.TotalTime() << " seconds\n";
-	mEngine.Draw(gt);
+	mEngine->Draw(gt);
 }
 
 
@@ -66,7 +66,7 @@ int main()
     }
     catch (DxException& e)
     {
-        MessageBox(nullptr, e.Message.c_str(), L"HR Failed", MB_OK);
+        MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
         return 0;
     }
 }

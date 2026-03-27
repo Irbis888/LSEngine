@@ -14,6 +14,7 @@
 #include <iostream>
 #include <GameTimer.h>
 #include <windows.h>
+#include <entt/entt.hpp>
 #include <glm/glm.hpp>
 
 using MeshID = uint32_t;
@@ -35,5 +36,47 @@ struct MeshComponent
 	MeshID meshID;
 };
 
-class Commons{};
+class IRenderAdapter
+{
+public:
+    IRenderAdapter() = default;
+    virtual ~IRenderAdapter() = default;
 
+    virtual void Init(void* windowHandle, uint32_t width, uint32_t height) = 0;
+    virtual void BeginFrame() = 0;
+    virtual void EndFrame() = 0;
+
+    virtual void SetTransform(const glm::mat4& world) = 0;
+
+    virtual void SetMaterial(MaterialID material) = 0;
+
+    virtual void DrawIndexed(
+        uint32_t indexCount,
+        uint32_t startIndex,
+        int32_t baseVertex
+    ) = 0;
+};
+
+class ISystem
+{
+public:
+	//ISystem();
+	virtual ~ISystem() = default;
+
+	virtual void Update(entt::registry& reg, float dt) {}
+};
+
+
+class DxException
+{
+public:
+    DxException() = default;
+    DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber);
+
+    std::wstring ToString()const;
+
+    HRESULT ErrorCode = S_OK;
+    std::wstring FunctionName;
+    std::wstring Filename;
+    int LineNumber = -1;
+};

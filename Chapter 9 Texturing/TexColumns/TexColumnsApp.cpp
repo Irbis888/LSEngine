@@ -24,25 +24,6 @@ using namespace DirectX::PackedVector;
 
 const int gNumFrameResources = 3;
 
-// Components
-
-struct Transform
-{
-	XMFLOAT4X4 world = MathHelper::Identity4x4();
-};
-
-struct MeshComponent
-{
-	MeshGeometry* geo = nullptr;
-	SubmeshGeometry* submesh = nullptr;
-};
-
-struct MaterialComponent
-{
-	Material* mat = nullptr;
-};
-
-struct Tag { std::string Name; }; 
 
 
 struct RenderItem
@@ -674,7 +655,7 @@ void TexColumnsApp::FinalTransitionAndPresent()
 
 void TexColumnsApp::Draw(const GameTimer& gt)
 {
-	auto view = mRegistry.view<Transform, MeshComponent, MaterialComponent>().each();
+	//auto view = mRegistry.view<Transform, MeshComponent, MaterialComponent>().each();
 
 	BeginFrame();
 	GeometryPass();

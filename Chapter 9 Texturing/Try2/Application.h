@@ -1,8 +1,16 @@
 #pragma once
 
 #include <Commons.h>
+#include <d3dUtils.h>
+#include <D3DRenderAdapter.h>
 #include "Engine.h"
 
+enum class RenderAPI
+{
+    None,
+    DX12,
+    Vulkan
+};
 
 class Application
 {
@@ -23,6 +31,7 @@ public:
 
     int Run();
 
+    std::unique_ptr<IRenderAdapter> CreateRenderer(RenderAPI api);
     virtual bool Initialize();
     virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -46,9 +55,6 @@ protected:
 protected:
 
     bool InitMainWindow();
-    bool InitDirect3D();
-    void CreateCommandObjects();
-    void CreateSwapChain();
 
 
     void CalculateFrameStats();
@@ -87,6 +93,9 @@ protected:
     int mClientHeight = 600;
 
 protected:
-	Engine mEngine;
+    std::unique_ptr<Engine> mEngine;
+	std::unique_ptr<IRenderAdapter> mRenderAdapter;
+
+	RenderAPI mRenderAPI = RenderAPI::DX12;
 };
 

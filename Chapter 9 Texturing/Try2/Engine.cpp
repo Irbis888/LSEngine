@@ -1,7 +1,7 @@
 #include "Engine.h"
 
 void Engine::Init() {
-	renderSystems.push_back(std::make_unique<RenderSystem>(&mRenderAdapter));
+	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 	mResourceManager.LoadMesh("../../Common/sponza.obj");
 
 	// Create first mesh entity

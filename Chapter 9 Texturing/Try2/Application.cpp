@@ -66,6 +66,20 @@ void Application::Set4xMsaaState(bool value)
 	}
 }
 
+std::unique_ptr<IRenderAdapter> Application::CreateRenderer(RenderAPI api)
+{
+	switch (api)
+	{
+	case RenderAPI::DX12:
+		return std::make_unique<D3DRenderAdapter>();
+	default:
+		break;
+	}
+	return nullptr;
+}
+
+
+
 const float fixed_dt = 1.0f / 60.0f;
 
 int Application::Run()
@@ -126,10 +140,10 @@ int Application::Run()
 					OnKeyPressed(mTimer, 'Q');
 				}
 				//CalculateFrameStats();
+				mRenderAdapter->BeginFrame();
 				Update(mTimer);
 				Draw(mTimer);
-
-
+				mRenderAdapter->EndFrame();
 			}
 			else
 			{
@@ -145,12 +159,13 @@ bool Application::Initialize()
 {
 	if (!InitMainWindow())
 		return false;
-
-	//if (!InitDirect3D())
-		//return false;
+	mRenderAdapter = Application::CreateRenderer(mRenderAPI);
+	mRenderAdapter->Init(mhMainWnd, mClientWidth, mClientHeight);
 
 	// Do the initial resize code.
-	mEngine.Init();
+	mEngine = std::make_unique<Engine>(mRenderAdapter.get());
+	mEngine->Init();
+
 	OnResize();
 
 	return true;
