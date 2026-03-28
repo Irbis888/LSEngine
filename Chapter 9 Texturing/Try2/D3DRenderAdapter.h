@@ -61,7 +61,23 @@ private:
     D3D12_VIEWPORT mScreenViewport;
     D3D12_RECT mScissorRect;
 
+    UINT mRtvDescriptorSize = 0;
+    UINT mDsvDescriptorSize = 0;
+    UINT mCbvSrvUavDescriptorSize = 0;
+
     D3D_DRIVER_TYPE md3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
     DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    std::unordered_map<std::string, std::unique_ptr<MeshGPU>> mGeometries;
+    std::unordered_map<std::string, std::unique_ptr<MaterialGPU>> mMaterials;
+    std::unordered_map<std::string, std::unique_ptr<TextureGPU>> mTextures;
+    std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
+    std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
+
+    std::unordered_map<std::string, std::unique_ptr<CustomBuffer>> mBuffers;
+    std::unordered_map<std::string, std::vector<DXGI_FORMAT>> mBufferFormats;
+
+    bool      m4xMsaaState = false;    // 4X MSAA enabled
+    UINT      m4xMsaaQuality = 0;
 };

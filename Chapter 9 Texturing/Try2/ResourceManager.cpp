@@ -50,7 +50,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         }
 
         // --- NORMAL ---
-        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texPath) == AI_SUCCESS)
+        if (aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
         {
             std::wstring wpath(texPath.C_Str(), texPath.C_Str() + strlen(texPath.C_Str()));
             mat.normal = LoadTexture(wpath);
