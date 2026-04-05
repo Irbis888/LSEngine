@@ -67,6 +67,13 @@ inline std::wstring AnsiToWString(const std::string& str)
     return std::wstring(buffer);
 }
 
+struct SubmeshGPU
+{
+    uint32_t indexOffset;
+    uint32_t indexCount;
+    uint32_t material;
+};
+
 struct MeshGPU
 {
     ComPtr<ID3D12Resource> vertexBuffer;
@@ -76,6 +83,8 @@ struct MeshGPU
     D3D12_INDEX_BUFFER_VIEW ibView;
 
     UINT indexCount;
+
+    std::vector<SubmeshGPU> submeshes;
 };
 
 

@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "RenderSystem.h"
 
 void Engine::Init() {
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));

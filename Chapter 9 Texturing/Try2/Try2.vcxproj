@@ -136,6 +136,8 @@
     <ClCompile Include="D3DRenderAdapter.cpp" />
     <ClCompile Include="d3dUtils.cpp" />
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="FrameRes.cpp" />
+    <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="Try2.cpp" />
     <ClCompile Include="World.cpp" />
@@ -147,8 +149,21 @@
     <ClInclude Include="D3DRenderAdapter.h" />
     <ClInclude Include="d3dUtils.h" />
     <ClInclude Include="Engine.h" />
+    <ClInclude Include="FrameRes.h" />
+    <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ResourceManager.h" />
     <ClInclude Include="World.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Shaders\Default.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+    <Text Include="Shaders\LightingUtil.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MESH_UPLOAD_GUIDE.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

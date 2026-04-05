@@ -1,6 +1,7 @@
 #include "D3DRenderAdapter.h"
 
 #include <stdexcept>
+#include "ResourceManager.h"
 
 using namespace Microsoft::WRL;
 
@@ -50,9 +51,21 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     mDsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
     mCbvSrvUavDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    // Create CBV/SRV/UAV descriptor heap (shader visible). We'll allocate descriptors as needed.
+    D3D12_DESCRIPTOR_HEAP_DESC cbvSrvDesc = {};
+    cbvSrvDesc.NumDescriptors = 1024; // allow many descriptors for textures and CBVs
+    cbvSrvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    cbvSrvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvDesc, IID_PPV_ARGS(&mCbvSrvUavHeap)));
+    mCbvSrvUavDescriptorCount = cbvSrvDesc.NumDescriptors;
+    mNextCbvSrvIndex = 0;
+
     CreateCommandObjects();
     CreateSwapChain();
     CreateRtvAndDsvDescriptorHeaps();
+    BuildRootSignatures();
+    BuildShadersAndInputLayout();
+    BuildPSOs();
 
     OnResize();
 }
@@ -148,6 +161,8 @@ void D3DRenderAdapter::BeginFrame()
     mCommandList->ClearDepthStencilView(dsv,
         D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
         1.0f, 0, 0, nullptr);
+    mCommandList->RSSetViewports(1, &mScreenViewport);
+    mCommandList->RSSetScissorRects(1, &mScissorRect);
 }
 
 // -------------------------------------------------------------
@@ -284,6 +299,72 @@ ID3D12Resource* D3DRenderAdapter::CurrentBackBuffer() const
     return mSwapChainBuffer[mCurrBackBuffer].Get();
 }
 
+int D3DRenderAdapter::CreateSRV(ID3D12Resource* resource)
+{
+    if (!resource) return -1;
+    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount) return -1;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Format = resource->GetDesc().Format;
+    srvDesc.Texture2D.MipLevels = (UINT)resource->GetDesc().MipLevels;
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(), mNextCbvSrvIndex, mCbvSrvUavDescriptorSize);
+    md3dDevice->CreateShaderResourceView(resource, &srvDesc, handle);
+
+    // keep resource alive
+    mOwnedResources.push_back(resource);
+
+    return static_cast<int>(mNextCbvSrvIndex++);
+}
+
+// CreateSRVFromFile removed - use ResourceManager/DDSTextureLoader in a module that links DirectX helper.
+
+int D3DRenderAdapter::CreateCBV(const void* data, UINT64 byteSize, ID3D12Resource** outUploadResource)
+{
+    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount) return -1;
+
+    UINT64 uploadSize = byteSize;
+    // Create upload buffer
+    ComPtr<ID3D12Resource> uploadBuffer;
+    D3D12_RESOURCE_DESC uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(d3dUtils::CalcConstantBufferByteSize((UINT)uploadSize));
+    ThrowIfFailed(md3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &uploadDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&uploadBuffer)));
+
+    // Copy data
+    void* mapped = nullptr;
+    CD3DX12_RANGE readRange(0, 0);
+    ThrowIfFailed(uploadBuffer->Map(0, &readRange, &mapped));
+    memcpy(mapped, data, (size_t)byteSize);
+    uploadBuffer->Unmap(0, nullptr);
+
+    // Create CBV descriptor
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = uploadBuffer->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = d3dUtils::CalcConstantBufferByteSize((UINT)byteSize);
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(), mNextCbvSrvIndex, mCbvSrvUavDescriptorSize);
+    md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
+
+    mOwnedResources.push_back(uploadBuffer);
+    if (outUploadResource) *outUploadResource = uploadBuffer.Get();
+
+    return static_cast<int>(mNextCbvSrvIndex++);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE D3DRenderAdapter::GetGPUDescriptorHandle(UINT index) const
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE h = mCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+    h.ptr += (size_t)index * mCbvSrvUavDescriptorSize;
+    return h;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE D3DRenderAdapter::CurrentBackBufferView() const
 {
     //return mRtvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -322,16 +403,404 @@ void D3DRenderAdapter::FlushCommandQueue()
     }
 }
 
-void D3DRenderAdapter::SetTransform(const glm::mat4& world) {
+void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
 
-};
+    mCurrentTransform = world;
+}
 
 void D3DRenderAdapter::SetMaterial(MaterialID material) {
-};
+    mCurrentMaterial = material;
+}
 
 void D3DRenderAdapter::DrawIndexed(
     uint32_t indexCount,
     uint32_t startIndex,
     int32_t baseVertex)  {
 
-};
+    // Bind CBV/SRV heap
+    ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
+    mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
+
+    //mCommandList->IASetVertexBuffers(0, 1, &mVertexBufferView);
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // For now we do not perform actual drawing because higher-level code sets PSO and root signature.
+    // This function is a placeholder that would bind per-draw SRVs/CBVs (material, transform) when available.
+
+}
+
+// -------------------------------------------------------------
+// ROOT SIGNATURES AND PSOs
+// -------------------------------------------------------------
+
+void D3DRenderAdapter::BuildShadersAndInputLayout()
+{
+    mShaders["standardVS"] = d3dUtils::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
+    if (!mShaders["standardVS"]) throw std::runtime_error("Failed to compile vertex shader");
+
+    mShaders["standardPS"] = d3dUtils::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
+    if (!mShaders["standardPS"]) throw std::runtime_error("Failed to compile pixel shader");
+
+    mInputLayout =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+}
+
+std::vector<D3D12_STATIC_SAMPLER_DESC> D3DRenderAdapter::GetStaticSamplers()
+{
+    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
+
+    // Point wrap (s0)
+    D3D12_STATIC_SAMPLER_DESC pointWrap = {};
+    pointWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    pointWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.MipLODBias = 0.0f;
+    pointWrap.MaxAnisotropy = 1;
+    pointWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    pointWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    pointWrap.MinLOD = 0.0f;
+    pointWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    pointWrap.ShaderRegister = 0;
+    pointWrap.RegisterSpace = 0;
+    pointWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(pointWrap);
+
+    // Point clamp (s1)
+    D3D12_STATIC_SAMPLER_DESC pointClamp = {};
+    pointClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    pointClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.MipLODBias = 0.0f;
+    pointClamp.MaxAnisotropy = 1;
+    pointClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    pointClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    pointClamp.MinLOD = 0.0f;
+    pointClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    pointClamp.ShaderRegister = 1;
+    pointClamp.RegisterSpace = 0;
+    pointClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(pointClamp);
+
+    // Linear wrap (s2)
+    D3D12_STATIC_SAMPLER_DESC linearWrap = {};
+    linearWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    linearWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.MipLODBias = 0.0f;
+    linearWrap.MaxAnisotropy = 1;
+    linearWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    linearWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    linearWrap.MinLOD = 0.0f;
+    linearWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    linearWrap.ShaderRegister = 2;
+    linearWrap.RegisterSpace = 0;
+    linearWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(linearWrap);
+
+    // Linear clamp (s3)
+    D3D12_STATIC_SAMPLER_DESC linearClamp = {};
+    linearClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    linearClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.MipLODBias = 0.0f;
+    linearClamp.MaxAnisotropy = 1;
+    linearClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    linearClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    linearClamp.MinLOD = 0.0f;
+    linearClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    linearClamp.ShaderRegister = 3;
+    linearClamp.RegisterSpace = 0;
+    linearClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(linearClamp);
+
+    // Anisotropic wrap (s4)
+    D3D12_STATIC_SAMPLER_DESC anisotropicWrap = {};
+    anisotropicWrap.Filter = D3D12_FILTER_ANISOTROPIC;
+    anisotropicWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.MipLODBias = 0.0f;
+    anisotropicWrap.MaxAnisotropy = 8;
+    anisotropicWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    anisotropicWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    anisotropicWrap.MinLOD = 0.0f;
+    anisotropicWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    anisotropicWrap.ShaderRegister = 4;
+    anisotropicWrap.RegisterSpace = 0;
+    anisotropicWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(anisotropicWrap);
+
+    // Anisotropic clamp (s5)
+    D3D12_STATIC_SAMPLER_DESC anisotropicClamp = {};
+    anisotropicClamp.Filter = D3D12_FILTER_ANISOTROPIC;
+    anisotropicClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.MipLODBias = 0.0f;
+    anisotropicClamp.MaxAnisotropy = 8;
+    anisotropicClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    anisotropicClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    anisotropicClamp.MinLOD = 0.0f;
+    anisotropicClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    anisotropicClamp.ShaderRegister = 5;
+    anisotropicClamp.RegisterSpace = 0;
+    anisotropicClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(anisotropicClamp);
+
+    return samplers;
+}
+
+void D3DRenderAdapter::BuildRootSignatures()
+{
+    // Root signature for forward lighting pass (opaque objects)
+    // Each draw call renders one fully lit object to the back buffer
+    {
+        CD3DX12_DESCRIPTOR_RANGE albedoRange;
+        albedoRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0 - albedo texture
+
+        CD3DX12_DESCRIPTOR_RANGE normalRange;
+        normalRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1 - normal texture
+
+        CD3DX12_ROOT_PARAMETER rootParams[5];
+        rootParams[0].InitAsDescriptorTable(1, &albedoRange, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParams[1].InitAsDescriptorTable(1, &normalRange, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParams[2].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // b0 - object/world cbuffer
+        rootParams[3].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL); // b1 - pass cbuffer (camera, lights)
+        rootParams[4].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_ALL); // b2 - material cbuffer
+
+        auto staticSamplers = GetStaticSamplers();
+
+        CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
+            _countof(rootParams), rootParams,
+            (UINT)staticSamplers.size(), staticSamplers.data(),
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ComPtr<ID3DBlob> serializedRootSig = nullptr;
+        ComPtr<ID3DBlob> errorBlob = nullptr;
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+            serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf()));
+
+        if (errorBlob)
+        {
+            ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+
+        ComPtr<ID3D12RootSignature> rootSig;
+        ThrowIfFailed(md3dDevice->CreateRootSignature(
+            0,
+            serializedRootSig->GetBufferPointer(),
+            serializedRootSig->GetBufferSize(),
+            IID_PPV_ARGS(&rootSig)));
+
+        mRootSignatures["standard"] = rootSig;
+    }
+}
+
+void D3DRenderAdapter::BuildPSOs()
+{
+    // PSO for forward lighting: single render target, one draw call per lit object
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
+    ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+
+    if (!mShaders["standardVS"] || !mShaders["standardPS"])
+        throw std::runtime_error("Shaders not compiled before BuildPSOs");
+
+    opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
+    opaquePsoDesc.pRootSignature = mRootSignatures["standard"].Get();
+    opaquePsoDesc.VS =
+    {
+        reinterpret_cast<BYTE*>(mShaders["standardVS"]->GetBufferPointer()),
+        mShaders["standardVS"]->GetBufferSize()
+    };
+    opaquePsoDesc.PS = 
+    {
+        reinterpret_cast<BYTE*>(mShaders["standardPS"]->GetBufferPointer()),
+        mShaders["standardPS"]->GetBufferSize()
+    };
+    opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    opaquePsoDesc.SampleMask = UINT_MAX;
+    opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+    // Single render target: directly render to back buffer with albedo + normal-based lighting
+    opaquePsoDesc.NumRenderTargets = 1;
+    opaquePsoDesc.RTVFormats[0] = mBackBufferFormat;
+    opaquePsoDesc.DSVFormat = mDepthStencilFormat;
+    opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+    opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
+}
+
+// -------------------------------------------------------------
+// MESH UPLOAD
+// -------------------------------------------------------------
+
+void D3DRenderAdapter::SetResourceManager(ResourceManager* resourceManager)
+{
+    mResourceManager = resourceManager;
+}
+
+MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
+{
+    // Check if already uploaded
+    auto it = mGeometries.find(meshId);
+    if (it != mGeometries.end())
+    {
+        return it->second.get();
+    }
+
+    if (!mResourceManager)
+    {
+        throw std::runtime_error("ResourceManager not set on D3DRenderAdapter");
+    }
+
+    // Get CPU mesh data from ResourceManager
+    Mesh& cpuMesh = mResourceManager->GetMesh(meshId);
+
+    if (cpuMesh.vertices.empty() || cpuMesh.indices.empty())
+    {
+        throw std::runtime_error("Mesh has no vertices or indices");
+    }
+
+    auto meshGPU = std::make_unique<MeshGPU>();
+
+    // Upload vertex buffer
+    UINT64 vbByteSize = (UINT64)cpuMesh.vertices.size() * sizeof(Vertex);
+    ComPtr<ID3D12Resource> vbUploadBuffer;
+
+    meshGPU->vertexBuffer = d3dUtils::CreateDefaultBuffer(
+        md3dDevice.Get(),
+        mCommandList.Get(),
+        cpuMesh.vertices.data(),
+        vbByteSize,
+        vbUploadBuffer);
+
+    // Upload index buffer
+    UINT64 ibByteSize = (UINT64)cpuMesh.indices.size() * sizeof(uint32_t);
+    ComPtr<ID3D12Resource> ibUploadBuffer;
+
+    meshGPU->indexBuffer = d3dUtils::CreateDefaultBuffer(
+        md3dDevice.Get(),
+        mCommandList.Get(),
+        cpuMesh.indices.data(),
+        ibByteSize,
+        ibUploadBuffer);
+
+    // Create vertex buffer view
+    meshGPU->vbView.BufferLocation = meshGPU->vertexBuffer->GetGPUVirtualAddress();
+    meshGPU->vbView.StrideInBytes = sizeof(Vertex);
+    meshGPU->vbView.SizeInBytes = (UINT)vbByteSize;
+
+    // Create index buffer view
+    meshGPU->ibView.BufferLocation = meshGPU->indexBuffer->GetGPUVirtualAddress();
+    meshGPU->ibView.Format = DXGI_FORMAT_R32_UINT;
+    meshGPU->ibView.SizeInBytes = (UINT)ibByteSize;
+
+    // Store index count
+    meshGPU->indexCount = (UINT)cpuMesh.indices.size();
+
+    // Copy submesh metadata from CPU to GPU
+    meshGPU->submeshes.reserve(cpuMesh.submeshes.size());
+    for (const auto& cpuSubmesh : cpuMesh.submeshes)
+    {
+        SubmeshGPU gpuSubmesh;
+        gpuSubmesh.indexOffset = cpuSubmesh.indexOffset;
+        gpuSubmesh.indexCount = cpuSubmesh.indexCount;
+        gpuSubmesh.material = cpuSubmesh.material;
+        meshGPU->submeshes.push_back(gpuSubmesh);
+    }
+
+    // Keep upload buffers alive until GPU finishes consuming them
+    mOwnedResources.push_back(vbUploadBuffer);
+    mOwnedResources.push_back(ibUploadBuffer);
+
+    // Store in geometry map
+    MeshGPU* result = meshGPU.get();
+    mGeometries[meshId] = std::move(meshGPU);
+
+    return result;
+}
+
+MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
+{
+    // Return if already uploaded
+    auto it = mGeometries.find(meshId);
+    if (it != mGeometries.end())
+    {
+        return it->second.get();
+    }
+
+    // Lazy load
+    return UploadMesh(meshId);
+}
+
+void D3DRenderAdapter::DrawMesh(MeshID meshId)
+{
+    MeshGPU* meshGPU = GetMeshGPU(meshId);
+    if (!meshGPU || meshGPU->submeshes.empty())
+    {
+        return;
+    }
+
+    // Bind vertex and index buffers
+    mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
+    mCommandList->IASetIndexBuffer(&meshGPU->ibView);
+
+    // Draw all submeshes with their respective materials
+    for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
+    {
+        const auto& submesh = meshGPU->submeshes[i];
+
+        // Set material for this submesh
+        SetMaterial(submesh.material);
+
+        // Draw this submesh
+        mCommandList->DrawIndexedInstanced(
+            submesh.indexCount,    // IndexCountPerInstance
+            1,                      // InstanceCount
+            submesh.indexOffset,   // StartIndexLocation
+            0,                      // BaseVertexLocation
+            0                       // StartInstanceLocation
+        );
+    }
+}
+
+void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
+{
+    MeshGPU* meshGPU = GetMeshGPU(meshId);
+    if (!meshGPU || submeshIndex >= meshGPU->submeshes.size())
+    {
+        return;
+    }
+
+    const auto& submesh = meshGPU->submeshes[submeshIndex];
+
+    // Bind vertex and index buffers
+    mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
+    mCommandList->IASetIndexBuffer(&meshGPU->ibView);
+
+    // Set material for this submesh
+    SetMaterial(submesh.material);
+
+    // Draw this specific submesh
+    mCommandList->DrawIndexedInstanced(
+        submesh.indexCount,    // IndexCountPerInstance
+        1,                      // InstanceCount
+        submesh.indexOffset,   // StartIndexLocation
+        0,                      // BaseVertexLocation
+        0                       // StartInstanceLocation
+    );
+}
+
+// End of file

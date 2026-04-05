@@ -45,6 +45,12 @@
     <ClCompile Include="d3dUtils.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="FrameRes.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSystem.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Common\GameTimer.h">
@@ -71,5 +77,18 @@
     <ClInclude Include="d3dUtils.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="FrameRes.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderSystem.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Shaders\Default.hlsl" />
+    <Text Include="Shaders\LightingUtil.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MESH_UPLOAD_GUIDE.md" />
   </ItemGroup>
 </Project>

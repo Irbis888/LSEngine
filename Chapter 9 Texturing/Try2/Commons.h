@@ -46,7 +46,7 @@ public:
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
 
-    virtual void SetTransform(const glm::mat4& world) = 0;
+    virtual void SetTransform(const TransformComponent& world) = 0;
 
     virtual void SetMaterial(MaterialID material) = 0;
 
