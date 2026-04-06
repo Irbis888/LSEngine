@@ -23,6 +23,7 @@
 #include "d3dx12.h"
 #include "DDSTextureLoader.h"
 #include "../TexColumns/CustomBuffer.h"
+#include <MathHelper.h>
 
 class d3dUtils
 {
@@ -58,6 +59,43 @@ public:
         const D3D_SHADER_MACRO* defines,
         const std::string& entrypoint,
         const std::string& target);
+
+    // Build a world transformation matrix from TransformComponent (TRS composition)
+    // Returns result as XMFLOAT4X4 for direct use in ObjectConstants
+    static DirectX::XMFLOAT4X4 TransformComponentToWorldMatrix(const TransformComponent& transform)
+    {
+        // Build scale matrix
+        DirectX::XMMATRIX S = DirectX::XMMatrixScaling(transform.scale.x, transform.scale.y, transform.scale.z);
+
+        // Build rotation matrix (applying rotations in X, Y, Z order)
+        DirectX::XMMATRIX Rx = DirectX::XMMatrixRotationX(transform.rotation.x);
+        DirectX::XMMATRIX Ry = DirectX::XMMatrixRotationY(transform.rotation.y);
+        DirectX::XMMATRIX Rz = DirectX::XMMatrixRotationZ(transform.rotation.z);
+        DirectX::XMMATRIX R = Rx * Ry * Rz;
+
+        // Build translation matrix
+        DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(transform.position.x, transform.position.y, transform.position.z);
+
+        // Combine: S * R * T
+        DirectX::XMMATRIX world = S * R * T;
+
+        // Store in XMFLOAT4X4 and return
+        DirectX::XMFLOAT4X4 result;
+        DirectX::XMStoreFloat4x4(&result, world);
+        return result;
+    }
+
+    // Compute inverse of a 4x4 matrix (for InvWorld)
+    static DirectX::XMFLOAT4X4 InvertMatrix4x4(const DirectX::XMFLOAT4X4& inMatrix)
+    {
+        DirectX::XMMATRIX xmIn = DirectX::XMLoadFloat4x4(&inMatrix);
+        DirectX::XMVECTOR det = DirectX::XMMatrixDeterminant(xmIn);
+        DirectX::XMMATRIX xmInv = DirectX::XMMatrixInverse(&det, xmIn);
+
+        DirectX::XMFLOAT4X4 out;
+        DirectX::XMStoreFloat4x4(&out, xmInv);
+        return out;
+    }
 };
 
 inline std::wstring AnsiToWString(const std::string& str)
@@ -85,6 +123,13 @@ struct MeshGPU
     UINT indexCount;
 
     std::vector<SubmeshGPU> submeshes;
+
+    // Upload buffers (temporary, disposed after GPU finishes with them)
+    ComPtr<ID3D12Resource> vertexUploadBuffer;
+    ComPtr<ID3D12Resource> indexUploadBuffer;
+
+    // Fence value when upload completes (used to know when buffers can be disposed)
+    UINT64 uploadCompleteFence = 0;
 };
 
 
@@ -129,6 +174,16 @@ struct TextureGPU
 
     Microsoft::WRL::ComPtr<ID3D12Resource> Resource = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> UploadHeap = nullptr;
+};
+
+struct Light
+{
+    DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
+    float FalloffStart = 1.0f;                          // point/spot light only
+    DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// directional/spot light only
+    float FalloffEnd = 10.0f;                           // point/spot light only
+    DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // point/spot light only
+    float SpotPower = 64.0f;                            // spot light only
 };
 
 #ifndef ThrowIfFailed

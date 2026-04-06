@@ -67,6 +67,14 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     BuildShadersAndInputLayout();
     BuildPSOs();
 
+    // Create frame resources (one per frame in flight)
+    for (int i = 0; i < NumFrameResources; ++i)
+    {
+        mFrameResources.push_back(std::make_unique<FrameRes>(md3dDevice.Get(), 1, 1024, 512));
+    }
+    mCurrFrameResourceIndex = 0;
+    mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
+
     OnResize();
 }
 
@@ -141,7 +149,22 @@ void D3DRenderAdapter::CreateRtvAndDsvDescriptorHeaps()
 
 void D3DRenderAdapter::BeginFrame()
 {
-    mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr);
+    // Cycle to next frame resource
+    mCurrFrameResourceIndex = (mCurrFrameResourceIndex + 1) % NumFrameResources;
+    mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
+
+    // If GPU has not finished processing commands up to this fence, wait
+    if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
+    {
+        HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+        ThrowIfFailed(mFence->SetEventOnCompletion(mCurrFrameResource->Fence, eventHandle));
+        WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+    }
+
+    // Reset command allocator for this frame
+    ThrowIfFailed(mCurrFrameResource->CmdListAlloc->Reset());
+    ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
 
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -186,7 +209,13 @@ void D3DRenderAdapter::EndFrame()
 
     mCurrBackBuffer = (mCurrBackBuffer + 1) % SwapChainBufferCount;
 
-    FlushCommandQueue();
+    // Signal fence for this frame resource
+    mCurrentFence++;
+    ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mCurrentFence));
+    mCurrFrameResource->Fence = mCurrentFence;
+
+    // Clean up completed mesh uploads
+    CleanupMeshUploadBuffers();
 }
 
 // -------------------------------------------------------------
@@ -404,11 +433,55 @@ void D3DRenderAdapter::FlushCommandQueue()
 }
 
 void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
+    if (!mCurrFrameResource) return;
+
+    // Build world matrix from transform component (TRS composition)
+    ObjectConstants objConstants;
+    objConstants.World = d3dUtils::TransformComponentToWorldMatrix(world);
+    objConstants.InvWorld = d3dUtils::InvertMatrix4x4(objConstants.World);
+
+    // Identity for texture transform
+    objConstants.TexTransform = MathHelper::Identity4x4();
+
+    // Copy to GPU constant buffer (index 0 for now)
+    mCurrFrameResource->ObjectCB->CopyData(0, objConstants);
+
+    // Bind object CBV to root parameter 2
+    D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress();
+    mCommandList->SetGraphicsRootConstantBufferView(2, objCBAddress);
 
     mCurrentTransform = world;
 }
 
 void D3DRenderAdapter::SetMaterial(MaterialID material) {
+    if (!mCurrFrameResource) return;
+
+    MaterialConstants matConstants;
+
+    // DiffuseAlbedo (XMFLOAT4)
+    matConstants.DiffuseAlbedo = DirectX::XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+
+    // FresnelR0 (XMFLOAT3)
+    matConstants.FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+
+    // Roughness (single float)
+    matConstants.Roughness = 0.3f;
+
+    // MatTransform - identity matrix
+    matConstants.MatTransform = DirectX::XMFLOAT4X4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    );
+
+    // Copy to GPU constant buffer (index 0 for now)
+    mCurrFrameResource->MaterialCB->CopyData(0, matConstants);
+
+    // Bind material CBV to root parameter 4
+    D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = mCurrFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress();
+    mCommandList->SetGraphicsRootConstantBufferView(4, matCBAddress);
+
     mCurrentMaterial = material;
 }
 
@@ -450,114 +523,7 @@ void D3DRenderAdapter::BuildShadersAndInputLayout()
     };
 }
 
-std::vector<D3D12_STATIC_SAMPLER_DESC> D3DRenderAdapter::GetStaticSamplers()
-{
-    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
 
-    // Point wrap (s0)
-    D3D12_STATIC_SAMPLER_DESC pointWrap = {};
-    pointWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    pointWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    pointWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    pointWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    pointWrap.MipLODBias = 0.0f;
-    pointWrap.MaxAnisotropy = 1;
-    pointWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    pointWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    pointWrap.MinLOD = 0.0f;
-    pointWrap.MaxLOD = D3D12_FLOAT32_MAX;
-    pointWrap.ShaderRegister = 0;
-    pointWrap.RegisterSpace = 0;
-    pointWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(pointWrap);
-
-    // Point clamp (s1)
-    D3D12_STATIC_SAMPLER_DESC pointClamp = {};
-    pointClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    pointClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    pointClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    pointClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    pointClamp.MipLODBias = 0.0f;
-    pointClamp.MaxAnisotropy = 1;
-    pointClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    pointClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    pointClamp.MinLOD = 0.0f;
-    pointClamp.MaxLOD = D3D12_FLOAT32_MAX;
-    pointClamp.ShaderRegister = 1;
-    pointClamp.RegisterSpace = 0;
-    pointClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(pointClamp);
-
-    // Linear wrap (s2)
-    D3D12_STATIC_SAMPLER_DESC linearWrap = {};
-    linearWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    linearWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    linearWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    linearWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    linearWrap.MipLODBias = 0.0f;
-    linearWrap.MaxAnisotropy = 1;
-    linearWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    linearWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    linearWrap.MinLOD = 0.0f;
-    linearWrap.MaxLOD = D3D12_FLOAT32_MAX;
-    linearWrap.ShaderRegister = 2;
-    linearWrap.RegisterSpace = 0;
-    linearWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(linearWrap);
-
-    // Linear clamp (s3)
-    D3D12_STATIC_SAMPLER_DESC linearClamp = {};
-    linearClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    linearClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    linearClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    linearClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    linearClamp.MipLODBias = 0.0f;
-    linearClamp.MaxAnisotropy = 1;
-    linearClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    linearClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    linearClamp.MinLOD = 0.0f;
-    linearClamp.MaxLOD = D3D12_FLOAT32_MAX;
-    linearClamp.ShaderRegister = 3;
-    linearClamp.RegisterSpace = 0;
-    linearClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(linearClamp);
-
-    // Anisotropic wrap (s4)
-    D3D12_STATIC_SAMPLER_DESC anisotropicWrap = {};
-    anisotropicWrap.Filter = D3D12_FILTER_ANISOTROPIC;
-    anisotropicWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    anisotropicWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    anisotropicWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    anisotropicWrap.MipLODBias = 0.0f;
-    anisotropicWrap.MaxAnisotropy = 8;
-    anisotropicWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    anisotropicWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    anisotropicWrap.MinLOD = 0.0f;
-    anisotropicWrap.MaxLOD = D3D12_FLOAT32_MAX;
-    anisotropicWrap.ShaderRegister = 4;
-    anisotropicWrap.RegisterSpace = 0;
-    anisotropicWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(anisotropicWrap);
-
-    // Anisotropic clamp (s5)
-    D3D12_STATIC_SAMPLER_DESC anisotropicClamp = {};
-    anisotropicClamp.Filter = D3D12_FILTER_ANISOTROPIC;
-    anisotropicClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    anisotropicClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    anisotropicClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    anisotropicClamp.MipLODBias = 0.0f;
-    anisotropicClamp.MaxAnisotropy = 8;
-    anisotropicClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    anisotropicClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-    anisotropicClamp.MinLOD = 0.0f;
-    anisotropicClamp.MaxLOD = D3D12_FLOAT32_MAX;
-    anisotropicClamp.ShaderRegister = 5;
-    anisotropicClamp.RegisterSpace = 0;
-    anisotropicClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samplers.push_back(anisotropicClamp);
-
-    return samplers;
-}
 
 void D3DRenderAdapter::BuildRootSignatures()
 {
@@ -594,14 +560,12 @@ void D3DRenderAdapter::BuildRootSignatures()
             ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
         }
 
-        ComPtr<ID3D12RootSignature> rootSig;
         ThrowIfFailed(md3dDevice->CreateRootSignature(
             0,
             serializedRootSig->GetBufferPointer(),
             serializedRootSig->GetBufferSize(),
-            IID_PPV_ARGS(&rootSig)));
+            IID_PPV_ARGS(&mRootSignatures["standard"])));
 
-        mRootSignatures["standard"] = rootSig;
     }
 }
 
@@ -721,9 +685,10 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
         meshGPU->submeshes.push_back(gpuSubmesh);
     }
 
-    // Keep upload buffers alive until GPU finishes consuming them
-    mOwnedResources.push_back(vbUploadBuffer);
-    mOwnedResources.push_back(ibUploadBuffer);
+    // Store upload buffers in the mesh (will be disposed after GPU finishes)
+    meshGPU->vertexUploadBuffer = vbUploadBuffer;
+    meshGPU->indexUploadBuffer = ibUploadBuffer;
+    meshGPU->uploadCompleteFence = mCurrentFence + 1;  // Will be signaled after next flush
 
     // Store in geometry map
     MeshGPU* result = meshGPU.get();
@@ -795,12 +760,137 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
 
     // Draw this specific submesh
     mCommandList->DrawIndexedInstanced(
-        submesh.indexCount,    // IndexCountPerInstance
+        submesh.indexCount,     // IndexCountPerInstance
         1,                      // InstanceCount
-        submesh.indexOffset,   // StartIndexLocation
+        submesh.indexOffset,    // StartIndexLocation
         0,                      // BaseVertexLocation
         0                       // StartInstanceLocation
     );
+}
+
+void D3DRenderAdapter::CleanupMeshUploadBuffers()
+{
+    // Dispose upload buffers once GPU has finished processing them
+    for (auto& [meshId, meshGPU] : mGeometries)
+    {
+        // Only clean up if upload is marked complete and GPU has reached that fence
+        if (meshGPU->uploadCompleteFence > 0 && 
+            mFence->GetCompletedValue() >= meshGPU->uploadCompleteFence)
+        {
+            meshGPU->vertexUploadBuffer.Reset();
+            meshGPU->indexUploadBuffer.Reset();
+            meshGPU->uploadCompleteFence = 0;  // Mark as cleaned up
+        }
+    }
+}
+
+std::vector<D3D12_STATIC_SAMPLER_DESC> D3DRenderAdapter::GetStaticSamplers()
+{
+    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
+
+    // Point wrap (s0)
+    D3D12_STATIC_SAMPLER_DESC pointWrap = {};
+    pointWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    pointWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    pointWrap.MipLODBias = 0.0f;
+    pointWrap.MaxAnisotropy = 1;
+    pointWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    pointWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    pointWrap.MinLOD = 0.0f;
+    pointWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    pointWrap.ShaderRegister = 0;
+    pointWrap.RegisterSpace = 0;
+    pointWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(pointWrap);
+
+    // Point clamp (s1)
+    D3D12_STATIC_SAMPLER_DESC pointClamp = {};
+    pointClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    pointClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    pointClamp.MipLODBias = 0.0f;
+    pointClamp.MaxAnisotropy = 1;
+    pointClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    pointClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    pointClamp.MinLOD = 0.0f;
+    pointClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    pointClamp.ShaderRegister = 1;
+    pointClamp.RegisterSpace = 0;
+    pointClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(pointClamp);
+
+    // Linear wrap (s2)
+    D3D12_STATIC_SAMPLER_DESC linearWrap = {};
+    linearWrap.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    linearWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    linearWrap.MipLODBias = 0.0f;
+    linearWrap.MaxAnisotropy = 1;
+    linearWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    linearWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    linearWrap.MinLOD = 0.0f;
+    linearWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    linearWrap.ShaderRegister = 2;
+    linearWrap.RegisterSpace = 0;
+    linearWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(linearWrap);
+
+    // Linear clamp (s3)
+    D3D12_STATIC_SAMPLER_DESC linearClamp = {};
+    linearClamp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    linearClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    linearClamp.MipLODBias = 0.0f;
+    linearClamp.MaxAnisotropy = 1;
+    linearClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    linearClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    linearClamp.MinLOD = 0.0f;
+    linearClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    linearClamp.ShaderRegister = 3;
+    linearClamp.RegisterSpace = 0;
+    linearClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(linearClamp);
+
+    // Anisotropic wrap (s4)
+    D3D12_STATIC_SAMPLER_DESC anisotropicWrap = {};
+    anisotropicWrap.Filter = D3D12_FILTER_ANISOTROPIC;
+    anisotropicWrap.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    anisotropicWrap.MipLODBias = 0.0f;
+    anisotropicWrap.MaxAnisotropy = 8;
+    anisotropicWrap.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    anisotropicWrap.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    anisotropicWrap.MinLOD = 0.0f;
+    anisotropicWrap.MaxLOD = D3D12_FLOAT32_MAX;
+    anisotropicWrap.ShaderRegister = 4;
+    anisotropicWrap.RegisterSpace = 0;
+    anisotropicWrap.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(anisotropicWrap);
+
+    // Anisotropic clamp (s5)
+    D3D12_STATIC_SAMPLER_DESC anisotropicClamp = {};
+    anisotropicClamp.Filter = D3D12_FILTER_ANISOTROPIC;
+    anisotropicClamp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    anisotropicClamp.MipLODBias = 0.0f;
+    anisotropicClamp.MaxAnisotropy = 8;
+    anisotropicClamp.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    anisotropicClamp.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    anisotropicClamp.MinLOD = 0.0f;
+    anisotropicClamp.MaxLOD = D3D12_FLOAT32_MAX;
+    anisotropicClamp.ShaderRegister = 5;
+    anisotropicClamp.RegisterSpace = 0;
+    anisotropicClamp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplers.push_back(anisotropicClamp);
+
+    return samplers;
 }
 
 // End of file

@@ -2,6 +2,7 @@
 #include "Commons.h"
 #include "d3dUtils.h"
 #include "MathHelper.h"
+#include "FrameRes.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -27,6 +28,9 @@ public:
 
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex);
+
+    // Cleanup completed mesh uploads (dispose upload buffers once GPU finishes)
+    void CleanupMeshUploadBuffers();
 
     //void InitDirect3D();
     void CreateCommandObjects();
@@ -85,6 +89,12 @@ private:
     // Current material/transform state (set by SetMaterial/SetTransform)
     MaterialID mCurrentMaterial = 0;
     TransformComponent mCurrentTransform;
+
+    // Frame resource management (2 frames in flight for GPU-CPU sync)
+    static const int NumFrameResources = 2;
+    std::vector<std::unique_ptr<FrameRes>> mFrameResources;
+    int mCurrFrameResourceIndex = 0;
+    FrameRes* mCurrFrameResource = nullptr;
 
 public:
     // Create SRV from an already loaded ID3D12Resource (returns descriptor index)
