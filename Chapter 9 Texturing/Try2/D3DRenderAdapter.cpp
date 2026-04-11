@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "ResourceManager.h"
 
-#define DEBUG
+//#define DEBUG
 
 using namespace Microsoft::WRL;
 
@@ -189,6 +189,12 @@ void D3DRenderAdapter::BeginFrame()
         1.0f, 0, 0, nullptr);
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+
+    mCommandList->SetGraphicsRootConstantBufferView(3, mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+
 }
 
 // -------------------------------------------------------------
@@ -713,12 +719,13 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
     MeshGPU* meshGPU = GetMeshGPU(meshId);
     if (!meshGPU || meshGPU->submeshes.empty())
     {
+		//::OutputDebugStringA(L"Mesh not found or has no submeshes: " + std::to_wstring(meshId) + L"\n");
         return;
     }
 
     // Set graphics pipeline state and root signature (must be done before drawing)
-    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    //mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    //mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
 
     // Bind vertex and index buffers
     mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);

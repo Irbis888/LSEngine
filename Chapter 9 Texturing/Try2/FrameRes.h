@@ -18,19 +18,19 @@ using Microsoft::WRL::ComPtr;
 
 struct ObjectConstants
 {
-    DirectX::XMFLOAT4X4 World;        // 4x4 matrix
-    DirectX::XMFLOAT4X4 InvWorld;     // 4x4 matrix
-    DirectX::XMFLOAT4X4 TexTransform; // 4x4 matrix for texture coordinates
+    DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();        // 4x4 matrix
+    DirectX::XMFLOAT4X4 InvWorld = MathHelper::Identity4x4();     // 4x4 matrix
+    DirectX::XMFLOAT4X4 TexTransform = MathHelper::Identity4x4(); // 4x4 matrix for texture coordinates
 };
 
 struct PassConstants
 {
-    DirectX::XMFLOAT4X4 View;         // 4x4 matrix
-    DirectX::XMFLOAT4X4 InvView;      // 4x4 matrix
-    DirectX::XMFLOAT4X4 Proj;         // 4x4 matrix
-    DirectX::XMFLOAT4X4 InvProj;      // 4x4 matrix
-    DirectX::XMFLOAT4X4 ViewProj;     // 4x4 matrix
-    DirectX::XMFLOAT4X4 InvViewProj;  // 4x4 matrix
+    DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();         // 4x4 matrix
+    DirectX::XMFLOAT4X4 InvView = MathHelper::Identity4x4();      // 4x4 matrix
+    DirectX::XMFLOAT4X4 Proj = MathHelper::Identity4x4();         // 4x4 matrix
+    DirectX::XMFLOAT4X4 InvProj = MathHelper::Identity4x4();      // 4x4 matrix
+    DirectX::XMFLOAT4X4 ViewProj = MathHelper::Identity4x4();     // 4x4 matrix
+    DirectX::XMFLOAT4X4 InvViewProj = MathHelper::Identity4x4();  // 4x4 matrix
     DirectX::XMFLOAT3 EyePosW;        // Camera position in world space
     float cbPerObjectPad1;
     DirectX::XMFLOAT2 RenderTargetSize;      // Render target size
@@ -48,7 +48,7 @@ struct MaterialConstants
     DirectX::XMFLOAT4 DiffuseAlbedo;  // vec4 RGBA
     DirectX::XMFLOAT3 FresnelR0;      // vec3 for Fresnel reflection at 0 degrees
     float Roughness;                   // Roughness value for PBR
-    DirectX::XMFLOAT4X4 MatTransform; // 4x4 matrix for material texture transform
+    DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4(); // 4x4 matrix for material texture transform
 };
 
 // =========================================================================
