@@ -19,7 +19,7 @@ public:
 
                 // Передаём RenderAdapter
                 mAdapter->SetTransform(transform);
-                mAdapter->DrawIndexed(mesh.meshID, 0, 0);
+				mAdapter->DrawMesh(mesh.meshID);
             });
     }
 private:

@@ -24,10 +24,10 @@ public:
     ) override;
 
     // Draw a complete mesh with all its submeshes, binding appropriate material for each
-    void DrawMesh(MeshID meshId);
+    void DrawMesh(MeshID meshId) override;
 
     // Draw a specific submesh from a mesh
-    void DrawSubmesh(MeshID meshId, uint32_t submeshIndex);
+    void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
 
     // Cleanup completed mesh uploads (dispose upload buffers once GPU finishes)
     void CleanupMeshUploadBuffers();

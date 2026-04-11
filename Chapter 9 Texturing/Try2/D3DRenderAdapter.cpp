@@ -1,7 +1,10 @@
 #include "D3DRenderAdapter.h"
 
 #include <stdexcept>
+#include <assert.h>
 #include "ResourceManager.h"
+
+#define DEBUG
 
 using namespace Microsoft::WRL;
 
@@ -445,11 +448,6 @@ void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
 
     // Copy to GPU constant buffer (index 0 for now)
     mCurrFrameResource->ObjectCB->CopyData(0, objConstants);
-
-    // Bind object CBV to root parameter 2
-    D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress();
-    mCommandList->SetGraphicsRootConstantBufferView(2, objCBAddress);
-
     mCurrentTransform = world;
 }
 
@@ -718,9 +716,16 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
         return;
     }
 
+    // Set graphics pipeline state and root signature (must be done before drawing)
+    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+
     // Bind vertex and index buffers
     mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
     mCommandList->IASetIndexBuffer(&meshGPU->ibView);
+
+	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	mCommandList->SetGraphicsRootConstantBufferView(2, mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress());
 
     // Draw all submeshes with their respective materials
     for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
@@ -748,6 +753,10 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     {
         return;
     }
+
+    // Set graphics pipeline state and root signature (must be done before drawing)
+    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
 
     const auto& submesh = meshGPU->submeshes[submeshIndex];
 

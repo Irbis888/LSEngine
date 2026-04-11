@@ -43,6 +43,7 @@ public:
     virtual ~IRenderAdapter() = default;
 
     virtual void Init(void* windowHandle, uint32_t width, uint32_t height) = 0;
+    virtual void SetResourceManager(class ResourceManager* resourceManager) = 0;
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
 
@@ -55,6 +56,9 @@ public:
         uint32_t startIndex,
         int32_t baseVertex
     ) = 0;
+
+    virtual void DrawMesh(MeshID meshId) = 0;
+    virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
 };
 
 class ISystem

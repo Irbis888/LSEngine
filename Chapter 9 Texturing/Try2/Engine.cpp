@@ -2,6 +2,7 @@
 #include "RenderSystem.h"
 
 void Engine::Init() {
+	mRenderAdapter->SetResourceManager(&mResourceManager);
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 	mResourceManager.LoadMesh("../../Common/sponza.obj");
 
