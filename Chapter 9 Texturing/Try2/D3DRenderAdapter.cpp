@@ -173,7 +173,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
     float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
     const float fovY = DirectX::XM_PI / 4.0f;  // 45 degrees
     const float nearZ = 1.0f;
-    const float farZ = 1000.0f;
+    const float farZ = 1500.0f;
 
     DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ);
     DirectX::XMMATRIX projTranspose = DirectX::XMMatrixTranspose(proj);
@@ -210,7 +210,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
     mMainPassCB.DeltaTime = 0.0f;
 
     // Set default ambient light
-    mMainPassCB.AmbientLight = DirectX::XMFLOAT4(0.25f, 0.25f, 0.35f, 1.0f);
+    mMainPassCB.AmbientLight = DirectX::XMFLOAT4(0.75f, 0.75f, 0.85f, 1.0f);
 
     // Initialize lights to inactive (intensity 0)
     for (int i = 0; i < MaxLights; ++i)
@@ -221,7 +221,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
 
     // Add a default directional light
     mMainPassCB.Lights[0].Strength = DirectX::XMFLOAT3(0.9f, 0.9f, 0.9f);
-    mMainPassCB.Lights[0].Direction = DirectX::XMFLOAT3(-0.5773f, -0.5773f, -0.5773f);  // Normalized diagonal
+    mMainPassCB.Lights[0].Direction = DirectX::XMFLOAT3(-0.5773f, -0.5773f, 0.0f);  // Normalized diagonal
 
     // Copy to GPU constant buffer
     mCurrFrameResource->PassCB->CopyData(0, mMainPassCB);
@@ -606,8 +606,8 @@ void D3DRenderAdapter::BuildShadersAndInputLayout()
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 }
 

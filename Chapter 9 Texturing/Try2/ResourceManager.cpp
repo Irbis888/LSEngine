@@ -69,10 +69,16 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         aiMesh* aMesh = scene->mMeshes[m];
 
         Mesh::Submesh submesh;
-        submesh.indexOffset = indexOffset;
+
+        // старт индексов этого submesh в global index buffer
+        submesh.indexOffset = static_cast<uint32_t>(mesh.indices.size());
         submesh.material = materialIDs[aMesh->mMaterialIndex];
 
-        // --- ВЕРШИНЫ ---
+        uint32_t baseVertex = static_cast<uint32_t>(mesh.vertices.size());
+
+        // =========================
+        // VERTICES
+        // =========================
         for (unsigned int i = 0; i < aMesh->mNumVertices; ++i)
         {
             glm::vec3 pos(
@@ -91,15 +97,6 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
                 );
             }
 
-            glm::vec2 uv(0.0f);
-            if (aMesh->HasTextureCoords(0))
-            {
-                uv = glm::vec2(
-                    aMesh->mTextureCoords[0][i].x,
-                    aMesh->mTextureCoords[0][i].y
-                );
-            }
-
             glm::vec3 tangent(0.0f);
             if (aMesh->HasTangentsAndBitangents())
             {
@@ -110,19 +107,31 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
                 );
             }
 
+            glm::vec2 uv(0.0f);
+            if (aMesh->HasTextureCoords(0) && aMesh->mTextureCoords[0])
+            {
+                uv = glm::vec2(
+                    aMesh->mTextureCoords[0][i].x,
+                    aMesh->mTextureCoords[0][i].y
+                );
+            }
+
             mesh.vertices.emplace_back(pos, normal, tangent, uv);
         }
 
-        // --- ИНДЕКСЫ ---
+        // =========================
+        // INDICES
+        // =========================
         uint32_t localIndexCount = 0;
 
         for (unsigned int i = 0; i < aMesh->mNumFaces; ++i)
         {
             const aiFace& face = aMesh->mFaces[i];
 
+            // Assimp already triangulated
             for (unsigned int j = 0; j < face.mNumIndices; ++j)
             {
-                mesh.indices.push_back(face.mIndices[j] + vertexOffset);
+                mesh.indices.push_back(baseVertex + face.mIndices[j]);
                 localIndexCount++;
             }
         }
@@ -130,9 +139,6 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         submesh.indexCount = localIndexCount;
 
         mesh.submeshes.push_back(submesh);
-
-        vertexOffset += aMesh->mNumVertices;
-        indexOffset += localIndexCount;
     }
 
     MeshID id = gNextMeshID++;
