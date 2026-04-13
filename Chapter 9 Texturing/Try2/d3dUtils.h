@@ -23,6 +23,7 @@
 #include "d3dx12.h"
 #include "DDSTextureLoader.h"
 #include "../TexColumns/CustomBuffer.h"
+#include "DDSTextureLoader.h"
 #include <MathHelper.h>
 
 class d3dUtils
@@ -174,6 +175,9 @@ struct TextureGPU
 
     Microsoft::WRL::ComPtr<ID3D12Resource> Resource = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> UploadHeap = nullptr;
+
+    // Index into SRV heap for this texture
+    int SrvHeapIndex = -1;
 };
 
 struct Light

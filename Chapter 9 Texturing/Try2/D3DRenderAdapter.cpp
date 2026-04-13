@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <assert.h>
 #include "ResourceManager.h"
+#include "DDSTextureLoader.h"
 
 //#define DEBUG
 
@@ -147,6 +148,86 @@ void D3DRenderAdapter::CreateRtvAndDsvDescriptorHeaps()
 }
 
 // -------------------------------------------------------------
+// PASS CONSTANTS UPDATE
+// -------------------------------------------------------------
+
+void D3DRenderAdapter::UpdateMainPassCB()
+{
+    if (!mCurrFrameResource) return;
+
+    // Build view matrix (camera positioned above and looking at scene)
+    DirectX::XMVECTOR pos = DirectX::XMVectorSet(-1.0f, 11.0f, -20.0f, 1.0f);
+    DirectX::XMVECTOR target = DirectX::XMVectorSet(0.0f, 10.0f, 0.0f, 1.0f);
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
+    DirectX::XMMATRIX viewTranspose = DirectX::XMMatrixTranspose(view);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.View, viewTranspose);
+
+    // Compute inverse view
+    DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
+    DirectX::XMMATRIX invViewTranspose = DirectX::XMMatrixTranspose(invView);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.InvView, invViewTranspose);
+
+    // Build projection matrix (standard perspective)
+    float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    const float fovY = DirectX::XM_PI / 4.0f;  // 45 degrees
+    const float nearZ = 1.0f;
+    const float farZ = 1000.0f;
+
+    DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ);
+    DirectX::XMMATRIX projTranspose = DirectX::XMMatrixTranspose(proj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.Proj, projTranspose);
+
+    // Compute inverse projection
+    DirectX::XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, proj);
+    DirectX::XMMATRIX invProjTranspose = DirectX::XMMatrixTranspose(invProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.InvProj, invProjTranspose);
+
+    // Compute view-projection matrix
+    DirectX::XMMATRIX viewProj = DirectX::XMMatrixMultiply(view, proj);
+    DirectX::XMMATRIX viewProjTranspose = DirectX::XMMatrixTranspose(viewProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.ViewProj, viewProjTranspose);
+
+    // Compute inverse view-projection matrix
+    DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(nullptr, viewProj);
+    DirectX::XMMATRIX invViewProjTranspose = DirectX::XMMatrixTranspose(invViewProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.InvViewProj, invViewProjTranspose);
+
+    // Store camera position in world space
+    mMainPassCB.EyePosW = DirectX::XMFLOAT3(0.0f, 10.0f, -20.0f);
+
+    // Store render target dimensions
+    mMainPassCB.RenderTargetSize = DirectX::XMFLOAT2(static_cast<float>(mClientWidth), static_cast<float>(mClientHeight));
+    mMainPassCB.InvRenderTargetSize = DirectX::XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+
+    // Store near/far plane distances
+    mMainPassCB.NearZ = nearZ;
+    mMainPassCB.FarZ = farZ;
+
+    // Store timing information (placeholder - can be updated by caller if needed)
+    mMainPassCB.TotalTime = 0.0f;
+    mMainPassCB.DeltaTime = 0.0f;
+
+    // Set default ambient light
+    mMainPassCB.AmbientLight = DirectX::XMFLOAT4(0.25f, 0.25f, 0.35f, 1.0f);
+
+    // Initialize lights to inactive (intensity 0)
+    for (int i = 0; i < MaxLights; ++i)
+    {
+        mMainPassCB.Lights[i].Strength = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+        mMainPassCB.Lights[i].Direction = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);
+    }
+
+    // Add a default directional light
+    mMainPassCB.Lights[0].Strength = DirectX::XMFLOAT3(0.9f, 0.9f, 0.9f);
+    mMainPassCB.Lights[0].Direction = DirectX::XMFLOAT3(-0.5773f, -0.5773f, -0.5773f);  // Normalized diagonal
+
+    // Copy to GPU constant buffer
+    mCurrFrameResource->PassCB->CopyData(0, mMainPassCB);
+}
+
+// -------------------------------------------------------------
 // FRAME
 // -------------------------------------------------------------
 
@@ -168,6 +249,9 @@ void D3DRenderAdapter::BeginFrame()
     // Reset command allocator for this frame
     ThrowIfFailed(mCurrFrameResource->CmdListAlloc->Reset());
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
+
+    // Update pass constants for this frame
+    UpdateMainPassCB();
 
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -716,41 +800,66 @@ MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
 
 void D3DRenderAdapter::DrawMesh(MeshID meshId)
 {
-    MeshGPU* meshGPU = GetMeshGPU(meshId);
-    if (!meshGPU || meshGPU->submeshes.empty())
-    {
+	MeshGPU* meshGPU = GetMeshGPU(meshId);
+	if (!meshGPU || meshGPU->submeshes.empty())
+	{
 		//::OutputDebugStringA(L"Mesh not found or has no submeshes: " + std::to_wstring(meshId) + L"\n");
-        return;
-    }
+		return;
+	}
 
-    // Set graphics pipeline state and root signature (must be done before drawing)
-    //mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-    //mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+	// Set graphics pipeline state and root signature (must be done before drawing)
+	//mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+	//mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
 
-    // Bind vertex and index buffers
-    mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
-    mCommandList->IASetIndexBuffer(&meshGPU->ibView);
+	// Bind vertex and index buffers
+	mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
+	mCommandList->IASetIndexBuffer(&meshGPU->ibView);
 
 	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	mCommandList->SetGraphicsRootConstantBufferView(2, mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress());
 
-    // Draw all submeshes with their respective materials
-    for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
-    {
-        const auto& submesh = meshGPU->submeshes[i];
+	// Draw all submeshes with their respective materials
+	for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
+	{
+		const auto& submesh = meshGPU->submeshes[i];
 
-        // Set material for this submesh
-        SetMaterial(submesh.material);
+		// Get or load material (this will lazily load textures on first use)
+		MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
 
-        // Draw this submesh
-        mCommandList->DrawIndexedInstanced(
-            submesh.indexCount,    // IndexCountPerInstance
-            1,                      // InstanceCount
-            submesh.indexOffset,   // StartIndexLocation
-            0,                      // BaseVertexLocation
-            0                       // StartInstanceLocation
-        );
-    }
+		// Bind textures if available
+		if (matGPU)
+		{
+			// Bind descriptor heap for texture access
+			ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
+			mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
+
+			// Bind diffuse (albedo) texture if available
+			if (matGPU->DiffuseSrvHeapIndex >= 0)
+			{
+				D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
+				mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
+			}
+
+			// Bind normal texture if available
+			if (matGPU->NormalSrvHeapIndex >= 0)
+			{
+				D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
+				mCommandList->SetGraphicsRootDescriptorTable(1, normalSRV);
+			}
+
+			// Set material for this submesh
+			SetMaterial(submesh.material);
+		}
+
+		// Draw this submesh
+		mCommandList->DrawIndexedInstanced(
+			submesh.indexCount,    // IndexCountPerInstance
+			1,                      // InstanceCount
+			submesh.indexOffset,   // StartIndexLocation
+			0,                      // BaseVertexLocation
+			0                       // StartInstanceLocation
+		);
+	}
 }
 
 void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
@@ -771,8 +880,33 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
     mCommandList->IASetIndexBuffer(&meshGPU->ibView);
 
-    // Set material for this submesh
-    SetMaterial(submesh.material);
+    // Get or load material (this will lazily load textures on first use)
+    MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
+
+    // Bind textures if available
+    if (matGPU)
+    {
+        // Bind descriptor heap for texture access
+        ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
+        mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
+
+        // Bind diffuse (albedo) texture if available
+        if (matGPU->DiffuseSrvHeapIndex >= 0)
+        {
+            D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
+            mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
+        }
+
+        // Bind normal texture if available
+        if (matGPU->NormalSrvHeapIndex >= 0)
+        {
+            D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
+            mCommandList->SetGraphicsRootDescriptorTable(1, normalSRV);
+        }
+
+        // Set material for this submesh
+        SetMaterial(submesh.material);
+    }
 
     // Draw this specific submesh
     mCommandList->DrawIndexedInstanced(
@@ -782,6 +916,156 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
         0,                      // BaseVertexLocation
         0                       // StartInstanceLocation
     );
+}
+
+int D3DRenderAdapter::LoadTexture(const std::wstring& filename)
+{
+	std::wstring fn = L"../../Textures/" + filename; // Assuming textures are in this relative path
+    // Check if texture already loaded
+    std::string filenameStr;
+    size_t size = WideCharToMultiByte(CP_UTF8, 0, fn.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    filenameStr.resize(size - 1);
+    WideCharToMultiByte(CP_UTF8, 0, fn.c_str(), -1, &filenameStr[0], size, nullptr, nullptr);
+	//filenameStr = "../Textures/" + filenameStr; // Assuming textures are in this relative path
+
+    auto it = mTextures.find(filenameStr);
+    if (it != mTextures.end())
+    {
+        // Already loaded, return stored SRV index
+        return it->second->SrvHeapIndex;
+    }
+
+    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount)
+    {
+        return -1; // Descriptor heap full
+    }
+
+    auto textureGPU = std::make_unique<TextureGPU>();
+    textureGPU->Filename = fn;
+    textureGPU->Name = filenameStr;
+
+    // Load DDS texture using DirectX helper
+    ComPtr<ID3D12Resource> texture;
+    ComPtr<ID3D12Resource> uploadHeap;
+
+    HRESULT hr = DirectX::CreateDDSTextureFromFile12(
+        md3dDevice.Get(),
+        mCommandList.Get(),
+        fn.c_str(),
+        texture,
+        uploadHeap);
+
+    if (FAILED(hr))
+    {
+        return -1; // Failed to load texture
+    }
+
+    textureGPU->Resource = texture;
+    textureGPU->UploadHeap = uploadHeap;
+
+    // Create SRV for the texture
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Format = texture->GetDesc().Format;
+    srvDesc.Texture2D.MipLevels = (UINT)texture->GetDesc().MipLevels;
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(
+        mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
+        mNextCbvSrvIndex,
+        mCbvSrvUavDescriptorSize);
+
+    md3dDevice->CreateShaderResourceView(texture.Get(), &srvDesc, handle);
+
+    int srvHeapIndex = mNextCbvSrvIndex;
+    mNextCbvSrvIndex++;
+
+    // Store SRV index in TextureGPU
+    textureGPU->SrvHeapIndex = srvHeapIndex;
+
+    // Store texture
+    mTextures[filenameStr] = std::move(textureGPU);
+
+    // Keep upload heap alive in owned resources
+    mOwnedResources.push_back(uploadHeap);
+
+    return srvHeapIndex;
+}
+
+MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
+{
+    if (!mResourceManager)
+        return nullptr;
+
+    // Try to find existing GPU material
+    auto it = mMaterials.find(std::to_string((uint32_t)materialId));
+    if (it != mMaterials.end())
+    {
+        MaterialGPU* matGPU = it->second.get();
+        // Check if already fully loaded
+        if (matGPU->DiffuseSrvHeapIndex >= 0 || matGPU->NormalSrvHeapIndex >= 0)
+            return matGPU;
+    }
+
+    // Get CPU material data
+    Material& cpuMaterial = mResourceManager->GetMaterial(materialId);
+
+    // Create GPU material if not exists
+    std::string matKey = std::to_string((uint32_t)materialId);
+    if (mMaterials.find(matKey) == mMaterials.end())
+    {
+        mMaterials[matKey] = std::make_unique<MaterialGPU>();
+        mMaterials[matKey]->Name = cpuMaterial.name;
+        mMaterials[matKey]->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        mMaterials[matKey]->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+        mMaterials[matKey]->Roughness = cpuMaterial.roughness;
+    }
+
+    MaterialGPU* matGPU = mMaterials[matKey].get();
+
+    // Load albedo texture if present
+    if (cpuMaterial.albedo != 0)
+    {
+        try
+        {
+            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.albedo);
+            if (!cpuTexture.filename.empty())
+            {
+                int srvIndex = LoadTexture(cpuTexture.filename);
+                if (srvIndex >= 0)
+                {
+                    matGPU->DiffuseSrvHeapIndex = srvIndex;
+                }
+            }
+        }
+        catch (...)
+        {
+            // Texture not found or loading failed - leave as -1
+        }
+    }
+
+    // Load normal texture if present
+    if (cpuMaterial.normal != 0)
+    {
+        try
+        {
+            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.normal);
+            if (!cpuTexture.filename.empty())
+            {
+                int srvIndex = LoadTexture(cpuTexture.filename);
+                if (srvIndex >= 0)
+                {
+                    matGPU->NormalSrvHeapIndex = srvIndex;
+                }
+            }
+        }
+        catch (...)
+        {
+            // Texture not found or loading failed - leave as -1
+        }
+    }
+
+    return matGPU;
 }
 
 void D3DRenderAdapter::CleanupMeshUploadBuffers()

@@ -96,6 +96,9 @@ private:
     int mCurrFrameResourceIndex = 0;
     FrameRes* mCurrFrameResource = nullptr;
 
+	PassConstants mMainPassCB;
+
+
 public:
     // Create SRV from an already loaded ID3D12Resource (returns descriptor index)
     int CreateSRV(ID3D12Resource* resource);
@@ -125,6 +128,13 @@ public:
 
     std::unordered_map<std::string, std::unique_ptr<CustomBuffer>> mBuffers;
     std::unordered_map<std::string, std::vector<DXGI_FORMAT>> mBufferFormats;
+
+    // Update main pass constants (called every frame)
+    void UpdateMainPassCB();
+
+    // Texture loading (lazy loading similar to meshes)
+    int LoadTexture(const std::wstring& filename);
+    MaterialGPU* GetOrLoadMaterial(MaterialID materialId);
 
     // Build root signatures and PSOs
     void BuildShadersAndInputLayout();
