@@ -16,6 +16,7 @@ public:
     void SetTransform(const TransformComponent& world) override;
 
     void SetMaterial(MaterialID material) override;
+    void SetTimeData(float TotalTime, float DeltaTime) override;
 
     void DrawIndexed(
         uint32_t indexCount,
@@ -42,13 +43,16 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView()const;
     D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView()const;
 
-    void OnResize();
+    void OnResize(int width, int height) override;
 	void FlushCommandQueue();
 
 private:
     HWND      mhMainWnd = nullptr;
     int mClientWidth;
     int mClientHeight;
+
+	float mTotalTime = 0.0f;
+	float mDeltaTime = 0.0f;
 
     ComPtr<ID3D12Device> md3dDevice;
     ComPtr<IDXGIFactory4> mdxgiFactory;

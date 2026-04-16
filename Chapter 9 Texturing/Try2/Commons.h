@@ -46,6 +46,7 @@ public:
     virtual void SetResourceManager(class ResourceManager* resourceManager) = 0;
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
+    virtual void SetTimeData(float TotalTime, float DeltaTime) = 0;
 
     virtual void SetTransform(const TransformComponent& world) = 0;
 
@@ -59,6 +60,7 @@ public:
 
     virtual void DrawMesh(MeshID meshId) = 0;
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
+    virtual void OnResize(int width, int height) = 0;
 };
 
 class ISystem
@@ -67,7 +69,7 @@ public:
 	//ISystem();
 	virtual ~ISystem() = default;
 
-	virtual void Update(entt::registry& reg, float dt) {}
+	virtual void Update(entt::registry& reg, const GameTimer& gt) {}
 };
 
 

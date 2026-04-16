@@ -10,10 +10,11 @@ public:
     RenderSystem(IRenderAdapter* adapter)
         : mAdapter(adapter) {
     }
-    void Update(entt::registry& reg, float dt) override
+    void Update(entt::registry& reg, const GameTimer& gt) override
     {
-        reg.view<TransformComponent, MeshComponent>().each([this](auto& transform, auto& mesh)
+        reg.view<TransformComponent, MeshComponent>().each([this, &gt](auto& transform, auto& mesh)
             {
+				mAdapter->SetTimeData(gt.TotalTime(), gt.DeltaTime());
                 //auto& mesh = mResourceManager->GetMesh(MeshComponent.mesh);
                 //auto& material = mResourceManager->GetMaterial(MeshComponent.material);
 

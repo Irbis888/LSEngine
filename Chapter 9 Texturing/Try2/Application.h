@@ -39,7 +39,7 @@ protected:
 
     virtual void OnResize();
     virtual void Update(const GameTimer& gt) = 0;
-    virtual void PhysicsUpdate(float dt) = 0;
+    virtual void PhysicsUpdate(const GameTimer& gt, float dt) = 0;
     virtual void Draw(const GameTimer& gt) = 0;
 
     // Convenience overrides for handling mouse input.

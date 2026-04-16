@@ -766,6 +766,7 @@ void TexColumnsApp::UpdateCamera(const GameTimer& gt)
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 	XMVECTOR campos = cam.GetPosition();
+	
 	pos = XMVectorSet(campos.m128_f32[0], campos.m128_f32[1], campos.m128_f32[2], 0.0f);
 	target = cam.GetLook();
 	up = cam.GetUp();

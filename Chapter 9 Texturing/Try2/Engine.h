@@ -20,9 +20,9 @@ public:
         : mRenderAdapter(renderer) {
     };
 
-	void Init();
+	void Init(const GameTimer& gt);
 	void Update(const GameTimer& gt);
-	void PhysicsUpdate(float dt);
+	void PhysicsUpdate(const GameTimer& gt, float dt);
 	void Draw(const GameTimer& gt);
 };
 

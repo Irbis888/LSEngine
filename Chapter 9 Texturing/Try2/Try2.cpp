@@ -25,7 +25,7 @@ public:
 private:
     //virtual void Init()override;
     virtual void Update(const GameTimer& gt)override;
-    virtual void PhysicsUpdate(float dt)override;
+    virtual void PhysicsUpdate(const GameTimer& gt, float dt)override;
     virtual void Draw(const GameTimer& gt)override;
 };
 
@@ -33,11 +33,13 @@ TestApp::TestApp(HINSTANCE hInstance)
     : Application(hInstance)
 {
 }
-void TestApp::PhysicsUpdate(float dt)
+
+
+void TestApp::PhysicsUpdate(const GameTimer& gt, float dt)
 {
     
     //std::cout << "Physics tick: " << dt << " seconds\n";
-    mEngine->PhysicsUpdate(dt);
+    mEngine->PhysicsUpdate(gt, dt);
 }
 void TestApp::Update(const GameTimer& gt)
 {

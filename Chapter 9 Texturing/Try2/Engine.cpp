@@ -1,7 +1,7 @@
 #include "Engine.h"
 #include "RenderSystem.h"
 
-void Engine::Init() {
+void Engine::Init(const GameTimer& gt) {
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 	mResourceManager.LoadMesh("../../Common/sponza.obj");
@@ -22,14 +22,14 @@ void Engine::Update(const GameTimer& gt)
 {
 	for (auto& system : updateSystems)
 	{
-		system->Update(world.registry, gt.DeltaTime());
+		system->Update(world.registry, gt);
 	}
 }
-void Engine::PhysicsUpdate(float dt)
+void Engine::PhysicsUpdate(const GameTimer& gt, float dt)
 {
 	for (auto& system : physicsSystems)
 	{
-		system->Update(world.registry, dt);
+		system->Update(world.registry, gt);
 	}
 }
 
@@ -37,7 +37,7 @@ void Engine::Draw(const GameTimer& gt)
 {
 	for (auto& system : renderSystems)
 	{
-		system->Update(world.registry, gt.DeltaTime());
+		system->Update(world.registry, gt);
 	}
 }
 

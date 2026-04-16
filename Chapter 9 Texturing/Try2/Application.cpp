@@ -108,7 +108,7 @@ int Application::Run()
 
 			while (accumulator >= fixed_dt && steps < maxSteps)
 			{
-				PhysicsUpdate(fixed_dt);
+				PhysicsUpdate(mTimer, fixed_dt);
 				accumulator -= fixed_dt;
 				steps++;
 			}
@@ -164,7 +164,7 @@ bool Application::Initialize()
 
 	// Do the initial resize code.
 	mEngine = std::make_unique<Engine>(mRenderAdapter.get());
-	mEngine->Init();
+	mEngine->Init(mTimer);
 
 	OnResize();
 
@@ -172,7 +172,9 @@ bool Application::Initialize()
 }
 void Application::OnResize()
 {
-	
+	if (!mRenderAdapter)
+		return;
+	mRenderAdapter->OnResize(mClientWidth, mClientHeight);
 }
 
 LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)

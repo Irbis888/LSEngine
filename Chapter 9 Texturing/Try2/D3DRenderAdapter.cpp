@@ -79,7 +79,7 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     mCurrFrameResourceIndex = 0;
     mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
 
-    OnResize();
+    OnResize(mClientHeight, mClientWidth);
 }
 
 // -------------------------------------------------------------
@@ -157,7 +157,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
 
     // Build view matrix (camera positioned above and looking at scene)
     DirectX::XMVECTOR pos = DirectX::XMVectorSet(-1.0f, 11.0f, -20.0f, 1.0f);
-    DirectX::XMVECTOR target = DirectX::XMVectorSet(0.0f, 10.0f, 0.0f, 1.0f);
+    DirectX::XMVECTOR target = DirectX::XMVectorSet(cos(mTotalTime*0) - 1.0f, 11.0f, 0.0f + sin(mTotalTime*0) - 20.0f, 1.0f);
     DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(pos, target, up);
@@ -171,7 +171,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
 
     // Build projection matrix (standard perspective)
     float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
-    const float fovY = DirectX::XM_PI / 4.0f;  // 45 degrees
+    const float fovY = DirectX::XM_PI / 2.0f;  // 45 degrees
     const float nearZ = 1.0f;
     const float farZ = 1500.0f;
 
@@ -315,7 +315,7 @@ void D3DRenderAdapter::EndFrame()
 // RESIZE (минимальный)
 // -------------------------------------------------------------
 
-void D3DRenderAdapter::OnResize()
+void D3DRenderAdapter::OnResize(int width, int height)
 {
     assert(md3dDevice);
     assert(mSwapChain);
@@ -325,6 +325,9 @@ void D3DRenderAdapter::OnResize()
     FlushCommandQueue();
 
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+
+	mClientHeight = height;
+	mClientWidth = width;
 
     // Release the previous resources we will be recreating.
     for (int i = 0; i < SwapChainBufferCount; ++i)
@@ -337,6 +340,7 @@ void D3DRenderAdapter::OnResize()
         mClientWidth, mClientHeight,
         mBackBufferFormat,
         DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
+	std::cout << "Swap chain resized to " << mClientWidth << "x" << mClientHeight << std::endl;
 
     mCurrBackBuffer = 0;
 
@@ -571,6 +575,12 @@ void D3DRenderAdapter::SetMaterial(MaterialID material) {
     mCommandList->SetGraphicsRootConstantBufferView(4, matCBAddress);
 
     mCurrentMaterial = material;
+}
+
+void D3DRenderAdapter::SetTimeData(float TotalTime, float DeltaTime)
+{
+	mTotalTime = TotalTime;
+	mDeltaTime = DeltaTime;
 }
 
 void D3DRenderAdapter::DrawIndexed(
