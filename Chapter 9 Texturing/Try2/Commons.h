@@ -35,6 +35,21 @@ struct MeshComponent
 {
 	MeshID meshID;
 };
+struct CameraComponent
+{
+    float fov;           // Field of view in degrees
+    float nearZ;         // Near plane distance
+    float farZ;          // Far plane distance
+    float aspectRatio;   // Width/Height ratio
+
+    // Cached matrices (updated by CameraControlSystem)
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
+};
+
+
+
+
 
 class IRenderAdapter
 {
@@ -49,6 +64,8 @@ public:
     virtual void SetTimeData(float TotalTime, float DeltaTime) = 0;
 
     virtual void SetTransform(const TransformComponent& world) = 0;
+    virtual void SetCamera(const CameraComponent& camera, const TransformComponent& transform) = 0;
+    virtual void UpdCB() = 0;
 
     virtual void SetMaterial(MaterialID material) = 0;
 
@@ -61,6 +78,8 @@ public:
     virtual void DrawMesh(MeshID meshId) = 0;
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
     virtual void OnResize(int width, int height) = 0;
+
+
 };
 
 class ISystem

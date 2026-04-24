@@ -134,6 +134,7 @@
     <ClCompile Include="..\..\Common\GameTimer.cpp" />
     <ClCompile Include="..\..\Common\MathHelper.cpp" />
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="CameraSystem.cpp" />
     <ClCompile Include="Commons.cpp" />
     <ClCompile Include="D3DRenderAdapter.cpp" />
     <ClCompile Include="d3dUtils.cpp" />
@@ -149,6 +150,7 @@
     <ClInclude Include="..\..\Common\GameTimer.h" />
     <ClInclude Include="..\..\Common\MathHelper.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="CameraSystem.h" />
     <ClInclude Include="Commons.h" />
     <ClInclude Include="D3DRenderAdapter.h" />
     <ClInclude Include="d3dUtils.h" />

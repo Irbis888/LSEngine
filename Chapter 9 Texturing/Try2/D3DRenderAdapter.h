@@ -14,6 +14,7 @@ public:
     void EndFrame() override;
 
     void SetTransform(const TransformComponent& world) override;
+    void SetCamera(const CameraComponent& camera, const TransformComponent& transform) override;
 
     void SetMaterial(MaterialID material) override;
     void SetTimeData(float TotalTime, float DeltaTime) override;
@@ -135,6 +136,8 @@ public:
 
     // Update main pass constants (called every frame)
     void UpdateMainPassCB();
+    void UpdCB();
+
 
     // Texture loading (lazy loading similar to meshes)
     int LoadTexture(const std::wstring& filename);

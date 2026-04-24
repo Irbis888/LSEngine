@@ -155,7 +155,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
 {
     if (!mCurrFrameResource) return;
 
-    // Build view matrix (camera positioned above and looking at scene)
+    /*// Build view matrix (camera positioned above and looking at scene)
     DirectX::XMVECTOR pos = DirectX::XMVectorSet(-1.0f, 11.0f, -20.0f, 1.0f);
     DirectX::XMVECTOR target = DirectX::XMVectorSet(cos(mTotalTime*0) - 1.0f, 11.0f, 0.0f + sin(mTotalTime*0) - 20.0f, 1.0f);
     DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -203,11 +203,11 @@ void D3DRenderAdapter::UpdateMainPassCB()
 
     // Store near/far plane distances
     mMainPassCB.NearZ = nearZ;
-    mMainPassCB.FarZ = farZ;
+    mMainPassCB.FarZ = farZ;*/
 
     // Store timing information (placeholder - can be updated by caller if needed)
-    mMainPassCB.TotalTime = 0.0f;
-    mMainPassCB.DeltaTime = 0.0f;
+    mMainPassCB.TotalTime = mTotalTime;
+    mMainPassCB.DeltaTime = mDeltaTime;
 
     // Set default ambient light
     mMainPassCB.AmbientLight = DirectX::XMFLOAT4(0.75f, 0.75f, 0.85f, 1.0f);
@@ -225,6 +225,11 @@ void D3DRenderAdapter::UpdateMainPassCB()
 
     // Copy to GPU constant buffer
     mCurrFrameResource->PassCB->CopyData(0, mMainPassCB);
+}
+
+void D3DRenderAdapter::UpdCB()
+{
+	UpdateMainPassCB();
 }
 
 // -------------------------------------------------------------
@@ -251,7 +256,7 @@ void D3DRenderAdapter::BeginFrame()
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
 
     // Update pass constants for this frame
-    UpdateMainPassCB();
+    //UpdateMainPassCB();
 
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -543,6 +548,82 @@ void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
     // Copy to GPU constant buffer (index 0 for now)
     mCurrFrameResource->ObjectCB->CopyData(0, objConstants);
     mCurrentTransform = world;
+}
+
+void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformComponent& transform)
+{
+    // Build view matrix (camera positioned above and looking at scene)
+    glm::vec3 camPos = transform.position;
+    glm::vec3 camRot = transform.rotation; // (pitch, yaw, roll) в радианах
+
+    using namespace DirectX;
+
+    // позиция
+    XMVECTOR pos = XMVectorSet(camPos.x, camPos.y, camPos.z, 1.0f);
+
+    // rotation matrix
+    XMMATRIX rot = XMMatrixRotationRollPitchYaw(
+        camRot.x, // pitch (X)
+        camRot.y, // yaw (Y)
+        camRot.z  // roll (Z)
+    );
+
+    // базовые направления
+    XMVECTOR forward = XMVectorSet(0, 0, 1, 0);
+    XMVECTOR upDir = XMVectorSet(0, 1, 0, 0);
+
+    // поворачиваем направления
+    forward = XMVector3TransformNormal(forward, rot);
+    upDir = XMVector3TransformNormal(upDir, rot);
+
+    // target = pos + forward
+    XMVECTOR target = XMVectorAdd(pos, forward);
+
+    // view
+    XMMATRIX view = XMMatrixLookAtLH(pos, target, upDir);
+
+    // transpose если нужно в шейдер
+    XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
+
+    // inverse
+    XMMATRIX invView = XMMatrixInverse(nullptr, view);
+    XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
+
+    // Build projection matrix (standard perspective)
+    float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    const float fovY = camera.fov;
+    const float nearZ = camera.nearZ;
+    const float farZ = camera.farZ;
+
+    DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ);
+    DirectX::XMMATRIX projTranspose = DirectX::XMMatrixTranspose(proj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.Proj, projTranspose);
+
+    // Compute inverse projection
+    DirectX::XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, proj);
+    DirectX::XMMATRIX invProjTranspose = DirectX::XMMatrixTranspose(invProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.InvProj, invProjTranspose);
+
+    // Compute view-projection matrix
+    DirectX::XMMATRIX viewProj = DirectX::XMMatrixMultiply(view, proj);
+    DirectX::XMMATRIX viewProjTranspose = DirectX::XMMatrixTranspose(viewProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.ViewProj, viewProjTranspose);
+
+    // Compute inverse view-projection matrix
+    DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(nullptr, viewProj);
+    DirectX::XMMATRIX invViewProjTranspose = DirectX::XMMatrixTranspose(invViewProj);
+    DirectX::XMStoreFloat4x4(&mMainPassCB.InvViewProj, invViewProjTranspose);
+
+    // Store camera position in world space
+    mMainPassCB.EyePosW = DirectX::XMFLOAT3(camPos.x, camPos.y, camPos.z);
+
+    // Store render target dimensions
+    mMainPassCB.RenderTargetSize = DirectX::XMFLOAT2(static_cast<float>(mClientWidth), static_cast<float>(mClientHeight));
+    mMainPassCB.InvRenderTargetSize = DirectX::XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+
+    // Store near/far plane distances
+    mMainPassCB.NearZ = nearZ;
+    mMainPassCB.FarZ = farZ;
 }
 
 void D3DRenderAdapter::SetMaterial(MaterialID material) {
