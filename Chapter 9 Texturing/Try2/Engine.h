@@ -21,27 +21,7 @@ public:
     };
 
 	void Init(const GameTimer& gt);
-	void Update(const GameTimer& gt);
-	void PhysicsUpdate(const GameTimer& gt, float dt);
-	void Draw(const GameTimer& gt);
+	void Update(const FrameContext& context);
+	void PhysicsUpdate(const FrameContext& context);
+	void Draw(const FrameContext& context);
 };
-
-/*class ConsoleRenderAdapter : public IRenderAdapter
-{
-public:
-    void BeginFrame() override
-    {
-        std::cout << "=== Begin Frame ===\n";
-    }
-    void EndFrame() override
-    {
-        std::cout << "=== End Frame ===\n\n";
-    }
-    void DrawIndexed(const MeshComponent mesh, TransformComponent& transform) override
-    {
-        std::cout << "Drawing mesh '" << mesh.meshID
-            << "' at (" << transform.position.x << ", "
-            << transform.position.y << ", "
-            << transform.position.z << ")\n";
-    }
-};*/

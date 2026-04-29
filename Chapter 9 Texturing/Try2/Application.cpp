@@ -106,9 +106,14 @@ int Application::Run()
 			int steps = 0;
 			const int maxSteps = 5;
 
+			mFrameContext.physDT = fixed_dt;
+			mFrameContext.timer = mTimer;
+			mFrameContext.input = mInput;
+
+
 			while (accumulator >= fixed_dt && steps < maxSteps)
 			{
-				PhysicsUpdate(mTimer, fixed_dt);
+				PhysicsUpdate(mFrameContext);
 				accumulator -= fixed_dt;
 				steps++;
 			}
@@ -141,8 +146,9 @@ int Application::Run()
 				}
 				//CalculateFrameStats();
 				mRenderAdapter->BeginFrame();
-				Update(mTimer);
-				Draw(mTimer);
+				FrameContext context{ mTimer, InputState(), 0.0f };
+				Update(mFrameContext);
+				Draw(mFrameContext);
 				mRenderAdapter->EndFrame();
 			}
 			else
@@ -162,7 +168,6 @@ bool Application::Initialize()
 	mRenderAdapter = Application::CreateRenderer(mRenderAPI);
 	mRenderAdapter->Init(mhMainWnd, mClientWidth, mClientHeight);
 
-	// Do the initial resize code.
 	mEngine = std::make_unique<Engine>(mRenderAdapter.get());
 	mEngine->Init(mTimer);
 
@@ -302,7 +307,11 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_KEYDOWN:
 		if (!(lParam & 0x40000000)) {
-			OnKeyPressed(mTimer, wParam);
+			//OnKeyPressed(mTimer, wParam);
+			if (!mInput.keys[wParam])
+				mInput.keysPressed[wParam] = true;
+
+			mInput.keys[wParam] = true;
 		}
 		return 0;
 	case WM_MOUSEWHEEL:
@@ -316,7 +325,11 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		else if ((int)wParam == VK_F2)
 			Set4xMsaaState(!m4xMsaaState);
 		else
-			OnKeyReleased(mTimer, wParam);
+		{
+			mInput.keys[wParam] = false;
+			mInput.keysReleased[wParam] = true;
+			//break;
+		}
 
 		return 0;
 	}

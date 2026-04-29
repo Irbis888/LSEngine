@@ -21,6 +21,37 @@ using MeshID = uint32_t;
 using MaterialID = uint32_t;
 using TextureID = uint32_t;
 
+
+struct InputState
+{
+    // is_pressed 
+    bool keys[256] = {};
+
+	// is_just_pressed 
+    bool keysPressed[256] = {};
+    bool keysReleased[256] = {};
+
+    // мышь
+    float mouseDeltaX = 0.0f;
+    float mouseDeltaY = 0.0f;
+
+    int mouseX = 0;
+    int mouseY = 0;
+
+    bool firstMouse = true;
+};
+
+
+struct FrameContext
+{
+    GameTimer& timer;
+    InputState input;
+
+    float physDT;
+};
+
+
+
 struct TransformComponent
 {
 	glm::vec3 position;
@@ -46,7 +77,6 @@ struct CameraComponent
     glm::mat4 viewMatrix;
     glm::mat4 projMatrix;
 };
-
 
 
 

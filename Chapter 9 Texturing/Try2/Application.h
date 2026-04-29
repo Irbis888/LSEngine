@@ -12,6 +12,8 @@ enum class RenderAPI
     Vulkan
 };
 
+
+
 class Application
 {
 protected:
@@ -38,9 +40,9 @@ public:
 protected:
 
     virtual void OnResize();
-    virtual void Update(const GameTimer& gt) = 0;
-    virtual void PhysicsUpdate(const GameTimer& gt, float dt) = 0;
-    virtual void Draw(const GameTimer& gt) = 0;
+    virtual void Update(const FrameContext& context) = 0;
+    virtual void PhysicsUpdate(const FrameContext& context) = 0;
+    virtual void Draw(const FrameContext& context) = 0;
 
     // Convenience overrides for handling mouse input.
     virtual void OnMouseDown(WPARAM btnState, int x, int y) {}
@@ -77,6 +79,8 @@ protected:
 
     // Used to keep track of the “delta-time” and game time (§4.4).
     GameTimer mTimer;
+	InputState mInput;
+	FrameContext mFrameContext{ mTimer, mInput, 0.0f };
 
     
     UINT64 mCurrentFence = 0;

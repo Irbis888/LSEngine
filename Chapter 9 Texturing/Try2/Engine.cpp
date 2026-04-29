@@ -24,26 +24,26 @@ void Engine::Init(const GameTimer& gt) {
 
 
 }
-void Engine::Update(const GameTimer& gt)
+void Engine::Update(const FrameContext& context)
 {
 	for (auto& system : updateSystems)
 	{
-		system->Update(world.registry, gt);
+		system->Update(world.registry, context.timer);
 	}
 }
-void Engine::PhysicsUpdate(const GameTimer& gt, float dt)
+void Engine::PhysicsUpdate(const FrameContext& context)
 {
 	for (auto& system : physicsSystems)
 	{
-		system->Update(world.registry, gt);
+		system->Update(world.registry, context.timer);
 	}
 }
 
-void Engine::Draw(const GameTimer& gt)
+void Engine::Draw(const FrameContext& context)
 {
 	for (auto& system : renderSystems)
 	{
-		system->Update(world.registry, gt);
+		system->Update(world.registry, context.timer);
 	}
 }
 
