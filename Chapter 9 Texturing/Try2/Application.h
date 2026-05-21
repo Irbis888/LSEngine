@@ -44,16 +44,6 @@ protected:
     virtual void PhysicsUpdate(const FrameContext& context) = 0;
     virtual void Draw(const FrameContext& context) = 0;
 
-    // Convenience overrides for handling mouse input.
-    virtual void OnMouseDown(WPARAM btnState, int x, int y) {}
-    virtual void OnMouseUp(WPARAM btnState, int x, int y) {}
-    virtual void OnMouseMove(WPARAM btnState, int x, int y) {}
-    virtual void MoveBackFwd(float step) {};
-    virtual void MoveLeftRight(float step) {};
-    virtual void MoveUpDown(float step) {};
-    virtual void OnKeyPressed(const GameTimer& gt, WPARAM key) {};
-    virtual void OnKeyReleased(const GameTimer& gt, WPARAM key) {};
-    //virtual std::wstring GetCamSpeed() { return L""; };
 protected:
 
     bool InitMainWindow();

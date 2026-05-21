@@ -88,6 +88,7 @@ int Application::Run()
 
 	mTimer.Reset();
 	float accumulator = 0.0f; // physics timer
+	
 	while (msg.message != WM_QUIT)
 	{
 		// If there are Window messages then process them.
@@ -120,36 +121,22 @@ int Application::Run()
 
 			if (true)
 			{
-				if (GetAsyncKeyState('W') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'W');
-				}
-				if (GetAsyncKeyState('S') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'S');
-				}
-				if (GetAsyncKeyState('A') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'A');
-				}
-				if (GetAsyncKeyState('D') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'D');
-				}
-				if (GetAsyncKeyState('E') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'E');
-				}
-				if (GetAsyncKeyState('Q') & 0x8000)
-				{
-					OnKeyPressed(mTimer, 'Q');
-				}
+
+
 				//CalculateFrameStats();
 				mRenderAdapter->BeginFrame();
 				FrameContext context{ mTimer, InputState(), 0.0f };
 				Update(mFrameContext);
 				Draw(mFrameContext);
 				mRenderAdapter->EndFrame();
+				memset(mInput.keysPressed, 0, sizeof(bool) * 256);
+				memset(mInput.keysReleased, 0, sizeof(bool) * 256);
+				memset(mInput.mouseButtonsPressed, 0, sizeof(bool) * 8);
+				memset(mInput.mouseButtonsReleased, 0, sizeof(bool) * 8);
+				mInput.mouseWheelDelta = 0.0f;
+				mInput.mouseDeltaX = 0.0f;
+				mInput.mouseDeltaY = 0.0f;
+
 			}
 			else
 			{
@@ -293,18 +280,74 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_LBUTTONDOWN:
+	{
+		mInput.mouseButtons[0] = true;
+		mInput.mouseButtonsPressed[0] = true;
+		return 0;
+	}
+
 	case WM_MBUTTONDOWN:
+	{
+		mInput.mouseButtons[1] = true;
+		mInput.mouseButtonsPressed[1] = true;
+		return 0;
+	}
+
 	case WM_RBUTTONDOWN:
-		OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+	{
+		mInput.mouseButtons[2] = true;
+		mInput.mouseButtonsPressed[2] = true;
 		return 0;
+	}
+
 	case WM_LBUTTONUP:
+	{
+		mInput.mouseButtons[0] = false;
+		mInput.mouseButtonsReleased[0] = true;
+		return 0;
+	}
+
 	case WM_MBUTTONUP:
+	{
+		mInput.mouseButtons[1] = false;
+		mInput.mouseButtonsReleased[1] = true;
+		return 0;
+	}
+
 	case WM_RBUTTONUP:
-		OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+	{
+		mInput.mouseButtons[2] = false;
+		mInput.mouseButtonsReleased[2] = true;
 		return 0;
+	}
+
 	case WM_MOUSEMOVE:
-		OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+	{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+
+		if (mInput.firstMouse)
+		{
+			mInput.mouseX = x;
+			mInput.mouseY = y;
+			mInput.firstMouse = false;
+		}
+
+		mInput.mouseDeltaX = float(x - mInput.mouseX);
+		mInput.mouseDeltaY = float(y - mInput.mouseY);
+
+		mInput.mouseX = x;
+		mInput.mouseY = y;
+
 		return 0;
+	}
+	case WM_MOUSEWHEEL:
+	{
+		mInput.mouseWheelDelta =
+			(float)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
+
+		return 0;
+	}
 	case WM_KEYDOWN:
 		if (!(lParam & 0x40000000)) {
 			//OnKeyPressed(mTimer, wParam);
@@ -314,9 +357,9 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			mInput.keys[wParam] = true;
 		}
 		return 0;
-	case WM_MOUSEWHEEL:
+	/*case WM_MOUSEWHEEL:
 		OnKeyPressed(mTimer, wParam);
-		return 0;
+		return 0;*/
 	case WM_KEYUP:
 		if (wParam == VK_ESCAPE)
 		{

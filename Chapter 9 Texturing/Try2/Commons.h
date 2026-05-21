@@ -32,6 +32,12 @@ struct InputState
     bool keysReleased[256] = {};
 
     // мышь
+    bool mouseButtons[8] = {};
+    bool mouseButtonsPressed[8] = {};
+    bool mouseButtonsReleased[8] = {};
+
+    float mouseWheelDelta = 0.0f;
+
     float mouseDeltaX = 0.0f;
     float mouseDeltaY = 0.0f;
 
@@ -118,7 +124,7 @@ public:
 	//ISystem();
 	virtual ~ISystem() = default;
 
-	virtual void Update(entt::registry& reg, const GameTimer& gt) {}
+	virtual void Update(entt::registry& reg, const FrameContext& context) {}
 };
 
 
