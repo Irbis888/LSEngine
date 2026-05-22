@@ -51,6 +51,13 @@ struct RigidbodyComponent
     }
 };
 
+enum class ColliderBoundsDebugMode
+{
+    None,
+    All,
+    SelectedOnly
+};
+
 struct ColliderComponent
 {
     ColliderType type = ColliderType::AABB;

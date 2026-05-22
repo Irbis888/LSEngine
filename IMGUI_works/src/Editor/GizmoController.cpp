@@ -133,3 +133,23 @@ void Editor_DrawGizmoToolbar(EditorContext& ctx)
     ImGui::Checkbox("Local space##gizmo", &ctx.gizmoLocal);
     ImGui::SetItemTooltip("When checked, gizmo uses object axes. Off = world axes.");
 }
+
+void Editor_DrawColliderBoundsDebug(EditorContext& ctx)
+{
+    ImGui::Text("Bounds:");
+    ImGui::SameLine();
+
+    if (ImGui::RadioButton("Off##colliderBounds", ctx.colliderBoundsDebug == ColliderBoundsDebugMode::None))
+        ctx.colliderBoundsDebug = ColliderBoundsDebugMode::None;
+    ImGui::SetItemTooltip("Do not draw physics collider wireframes.");
+
+    ImGui::SameLine();
+    if (ImGui::RadioButton("All##colliderBounds", ctx.colliderBoundsDebug == ColliderBoundsDebugMode::All))
+        ctx.colliderBoundsDebug = ColliderBoundsDebugMode::All;
+    ImGui::SetItemTooltip("Draw wireframe AABB for every entity with a collider.");
+
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Selected##colliderBounds", ctx.colliderBoundsDebug == ColliderBoundsDebugMode::SelectedOnly))
+        ctx.colliderBoundsDebug = ColliderBoundsDebugMode::SelectedOnly;
+    ImGui::SetItemTooltip("Draw wireframe only for the selected entity (if it has a collider).");
+}

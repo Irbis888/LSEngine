@@ -139,6 +139,7 @@ static void DrawLegendPanel(EditorContext& ctx)
             row("Edit", "Editor mode — design time, no physics.");
             row("Play", "Run mode — physics and simulation active.");
             row("Restore on Stop", "Debug option — reload snapshot when Stop is pressed.");
+            row("Collider bounds", "Debug/gizmo: Off, All, or Selected wireframe AABBs.");
             row("Restore Snapshot", "Manual reload of EditorPlaySnapshot.json.");
             row("Licensed", "Internal term: .imgui_on file present; editor allowed to run.");
 

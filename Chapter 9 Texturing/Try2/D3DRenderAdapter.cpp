@@ -1,6 +1,7 @@
 #include "D3DRenderAdapter.h"
 
 #include <stdexcept>
+#include <vector>
 #include <assert.h>
 #include "ResourceManager.h"
 #include "DDSTextureLoader.h"
@@ -70,6 +71,7 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     BuildRootSignatures();
     BuildShadersAndInputLayout();
     BuildPSOs();
+    BuildColliderBoxGeometry();
 
     // Create frame resources (one per frame in flight)
     for (int i = 0; i < NumFrameResources; ++i)
@@ -828,12 +830,23 @@ void D3DRenderAdapter::BuildShadersAndInputLayout()
     mShaders["standardPS"] = d3dUtils::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
     if (!mShaders["standardPS"]) throw std::runtime_error("Failed to compile pixel shader");
 
+    mShaders["colliderDebugVS"] = d3dUtils::CompileShader(L"Shaders\\BoundingBoxDebug.hlsl", nullptr, "VSMain", "vs_5_1");
+    if (!mShaders["colliderDebugVS"]) throw std::runtime_error("Failed to compile collider debug vertex shader");
+
+    mShaders["colliderDebugPS"] = d3dUtils::CompileShader(L"Shaders\\BoundingBoxDebug.hlsl", nullptr, "PSMain", "ps_5_1");
+    if (!mShaders["colliderDebugPS"]) throw std::runtime_error("Failed to compile collider debug pixel shader");
+
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    mColliderDebugInputLayout =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 }
 
@@ -881,6 +894,32 @@ void D3DRenderAdapter::BuildRootSignatures()
             IID_PPV_ARGS(&mRootSignatures["standard"])));
 
     }
+
+    // Collider AABB wireframe: pass CB (b1) + object CB (b0)
+    {
+        CD3DX12_ROOT_PARAMETER rootParams[2];
+        rootParams[0].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
+        rootParams[1].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
+
+        CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
+            _countof(rootParams), rootParams,
+            0, nullptr,
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ComPtr<ID3DBlob> serializedRootSig = nullptr;
+        ComPtr<ID3DBlob> errorBlob = nullptr;
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+            serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf()));
+
+        if (errorBlob)
+            ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+
+        ThrowIfFailed(md3dDevice->CreateRootSignature(
+            0,
+            serializedRootSig->GetBufferPointer(),
+            serializedRootSig->GetBufferSize(),
+            IID_PPV_ARGS(&mRootSignatures["colliderDebug"])));
+    }
 }
 
 void D3DRenderAdapter::BuildPSOs()
@@ -918,6 +957,151 @@ void D3DRenderAdapter::BuildPSOs()
     opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
+
+    if (!mShaders["colliderDebugVS"] || !mShaders["colliderDebugPS"])
+        throw std::runtime_error("Collider debug shaders not compiled before BuildPSOs");
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPsoDesc = opaquePsoDesc;
+    debugPsoDesc.InputLayout = { mColliderDebugInputLayout.data(), (UINT)mColliderDebugInputLayout.size() };
+    debugPsoDesc.pRootSignature = mRootSignatures["colliderDebug"].Get();
+    debugPsoDesc.VS =
+    {
+        reinterpret_cast<BYTE*>(mShaders["colliderDebugVS"]->GetBufferPointer()),
+        mShaders["colliderDebugVS"]->GetBufferSize()
+    };
+    debugPsoDesc.PS =
+    {
+        reinterpret_cast<BYTE*>(mShaders["colliderDebugPS"]->GetBufferPointer()),
+        mShaders["colliderDebugPS"]->GetBufferSize()
+    };
+    debugPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    debugPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    debugPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    debugPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&debugPsoDesc, IID_PPV_ARGS(&mPSOs["colliderDebug"])));
+}
+
+void D3DRenderAdapter::BuildColliderBoxGeometry()
+{
+    ThrowIfFailed(mDirectCmdListAlloc->Reset());
+    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
+
+    struct DebugBoxVertex
+    {
+        DirectX::XMFLOAT3 Pos;
+    };
+
+    const DebugBoxVertex unitCorners[8] =
+    {
+        { {-0.5f, -0.5f, -0.5f} },
+        { { 0.5f, -0.5f, -0.5f} },
+        { { 0.5f,  0.5f, -0.5f} },
+        { {-0.5f,  0.5f, -0.5f} },
+        { {-0.5f, -0.5f,  0.5f} },
+        { { 0.5f, -0.5f,  0.5f} },
+        { { 0.5f,  0.5f,  0.5f} },
+        { {-0.5f,  0.5f,  0.5f} },
+    };
+
+    const uint16_t edgePairs[] =
+    {
+        0, 1, 1, 2, 2, 3, 3, 0,
+        4, 5, 5, 6, 6, 7, 7, 4,
+        0, 4, 1, 5, 2, 6, 3, 7
+    };
+
+    std::vector<DebugBoxVertex> vertices;
+    vertices.reserve(sizeof(edgePairs) / sizeof(edgePairs[0]));
+    for (uint16_t index : edgePairs)
+        vertices.push_back(unitCorners[index]);
+
+    mColliderBoxVertexCount = static_cast<UINT>(vertices.size());
+    const UINT64 byteSize = static_cast<UINT64>(vertices.size() * sizeof(DebugBoxVertex));
+
+    ComPtr<ID3D12Resource> uploadBuffer;
+    mColliderBoxVertexBuffer = d3dUtils::CreateDefaultBuffer(
+        md3dDevice.Get(),
+        mCommandList.Get(),
+        vertices.data(),
+        byteSize,
+        uploadBuffer);
+
+    mOwnedResources.push_back(mColliderBoxVertexBuffer);
+
+    mColliderBoxVBView.BufferLocation = mColliderBoxVertexBuffer->GetGPUVirtualAddress();
+    mColliderBoxVBView.StrideInBytes = sizeof(DebugBoxVertex);
+    mColliderBoxVBView.SizeInBytes = static_cast<UINT>(byteSize);
+
+    ThrowIfFailed(mCommandList->Close());
+    ID3D12CommandList* lists[] = { mCommandList.Get() };
+    mCommandQueue->ExecuteCommandLists(1, lists);
+    FlushCommandQueue();
+direc    // Leave the command list closed. OnResize / BeginFrame will reset the allocator and list.
+}
+
+void D3DRenderAdapter::DrawColliderBoundingBoxes(
+    entt::registry& registry,
+    ColliderBoundsDebugMode mode,
+    entt::entity selectedEntity)
+{
+    if (mode == ColliderBoundsDebugMode::None || !mCurrFrameResource || !mColliderBoxVertexBuffer)
+        return;
+
+    auto psoIt = mPSOs.find("colliderDebug");
+    auto rootIt = mRootSignatures.find("colliderDebug");
+    if (psoIt == mPSOs.end() || rootIt == mRootSignatures.end())
+        return;
+
+    mCommandList->SetPipelineState(psoIt->second.Get());
+    mCommandList->SetGraphicsRootSignature(rootIt->second.Get());
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    mCommandList->IASetVertexBuffers(0, 1, &mColliderBoxVBView);
+
+    mCommandList->SetGraphicsRootConstantBufferView(
+        0,
+        mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+
+    auto drawEntity = [&](entt::entity entity)
+    {
+        if (!registry.valid(entity))
+            return;
+        if (!registry.all_of<TransformComponent, ColliderComponent>(entity))
+            return;
+
+        const auto& transform = registry.get<TransformComponent>(entity);
+        const auto& collider = registry.get<ColliderComponent>(entity);
+        const AABB bounds = MakeScaledAABB(transform.position, transform.scale, collider);
+
+        TransformComponent boxTransform;
+        boxTransform.position = bounds.center;
+        boxTransform.rotation = glm::vec3(0.0f);
+        boxTransform.scale = bounds.halfExtents * 2.0f;
+        SetTransform(boxTransform);
+
+        const D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress =
+            mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() +
+            static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(mCurrentObjectCBIndex) *
+            mCurrFrameResource->ObjectCB->ElementByteSize();
+        mCommandList->SetGraphicsRootConstantBufferView(1, objectCBAddress);
+
+        mCommandList->DrawInstanced(mColliderBoxVertexCount, 1, 0, 0);
+    };
+
+    if (mode == ColliderBoundsDebugMode::SelectedOnly)
+    {
+        drawEntity(selectedEntity);
+    }
+    else
+    {
+        auto view = registry.view<TransformComponent, ColliderComponent>();
+        for (auto entity : view)
+            drawEntity(entity);
+    }
+
+    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 // -------------------------------------------------------------

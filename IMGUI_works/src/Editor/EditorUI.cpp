@@ -10,6 +10,7 @@ void Editor_DrawInspector(EditorContext& ctx);
 void Editor_DrawViewport(EditorContext& ctx);
 void Editor_DrawStatistics(EditorContext& ctx, const FrameContext& context);
 void Editor_DrawGizmoToolbar(EditorContext& ctx);
+void Editor_DrawColliderBoundsDebug(EditorContext& ctx);
 void Editor_DrawLegend(EditorContext& ctx);
 
 static void DrawMainMenu(EditorContext& ctx)
@@ -66,6 +67,10 @@ static void DrawMainMenu(EditorContext& ctx)
             EditorSceneIO::RestorePlaySnapshot(ctx);
         ImGui::SetItemTooltip("Loads %s immediately (works in Play or Edit).", EditorSceneIO::PlaySnapshotPath());
 
+        ImGui::Separator();
+        ImGui::Text("Render bounding boxes");
+        Editor_DrawColliderBoundsDebug(ctx);
+
         ImGui::EndMenu();
     }
 
@@ -117,6 +122,11 @@ static void DrawToolbar(EditorContext& ctx)
     ImGui::Text("| Gizmo:");
     ImGui::SameLine();
     Editor_DrawGizmoToolbar(ctx);
+
+    ImGui::SameLine();
+    ImGui::Text("|");
+    ImGui::SameLine();
+    Editor_DrawColliderBoundsDebug(ctx);
 
     ImGui::SameLine();
     ImGui::TextDisabled("| Undo/Redo [PLACEHOLDER]");

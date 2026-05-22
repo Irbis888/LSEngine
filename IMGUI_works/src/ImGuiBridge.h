@@ -1,6 +1,8 @@
 #pragma once
 
+#include <PhysicsCommons.h>
 #include <Windows.h>
+#include <entt/entt.hpp>
 
 struct InputState;
 struct FrameContext;
@@ -26,4 +28,7 @@ namespace ImGuiBridge
     bool IsLicensed();
     bool IsVisible();
     bool WantsCaptureInput();
+
+    ColliderBoundsDebugMode GetColliderBoundsDebugMode();
+    entt::entity GetSelectedEntity();
 }

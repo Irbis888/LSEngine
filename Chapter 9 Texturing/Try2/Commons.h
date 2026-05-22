@@ -181,6 +181,10 @@ public:
 
     virtual void DrawMesh(MeshID meshId) = 0;
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
+    virtual void DrawColliderBoundingBoxes(
+        entt::registry& registry,
+        ColliderBoundsDebugMode mode,
+        entt::entity selectedEntity) = 0;
     virtual void OnResize(int width, int height) = 0;
 
 

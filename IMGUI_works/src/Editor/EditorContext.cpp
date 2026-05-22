@@ -23,6 +23,18 @@ bool Editor_IsPhysicsEnabled()
     return g_EditorContext.mode == EditorMode::Play;
 }
 
+ColliderBoundsDebugMode Editor_GetColliderBoundsDebugMode()
+{
+    if (!ImGuiBridge::IsLicensed())
+        return ColliderBoundsDebugMode::None;
+
+    EditorContext* ctx = Editor_GetContext();
+    if (!ctx)
+        return ColliderBoundsDebugMode::None;
+
+    return ctx->colliderBoundsDebug;
+}
+
 bool Editor_CanEditComponents()
 {
     return g_EditorContext.mode == EditorMode::Edit;

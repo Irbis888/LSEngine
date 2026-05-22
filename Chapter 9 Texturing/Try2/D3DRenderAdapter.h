@@ -44,6 +44,10 @@ public:
 
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
+    void DrawColliderBoundingBoxes(
+        entt::registry& registry,
+        ColliderBoundsDebugMode mode,
+        entt::entity selectedEntity) override;
 
     // Cleanup completed mesh uploads (dispose upload buffers once GPU finishes)
     void CleanupMeshUploadBuffers();
@@ -149,6 +153,11 @@ public:
 
     // Input layouts for different vertex formats
     std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
+    std::vector<D3D12_INPUT_ELEMENT_DESC> mColliderDebugInputLayout;
+
+    ComPtr<ID3D12Resource> mColliderBoxVertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW mColliderBoxVBView = {};
+    UINT mColliderBoxVertexCount = 0;
 
     std::unordered_map<std::string, std::unique_ptr<CustomBuffer>> mBuffers;
     std::unordered_map<std::string, std::vector<DXGI_FORMAT>> mBufferFormats;
@@ -166,6 +175,7 @@ public:
     void BuildShadersAndInputLayout();
     void BuildRootSignatures();
     void BuildPSOs();
+    void BuildColliderBoxGeometry();
     std::vector<D3D12_STATIC_SAMPLER_DESC> GetStaticSamplers();
 
     // Mesh upload (lazy loading from ResourceManager)

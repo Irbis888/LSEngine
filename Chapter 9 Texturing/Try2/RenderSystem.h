@@ -2,6 +2,7 @@
 #include "Commons.h"
 #include "ResourceManager.h"
 #include "World.h"
+#include "ImGuiBridge.h"
 
 
 class RenderSystem : public ISystem
@@ -65,6 +66,11 @@ public:
                 mAdapter->SetTransform(transform);
 				mAdapter->DrawMesh(mesh.meshID);
             });
+
+        mAdapter->DrawColliderBoundingBoxes(
+            reg,
+            ImGuiBridge::GetColliderBoundsDebugMode(),
+            ImGuiBridge::GetSelectedEntity());
     }
 private:
     IRenderAdapter* mAdapter;

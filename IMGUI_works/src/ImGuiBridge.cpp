@@ -206,6 +206,18 @@ bool ImGuiBridge::WantsCaptureInput()
     return Editor_WantsInputCapture();
 }
 
+ColliderBoundsDebugMode ImGuiBridge::GetColliderBoundsDebugMode()
+{
+    return Editor_GetColliderBoundsDebugMode();
+}
+
+entt::entity ImGuiBridge::GetSelectedEntity()
+{
+    if (EditorContext* ctx = Editor_GetContext())
+        return ctx->selected;
+    return entt::null;
+}
+
 void ImGuiBridge::BeginFrame(const FrameContext& context)
 {
     if (!g_Licensed || !g_Visible)

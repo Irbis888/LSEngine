@@ -1,5 +1,6 @@
 #pragma once
 
+#include <PhysicsCommons.h>
 #include <entt/entt.hpp>
 #include <string>
 
@@ -41,6 +42,9 @@ struct EditorContext
     /// Debug: when true, Stop reloads Scenes/EditorPlaySnapshot.json. When false, Stop only exits Play mode.
     bool restoreSceneOnStop = false;
 
+    /// Debug draw: physics collider AABB wireframes in the 3D view.
+    ColliderBoundsDebugMode colliderBoundsDebug = ColliderBoundsDebugMode::None;
+
     std::string statusMessage;
 };
 
@@ -49,8 +53,10 @@ EditorContext* Editor_GetContext();
 bool Editor_IsPhysicsEnabled();
 bool Editor_CanEditComponents();
 bool Editor_WantsInputCapture();
+ColliderBoundsDebugMode Editor_GetColliderBoundsDebugMode();
 
 void Editor_BeginFrame(const FrameContext& context);
 void Editor_RenderUI(const FrameContext& context);
 void Editor_RenderGizmo(const FrameContext& context);
+void Editor_DrawColliderBoundsDebug(EditorContext& ctx);
 void Editor_DrawLegend(EditorContext& ctx);
