@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Scenes">
+      <UniqueIdentifier>{F47EC7A5-F9AC-4E9B-83EE-FEE0C53F10C6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Try2.cpp">
@@ -132,5 +135,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MESH_UPLOAD_GUIDE.md" />
+    <None Include="Scenes\DemoScene.json">
+      <Filter>Scenes</Filter>
+    </None>
   </ItemGroup>
 </Project>
