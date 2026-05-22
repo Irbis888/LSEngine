@@ -16,6 +16,7 @@ public:
 
     void SetTransform(const TransformComponent& world) override;
     void SetCamera(const CameraComponent& camera, const TransformComponent& transform) override;
+    void SetLights(const SceneLightData& lights) override;
 
     void SetMaterial(MaterialID material) override;
     void SetTimeData(float TotalTime, float DeltaTime) override;
