@@ -1037,7 +1037,7 @@ void D3DRenderAdapter::BuildColliderBoxGeometry()
     ID3D12CommandList* lists[] = { mCommandList.Get() };
     mCommandQueue->ExecuteCommandLists(1, lists);
     FlushCommandQueue();
-direc    // Leave the command list closed. OnResize / BeginFrame will reset the allocator and list.
+    // Leave the command list closed. OnResize / BeginFrame will reset the allocator and list.
 }
 
 void D3DRenderAdapter::DrawColliderBoundingBoxes(
@@ -1094,9 +1094,11 @@ void D3DRenderAdapter::DrawColliderBoundingBoxes(
     }
     else
     {
-        auto view = registry.view<TransformComponent, ColliderComponent>();
-        for (auto entity : view)
-            drawEntity(entity);
+        registry.view<TransformComponent, ColliderComponent>().each(
+            [&](entt::entity entity, TransformComponent&, ColliderComponent&)
+            {
+                drawEntity(entity);
+            });
     }
 
     mCommandList->SetPipelineState(mPSOs["opaque"].Get());

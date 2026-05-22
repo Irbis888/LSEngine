@@ -11,6 +11,7 @@ void Editor_DrawViewport(EditorContext& ctx);
 void Editor_DrawStatistics(EditorContext& ctx, const FrameContext& context);
 void Editor_DrawGizmoToolbar(EditorContext& ctx);
 void Editor_DrawColliderBoundsDebug(EditorContext& ctx);
+void Editor_DrawSpawnPanel(EditorContext& ctx);
 void Editor_DrawLegend(EditorContext& ctx);
 
 static void DrawMainMenu(EditorContext& ctx)
@@ -49,6 +50,9 @@ static void DrawMainMenu(EditorContext& ctx)
 
         ImGui::MenuItem("Legend / Help", nullptr, &ctx.showLegend);
         ImGui::SetItemTooltip("Controls, abbreviations, and file paths.");
+
+        ImGui::MenuItem("Spawn Objects", nullptr, &ctx.showSpawnWindow);
+        ImGui::SetItemTooltip("Spawn sphere, brick box, or point light at a chosen position.");
 
         ImGui::MenuItem("ImGui Demo (debug)", nullptr, &ctx.showDemo);
         ImGui::SetItemTooltip("Official Dear ImGui demonstration window.");
@@ -156,6 +160,7 @@ void Editor_RenderUI(const FrameContext& context)
     Editor_DrawViewport(ctx);
     Editor_DrawStatistics(ctx, context);
     Editor_DrawLegend(ctx);
+    Editor_DrawSpawnPanel(ctx);
 
     if (ctx.showDemo)
         ImGui::ShowDemoWindow(&ctx.showDemo);
