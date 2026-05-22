@@ -16,6 +16,7 @@ public:
         reg.view<TransformComponent, CameraComponent>().each([this, &context](auto& transform, auto& camera)
             {
 				mAdapter->SetCamera(camera, transform);
+				
             });
 		mAdapter->UpdCB();
         reg.view<TransformComponent, MeshComponent>().each([this, &context](auto& transform, auto& mesh)

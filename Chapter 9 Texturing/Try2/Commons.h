@@ -17,6 +17,8 @@
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 
+#include "PhysicsCommons.h"
+
 using MeshID = uint32_t;
 using MaterialID = uint32_t;
 using TextureID = uint32_t;

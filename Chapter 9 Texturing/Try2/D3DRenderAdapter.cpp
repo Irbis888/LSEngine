@@ -241,6 +241,8 @@ void D3DRenderAdapter::BeginFrame()
     // Cycle to next frame resource
     mCurrFrameResourceIndex = (mCurrFrameResourceIndex + 1) % NumFrameResources;
     mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
+    mNextObjectCBIndex = 0;
+    mCurrentObjectCBIndex = 0;
 
     // If GPU has not finished processing commands up to this fence, wait
     if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
@@ -537,16 +539,23 @@ void D3DRenderAdapter::FlushCommandQueue()
 void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
     if (!mCurrFrameResource) return;
 
+    mCurrentObjectCBIndex = mNextObjectCBIndex++;
+
     // Build world matrix from transform component (TRS composition)
     ObjectConstants objConstants;
-    objConstants.World = d3dUtils::TransformComponentToWorldMatrix(world);
-    objConstants.InvWorld = d3dUtils::InvertMatrix4x4(objConstants.World);
+    DirectX::XMFLOAT4X4 worldMatrix = d3dUtils::TransformComponentToWorldMatrix(world);
+    DirectX::XMFLOAT4X4 invWorldMatrix = d3dUtils::InvertMatrix4x4(worldMatrix);
 
-    // Identity for texture transform
-    objConstants.TexTransform = MathHelper::Identity4x4();
+    DirectX::XMMATRIX worldXM = DirectX::XMLoadFloat4x4(&worldMatrix);
+    DirectX::XMMATRIX invWorldXM = DirectX::XMLoadFloat4x4(&invWorldMatrix);
 
-    // Copy to GPU constant buffer (index 0 for now)
-    mCurrFrameResource->ObjectCB->CopyData(0, objConstants);
+    DirectX::XMStoreFloat4x4(&objConstants.World, DirectX::XMMatrixTranspose(worldXM));
+    DirectX::XMStoreFloat4x4(&objConstants.InvWorld, DirectX::XMMatrixTranspose(invWorldXM));
+
+    DirectX::XMMATRIX texTransformXM = DirectX::XMMatrixIdentity();
+    DirectX::XMStoreFloat4x4(&objConstants.TexTransform, DirectX::XMMatrixTranspose(texTransformXM));
+
+    mCurrFrameResource->ObjectCB->CopyData(mCurrentObjectCBIndex, objConstants);
     mCurrentTransform = world;
 }
 
@@ -907,7 +916,11 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
 	mCommandList->IASetIndexBuffer(&meshGPU->ibView);
 
 	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	mCommandList->SetGraphicsRootConstantBufferView(2, mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress());
+	D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress =
+		mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() +
+		static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(mCurrentObjectCBIndex) *
+		mCurrFrameResource->ObjectCB->ElementByteSize();
+	mCommandList->SetGraphicsRootConstantBufferView(2, objectCBAddress);
 
 	// Draw all submeshes with their respective materials
 	for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
@@ -970,6 +983,11 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     // Bind vertex and index buffers
     mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
     mCommandList->IASetIndexBuffer(&meshGPU->ibView);
+    D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress =
+        mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() +
+        static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(mCurrentObjectCBIndex) *
+        mCurrFrameResource->ObjectCB->ElementByteSize();
+    mCommandList->SetGraphicsRootConstantBufferView(2, objectCBAddress);
 
     // Get or load material (this will lazily load textures on first use)
     MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);

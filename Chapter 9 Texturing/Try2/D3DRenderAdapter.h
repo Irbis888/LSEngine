@@ -94,6 +94,8 @@ private:
     // Current material/transform state (set by SetMaterial/SetTransform)
     MaterialID mCurrentMaterial = 0;
     TransformComponent mCurrentTransform;
+    UINT mCurrentObjectCBIndex = 0;
+    UINT mNextObjectCBIndex = 0;
 
     // Frame resource management (2 frames in flight for GPU-CPU sync)
     static const int NumFrameResources = 2;

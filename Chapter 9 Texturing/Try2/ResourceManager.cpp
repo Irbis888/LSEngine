@@ -1,5 +1,8 @@
 #include "ResourceManager.h"
 
+#include <algorithm>
+#include <cmath>
+
 //--------------------------------------------------------------
 // ID генераторы
 //--------------------------------------------------------------
@@ -11,6 +14,13 @@ static TextureID gNextTextureID = 1;
 //--------------------------------------------------------------
 // Mesh
 //--------------------------------------------------------------
+
+MeshID ResourceManager::CreateMesh(Mesh mesh)
+{
+    MeshID id = gNextMeshID++;
+    mMeshes[id] = std::move(mesh);
+    return id;
+}
 
 MeshID ResourceManager::LoadMesh(const std::string& path)
 {
@@ -141,10 +151,128 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         mesh.submeshes.push_back(submesh);
     }
 
-    MeshID id = gNextMeshID++;
-    mMeshes[id] = std::move(mesh);
+    return CreateMesh(std::move(mesh));
+}
 
-    return id;
+MeshID ResourceManager::CreatePlane(MaterialID material)
+{
+    Mesh mesh;
+
+    mesh.vertices =
+    {
+        Vertex(glm::vec3(-0.5f, 0.0f, -0.5f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 1.0f)),
+        Vertex(glm::vec3(-0.5f, 0.0f,  0.5f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f)),
+        Vertex(glm::vec3( 0.5f, 0.0f,  0.5f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(1.0f, 0.0f)),
+        Vertex(glm::vec3( 0.5f, 0.0f, -0.5f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2(1.0f, 1.0f))
+    };
+
+    mesh.indices = { 0, 1, 2, 0, 2, 3 };
+    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
+
+    return CreateMesh(std::move(mesh));
+}
+
+MeshID ResourceManager::CreateCube(MaterialID material)
+{
+    Mesh mesh;
+
+    const glm::vec3 positions[8] =
+    {
+        {-0.5f, -0.5f, -0.5f},
+        {-0.5f,  0.5f, -0.5f},
+        { 0.5f,  0.5f, -0.5f},
+        { 0.5f, -0.5f, -0.5f},
+        {-0.5f, -0.5f,  0.5f},
+        {-0.5f,  0.5f,  0.5f},
+        { 0.5f,  0.5f,  0.5f},
+        { 0.5f, -0.5f,  0.5f}
+    };
+
+    const struct Face
+    {
+        uint32_t a;
+        uint32_t b;
+        uint32_t c;
+        uint32_t d;
+        glm::vec3 normal;
+        glm::vec3 tangent;
+    } faces[6] =
+    {
+        {4, 5, 6, 7, glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(1.0f, 0.0f,  0.0f)},
+        {3, 2, 1, 0, glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)},
+        {1, 5, 4, 0, glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 0.0f,  1.0f)},
+        {6, 2, 3, 7, glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 0.0f, -1.0f)},
+        {1, 2, 6, 5, glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(1.0f, 0.0f,  0.0f)},
+        {4, 7, 3, 0, glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(1.0f, 0.0f,  0.0f)}
+    };
+
+    for (const Face& face : faces)
+    {
+        const uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
+
+        mesh.vertices.emplace_back(positions[face.a], face.normal, face.tangent, glm::vec2(0.0f, 1.0f));
+        mesh.vertices.emplace_back(positions[face.b], face.normal, face.tangent, glm::vec2(0.0f, 0.0f));
+        mesh.vertices.emplace_back(positions[face.c], face.normal, face.tangent, glm::vec2(1.0f, 0.0f));
+        mesh.vertices.emplace_back(positions[face.d], face.normal, face.tangent, glm::vec2(1.0f, 1.0f));
+
+        mesh.indices.insert(mesh.indices.end(), { base, base + 2, base + 1, base, base + 3, base + 2 });
+    }
+
+    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
+
+    return CreateMesh(std::move(mesh));
+}
+
+MeshID ResourceManager::CreateSphere(MaterialID material, uint32_t slices, uint32_t stacks)
+{
+    Mesh mesh;
+
+    constexpr float pi = 3.14159265358979323846f;
+    slices = std::max<uint32_t>(slices, 3);
+    stacks = std::max<uint32_t>(stacks, 2);
+
+    for (uint32_t stack = 0; stack <= stacks; ++stack)
+    {
+        const float v = static_cast<float>(stack) / static_cast<float>(stacks);
+        const float phi = v * pi;
+        const float y = 0.5f * std::cos(phi);
+        const float ringRadius = 0.5f * std::sin(phi);
+
+        for (uint32_t slice = 0; slice <= slices; ++slice)
+        {
+            const float u = static_cast<float>(slice) / static_cast<float>(slices);
+            const float theta = u * 2.0f * pi;
+
+            glm::vec3 position(
+                ringRadius * std::sin(theta),
+                y,
+                ringRadius * std::cos(theta));
+
+            glm::vec3 normal = glm::normalize(position);
+            glm::vec3 tangent(std::cos(theta), 0.0f, -std::sin(theta));
+
+            mesh.vertices.emplace_back(position, normal, tangent, glm::vec2(u, v));
+        }
+    }
+
+    const uint32_t ringVertexCount = slices + 1;
+
+    for (uint32_t stack = 0; stack < stacks; ++stack)
+    {
+        for (uint32_t slice = 0; slice < slices; ++slice)
+        {
+            const uint32_t a = stack * ringVertexCount + slice;
+            const uint32_t b = (stack + 1) * ringVertexCount + slice;
+            const uint32_t c = (stack + 1) * ringVertexCount + slice + 1;
+            const uint32_t d = stack * ringVertexCount + slice + 1;
+
+            mesh.indices.insert(mesh.indices.end(), { a, b, c, a, c, d });
+        }
+    }
+
+    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
+
+    return CreateMesh(std::move(mesh));
 }
 
 

@@ -156,6 +156,7 @@
     <ClInclude Include="d3dUtils.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="FrameRes.h" />
+    <ClInclude Include="PhysicsCommons.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ResourceManager.h" />
     <ClInclude Include="World.h" />

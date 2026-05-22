@@ -77,6 +77,10 @@ class ResourceManager
 {
 public:
     MeshID LoadMesh(const std::string& path);
+    MeshID CreateMesh(Mesh mesh);
+    MeshID CreatePlane(MaterialID material);
+    MeshID CreateCube(MaterialID material);
+    MeshID CreateSphere(MaterialID material, uint32_t slices = 32, uint32_t stacks = 16);
     MaterialID CreateMaterial(const Material& mat);
 
     Mesh& GetMesh(MeshID id);

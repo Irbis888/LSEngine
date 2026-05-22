@@ -6,13 +6,34 @@ void Engine::Init(const GameTimer& gt) {
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	updateSystems.push_back(std::make_unique<CameraControllerSystem>());
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
-	mResourceManager.LoadMesh("../../Common/sponza.obj");
+	MeshID sponzaMesh = mResourceManager.LoadMesh("../../Common/sponza.obj");
+
+	Material primitiveMaterial;
+	primitiveMaterial.name = "PrimitiveDefault";
+	primitiveMaterial.albedo = mResourceManager.LoadTexture(L"white1x1.dds");
+	primitiveMaterial.normal = mResourceManager.LoadTexture(L"default_nmap.dds");
+	primitiveMaterial.color = glm::vec3(1.0f);
+	primitiveMaterial.roughness = 0.6f;
+
+	MaterialID primitiveMaterialId = mResourceManager.CreateMaterial(primitiveMaterial);
+	MeshID planeMesh = mResourceManager.CreatePlane(primitiveMaterialId);
+	MeshID cubeMesh = mResourceManager.CreateCube(primitiveMaterialId);
+	MeshID sphereMesh = mResourceManager.CreateSphere(primitiveMaterialId);
+
+	auto createMeshEntity = [this](const std::string& tag, MeshID mesh, const glm::vec3& position, const glm::vec3& scale)
+		{
+			auto entity = world.registry.create();
+			world.registry.emplace<TagComponent>(entity, TagComponent{ tag });
+			world.registry.emplace<MeshComponent>(entity, MeshComponent{ mesh });
+			world.registry.emplace<TransformComponent>(entity, TransformComponent{ position, glm::vec3(0.0f), scale });
+			return entity;
+		};
 
 	// Create first mesh entity
-	auto sponza = world.registry.create();
-	world.registry.emplace<TagComponent>(sponza, TagComponent{ "Sponza" });
-	world.registry.emplace<MeshComponent>(sponza, MeshComponent{ 1 });
-	world.registry.emplace<TransformComponent>(sponza, TransformComponent{ glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.3f) });
+	createMeshEntity("Sponza", sponzaMesh, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.3f));
+	createMeshEntity("PrimitivePlane", planeMesh, glm::vec3(-8.0f, 1.1f, -8.0f), glm::vec3(10.0f, 1.0f, 10.0f));
+	createMeshEntity("PrimitiveCube", cubeMesh, glm::vec3(-1.0f, 9.0f, -20.0f), glm::vec3(10.0f));
+	createMeshEntity("PrimitiveSphere", sphereMesh, glm::vec3(-2.0f, 1.0f, -2.0f), glm::vec3(10.0f));
 
 	auto cam = world.registry.create();
 	world.registry.emplace<TagComponent>(cam, TagComponent{ "MainCamera" });
