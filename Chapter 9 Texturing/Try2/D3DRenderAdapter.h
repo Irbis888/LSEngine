@@ -6,6 +6,18 @@
 
 using Microsoft::WRL::ComPtr;
 
+struct Dx12ImGuiBindings
+{
+    ID3D12Device* Device = nullptr;
+    ID3D12CommandQueue* CommandQueue = nullptr;
+    ID3D12GraphicsCommandList* CommandList = nullptr;
+    ID3D12DescriptorHeap* SrvHeap = nullptr;
+    UINT SrvDescriptorSize = 0;
+    DXGI_FORMAT RtvFormat = DXGI_FORMAT_UNKNOWN;
+    DXGI_FORMAT DsvFormat = DXGI_FORMAT_UNKNOWN;
+    int NumFramesInFlight = 2;
+};
+
 class D3DRenderAdapter : public IRenderAdapter
 {
 public:
@@ -46,6 +58,8 @@ public:
 
     void OnResize(int width, int height) override;
 	void FlushCommandQueue();
+
+    Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
     HWND      mhMainWnd = nullptr;

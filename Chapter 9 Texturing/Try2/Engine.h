@@ -24,4 +24,8 @@ public:
 	void Update(const FrameContext& context);
 	void PhysicsUpdate(const FrameContext& context);
 	void Draw(const FrameContext& context);
+
+	World& GetWorld() { return world; }
+	entt::registry& GetRegistry() { return world.registry; }
+	ResourceManager& GetResources() { return mResourceManager; }
 };

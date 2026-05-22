@@ -291,6 +291,20 @@ void D3DRenderAdapter::BeginFrame()
 
 // -------------------------------------------------------------
 
+Dx12ImGuiBindings D3DRenderAdapter::GetImGuiBindings() const
+{
+    Dx12ImGuiBindings bindings;
+    bindings.Device = md3dDevice.Get();
+    bindings.CommandQueue = mCommandQueue.Get();
+    bindings.CommandList = mCommandList.Get();
+    bindings.SrvHeap = mCbvSrvUavHeap.Get();
+    bindings.SrvDescriptorSize = mCbvSrvUavDescriptorSize;
+    bindings.RtvFormat = mBackBufferFormat;
+    bindings.DsvFormat = mDepthStencilFormat;
+    bindings.NumFramesInFlight = NumFrameResources;
+    return bindings;
+}
+
 void D3DRenderAdapter::EndFrame()
 {
     // Transition → Present

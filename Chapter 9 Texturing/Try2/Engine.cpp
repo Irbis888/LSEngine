@@ -3,6 +3,7 @@
 #include "CameraControllerSystem.h"
 #include "DemoScene.h"
 #include "PhysicsSystem.h"
+#include "Editor/EditorContext.h"
 
 void Engine::Init(const GameTimer& gt) {
 	mRenderAdapter->SetResourceManager(&mResourceManager);
@@ -27,6 +28,9 @@ void Engine::Update(const FrameContext& context)
 }
 void Engine::PhysicsUpdate(const FrameContext& context)
 {
+	if (!Editor_IsPhysicsEnabled())
+		return;
+
 	for (auto& system : physicsSystems)
 	{
 		system->Update(world.registry, context);

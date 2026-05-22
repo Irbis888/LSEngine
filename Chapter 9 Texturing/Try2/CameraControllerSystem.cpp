@@ -1,9 +1,13 @@
 #include "CameraControllerSystem.h"
+#include "ImGuiBridge.h"
 
 #include <cmath>
 
 void CameraControllerSystem::Update(entt::registry& reg, const FrameContext& context)
 {
+	if (ImGuiBridge::WantsCaptureInput())
+		return;
+
 	const InputState& input = context.input;
 	const float dt = context.timer.DeltaTime();
 	const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
