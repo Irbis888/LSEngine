@@ -7,7 +7,21 @@
 
 namespace
 {
-    bool RestorePlaySnapshotInternal(EditorContext& ctx, std::string& outError);
+    bool RestorePlaySnapshotInternal(EditorContext& ctx, std::string& outError)
+    {
+        if (!ctx.engine)
+        {
+            outError = "engine not bound";
+            return false;
+        }
+
+        if (!ctx.engine->LoadScene(EditorSceneIO::PlaySnapshotPath(), outError))
+            return false;
+
+        ctx.selected = entt::null;
+        ctx.registry = &ctx.engine->GetRegistry();
+        return true;
+    }
 }
 
 void EditorSceneIO::SaveScene(EditorContext& ctx)
@@ -61,23 +75,6 @@ void EditorSceneIO::BeginPlay(EditorContext& ctx)
 
     ctx.mode = EditorMode::Play;
     ctx.statusMessage = std::string("Play — snapshot at ") + PlaySnapshotPath();
-}
-
-    bool RestorePlaySnapshotInternal(EditorContext& ctx, std::string& outError)
-    {
-        if (!ctx.engine)
-        {
-            outError = "engine not bound";
-            return false;
-        }
-
-        if (!ctx.engine->LoadScene(PlaySnapshotPath(), outError))
-            return false;
-
-        ctx.selected = entt::null;
-        ctx.registry = &ctx.engine->GetRegistry();
-        return true;
-    }
 }
 
 void EditorSceneIO::RestorePlaySnapshot(EditorContext& ctx)
