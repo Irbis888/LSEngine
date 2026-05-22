@@ -28,4 +28,7 @@ public:
 	World& GetWorld() { return world; }
 	entt::registry& GetRegistry() { return world.registry; }
 	ResourceManager& GetResources() { return mResourceManager; }
+
+	bool SaveScene(const std::string& path, std::string& outError);
+	bool LoadScene(const std::string& path, std::string& outError);
 };

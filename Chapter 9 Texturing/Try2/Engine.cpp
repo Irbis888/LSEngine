@@ -96,3 +96,34 @@ void Engine::Draw(const FrameContext& context)
 	}
 }
 
+bool Engine::SaveScene(const std::string& path, std::string& outError)
+{
+	try
+	{
+		SceneSerializer::Save(world, path);
+		outError.clear();
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		outError = e.what();
+		return false;
+	}
+}
+
+bool Engine::LoadScene(const std::string& path, std::string& outError)
+{
+	try
+	{
+		world.registry.clear();
+		SceneSerializer::Load(world, mResourceManager, path);
+		outError.clear();
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		outError = e.what();
+		return false;
+	}
+}
+

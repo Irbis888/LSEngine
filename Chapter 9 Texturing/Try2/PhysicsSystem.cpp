@@ -6,6 +6,8 @@
 
 void PhysicsSystem::Update(entt::registry& reg, const FrameContext& context)
 {
+    PhysicsStats::ResetFrameCollisionCount();
+
     const float dt = context.physDT > 0.0f ? context.physDT : context.timer.DeltaTime();
 
     Integrate(reg, dt);
@@ -57,6 +59,8 @@ void PhysicsSystem::ResolveCollisions(entt::registry& reg)
 
             if (!collision.colliding)
                 continue;
+
+            PhysicsStats::AddCollision();
 
             RigidbodyComponent* aBody = reg.try_get<RigidbodyComponent>(a);
             RigidbodyComponent* bBody = reg.try_get<RigidbodyComponent>(b);

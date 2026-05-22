@@ -165,3 +165,27 @@ inline bool IntersectsSphere(
 
     return glm::dot(delta, delta) <= radiusSum * radiusSum;
 }
+
+namespace PhysicsStats
+{
+    inline int& FrameCollisionCount()
+    {
+        static int count = 0;
+        return count;
+    }
+
+    inline void ResetFrameCollisionCount()
+    {
+        FrameCollisionCount() = 0;
+    }
+
+    inline void AddCollision()
+    {
+        ++FrameCollisionCount();
+    }
+
+    inline int GetFrameCollisionCount()
+    {
+        return FrameCollisionCount();
+    }
+}

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IMGUI_WORKS>$(SolutionDir)..\..\..\IMGUI_works</IMGUI_WORKS>
+    <IMGUI_WORKS>$(SolutionDir)..\..\IMGUI_works</IMGUI_WORKS>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(ProjectDir)Libs;$(LibraryPath)</LibraryPath>
@@ -158,6 +158,8 @@
     <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiBridge.cpp" />
     <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiPlatform.cpp" />
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorContext.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\LegendPanel.cpp" />
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorUI.cpp" />
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\HierarchyPanel.cpp" />
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\InspectorPanel.cpp" />
