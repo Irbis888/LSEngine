@@ -137,11 +137,15 @@
     <ClCompile Include="CameraControllerSystem.cpp" />
     <ClCompile Include="Commons.cpp" />
     <ClCompile Include="D3DRenderAdapter.cpp" />
+    <ClCompile Include="DemoScene.cpp" />
     <ClCompile Include="d3dUtils.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="FrameRes.cpp" />
+    <ClCompile Include="PhysicsSystem.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="SceneFactory.cpp" />
+    <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Try2.cpp" />
     <ClCompile Include="World.cpp" />
   </ItemGroup>
@@ -153,12 +157,16 @@
     <ClInclude Include="CameraControllerSystem.h" />
     <ClInclude Include="Commons.h" />
     <ClInclude Include="D3DRenderAdapter.h" />
+    <ClInclude Include="DemoScene.h" />
     <ClInclude Include="d3dUtils.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="FrameRes.h" />
     <ClInclude Include="PhysicsCommons.h" />
+    <ClInclude Include="PhysicsSystem.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="SceneFactory.h" />
+    <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>

@@ -243,6 +243,7 @@ void D3DRenderAdapter::BeginFrame()
     mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
     mNextObjectCBIndex = 0;
     mCurrentObjectCBIndex = 0;
+    mNextMaterialCBIndex = 0;
 
     // If GPU has not finished processing commands up to this fence, wait
     if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
@@ -638,30 +639,22 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
 void D3DRenderAdapter::SetMaterial(MaterialID material) {
     if (!mCurrFrameResource) return;
 
+    MaterialGPU* matGPU = GetOrLoadMaterial(material);
+    if (!matGPU) return;
+
     MaterialConstants matConstants;
+    matConstants.DiffuseAlbedo = matGPU->DiffuseAlbedo;
+    matConstants.FresnelR0 = matGPU->FresnelR0;
+    matConstants.Roughness = matGPU->Roughness;
+    matConstants.MatTransform = matGPU->MatTransform;
 
-    // DiffuseAlbedo (XMFLOAT4)
-    matConstants.DiffuseAlbedo = DirectX::XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+    const UINT materialCBIndex = mNextMaterialCBIndex++;
+    mCurrFrameResource->MaterialCB->CopyData(materialCBIndex, matConstants);
 
-    // FresnelR0 (XMFLOAT3)
-    matConstants.FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-
-    // Roughness (single float)
-    matConstants.Roughness = 0.3f;
-
-    // MatTransform - identity matrix
-    matConstants.MatTransform = DirectX::XMFLOAT4X4(
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    );
-
-    // Copy to GPU constant buffer (index 0 for now)
-    mCurrFrameResource->MaterialCB->CopyData(0, matConstants);
-
-    // Bind material CBV to root parameter 4
-    D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = mCurrFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS matCBAddress =
+        mCurrFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress() +
+        static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(materialCBIndex) *
+        mCurrFrameResource->MaterialCB->ElementByteSize();
     mCommandList->SetGraphicsRootConstantBufferView(4, matCBAddress);
 
     mCurrentMaterial = material;
@@ -937,14 +930,12 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
 			ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
 			mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
 
-			// Bind diffuse (albedo) texture if available
 			if (matGPU->DiffuseSrvHeapIndex >= 0)
 			{
 				D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
 				mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
 			}
 
-			// Bind normal texture if available
 			if (matGPU->NormalSrvHeapIndex >= 0)
 			{
 				D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
@@ -999,14 +990,12 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
         ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
         mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
 
-        // Bind diffuse (albedo) texture if available
         if (matGPU->DiffuseSrvHeapIndex >= 0)
         {
             D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
             mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
         }
 
-        // Bind normal texture if available
         if (matGPU->NormalSrvHeapIndex >= 0)
         {
             D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
@@ -1106,33 +1095,27 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
     if (!mResourceManager)
         return nullptr;
 
-    // Try to find existing GPU material
-    auto it = mMaterials.find(std::to_string((uint32_t)materialId));
+    std::string matKey = std::to_string((uint32_t)materialId);
+    auto it = mMaterials.find(matKey);
     if (it != mMaterials.end())
     {
-        MaterialGPU* matGPU = it->second.get();
-        // Check if already fully loaded
-        if (matGPU->DiffuseSrvHeapIndex >= 0 || matGPU->NormalSrvHeapIndex >= 0)
-            return matGPU;
+        return it->second.get();
     }
 
-    // Get CPU material data
     Material& cpuMaterial = mResourceManager->GetMaterial(materialId);
 
-    // Create GPU material if not exists
-    std::string matKey = std::to_string((uint32_t)materialId);
-    if (mMaterials.find(matKey) == mMaterials.end())
-    {
-        mMaterials[matKey] = std::make_unique<MaterialGPU>();
-        mMaterials[matKey]->Name = cpuMaterial.name;
-        mMaterials[matKey]->DiffuseAlbedo = DirectX::XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-        mMaterials[matKey]->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-        mMaterials[matKey]->Roughness = cpuMaterial.roughness;
-    }
+    auto materialGPU = std::make_unique<MaterialGPU>();
+    materialGPU->Name = cpuMaterial.name;
+    materialGPU->DiffuseAlbedo = DirectX::XMFLOAT4(
+        cpuMaterial.color.x,
+        cpuMaterial.color.y,
+        cpuMaterial.color.z,
+        1.0f);
+    materialGPU->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+    materialGPU->Roughness = cpuMaterial.roughness;
 
-    MaterialGPU* matGPU = mMaterials[matKey].get();
+    MaterialGPU* matGPU = materialGPU.get();
 
-    // Load albedo texture if present
     if (cpuMaterial.albedo != 0)
     {
         try
@@ -1153,7 +1136,6 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
         }
     }
 
-    // Load normal texture if present
     if (cpuMaterial.normal != 0)
     {
         try
@@ -1174,6 +1156,17 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
         }
     }
 
+    if (matGPU->DiffuseSrvHeapIndex < 0)
+    {
+        matGPU->DiffuseSrvHeapIndex = LoadTexture(L"white1x1.dds");
+    }
+
+    if (matGPU->NormalSrvHeapIndex < 0)
+    {
+        matGPU->NormalSrvHeapIndex = LoadTexture(L"default_nmap.dds");
+    }
+
+    mMaterials[matKey] = std::move(materialGPU);
     return matGPU;
 }
 

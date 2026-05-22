@@ -44,10 +44,10 @@ struct RigidbodyComponent
 
     float InverseMass() const
     {
-        if (type == RigidbodyType::Static)
+        if (type != RigidbodyType::Dynamic)
             return 0.0f;
 
-        return 1.0f / std::max(mass, Physics::MinMass);
+        return 1.0f / (std::max)(mass, Physics::MinMass);
     }
 };
 
@@ -93,6 +93,22 @@ inline AABB MakeAABB(const glm::vec3& position, const ColliderComponent& collide
             : collider.halfExtents;
 
     return AABB{ position + collider.offset, halfExtents };
+}
+
+inline AABB MakeScaledAABB(
+    const glm::vec3& position,
+    const glm::vec3& scale,
+    const ColliderComponent& collider)
+{
+    const glm::vec3 absScale = glm::abs(scale);
+
+    if (collider.type == ColliderType::Sphere)
+    {
+        const float maxScale = (std::max)((std::max)(absScale.x, absScale.y), absScale.z);
+        return AABB{ position + collider.offset * absScale, glm::vec3(collider.radius * maxScale) };
+    }
+
+    return AABB{ position + collider.offset * absScale, collider.halfExtents * absScale };
 }
 
 inline bool IntersectsAABB(const AABB& a, const AABB& b)

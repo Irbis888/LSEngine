@@ -96,6 +96,7 @@ private:
     TransformComponent mCurrentTransform;
     UINT mCurrentObjectCBIndex = 0;
     UINT mNextObjectCBIndex = 0;
+    UINT mNextMaterialCBIndex = 0;
 
     // Frame resource management (2 frames in flight for GPU-CPU sync)
     static const int NumFrameResources = 2;

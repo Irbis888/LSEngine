@@ -82,6 +82,10 @@ public:
     MeshID CreateCube(MaterialID material);
     MeshID CreateSphere(MaterialID material, uint32_t slices = 32, uint32_t stacks = 16);
     MaterialID CreateMaterial(const Material& mat);
+    MaterialID CreateSolidMaterial(
+        const std::string& name,
+        const glm::vec3& color,
+        float roughness = 0.5f);
 
     Mesh& GetMesh(MeshID id);
     Material& GetMaterial(MaterialID id);

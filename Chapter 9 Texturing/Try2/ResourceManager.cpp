@@ -294,6 +294,19 @@ MaterialID ResourceManager::CreateMaterial(const Material& mat)
     return id;
 }
 
+MaterialID ResourceManager::CreateSolidMaterial(
+    const std::string& name,
+    const glm::vec3& color,
+    float roughness)
+{
+    Material mat;
+    mat.name = name;
+    mat.color = color;
+    mat.roughness = roughness;
+
+    return CreateMaterial(mat);
+}
+
 Material& ResourceManager::GetMaterial(MaterialID id)
 {
     auto it = mMaterials.find(id);
