@@ -323,6 +323,64 @@ void D3DRenderAdapter::EndFrame()
 // RESIZE (минимальный)
 // -------------------------------------------------------------
 
+bool D3DRenderAdapter::ReloadShaders()
+{
+    auto previousShaders = mShaders;
+    auto previousPSOs = mPSOs;
+    auto previousInputLayout = mInputLayout;
+
+    try
+    {
+        BuildShadersAndInputLayout();
+        BuildPSOs();
+
+        if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
+        {
+            mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+            mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+        }
+
+        OutputDebugStringA("Shaders reloaded successfully.\n");
+        return true;
+    }
+    catch (const DxException& e)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed. Keeping previous shaders.\n");
+        OutputDebugStringW(e.ToString().c_str());
+        OutputDebugStringW(L"\n");
+    }
+    catch (const std::exception& e)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed. Keeping previous shaders: ");
+        OutputDebugStringA(e.what());
+        OutputDebugStringA("\n");
+    }
+    catch (...)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed with unknown error. Keeping previous shaders.\n");
+    }
+
+    if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
+    {
+        mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+        mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    }
+
+    return false;
+}
+
 void D3DRenderAdapter::OnResize(int width, int height)
 {
     assert(md3dDevice);

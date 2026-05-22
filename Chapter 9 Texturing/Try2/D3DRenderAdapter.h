@@ -12,6 +12,7 @@ public:
     void Init(void* windowHandle, uint32_t width, uint32_t height) override;
     void BeginFrame() override;
     void EndFrame() override;
+    bool ReloadShaders() override;
 
     void SetTransform(const TransformComponent& world) override;
     void SetCamera(const CameraComponent& camera, const TransformComponent& transform) override;

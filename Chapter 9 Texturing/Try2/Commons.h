@@ -99,6 +99,7 @@ public:
     virtual void SetResourceManager(class ResourceManager* resourceManager) = 0;
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
+    virtual bool ReloadShaders() = 0;
     virtual void SetTimeData(float TotalTime, float DeltaTime) = 0;
 
     virtual void SetTransform(const TransformComponent& world) = 0;

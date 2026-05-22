@@ -20,6 +20,11 @@ void Engine::Init(const GameTimer& gt) {
 }
 void Engine::Update(const FrameContext& context)
 {
+	if (context.input.keysPressed[VK_F5])
+	{
+		mRenderAdapter->ReloadShaders();
+	}
+
 	for (auto& system : updateSystems)
 	{
 		system->Update(world.registry, context);
