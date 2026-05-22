@@ -63,7 +63,7 @@ inline std::wstring AnsiToWString(const std::string& str)
 
 
 
-/*
+
 #if defined(_DEBUG)
     #ifndef Assert
     #define Assert(x, description)                                  \
@@ -89,7 +89,7 @@ inline std::wstring AnsiToWString(const std::string& str)
     #define Assert(x, description) 
     #endif
 #endif 		
-    */
+    
 
 class d3dUtil
 {
