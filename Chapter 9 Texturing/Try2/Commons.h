@@ -86,6 +86,70 @@ struct CameraComponent
     glm::mat4 projMatrix;
 };
 
+struct DirectionalLightComponent
+{
+    glm::vec3 color = glm::vec3(1.0f);
+    float intensity = 1.0f;
+    glm::vec3 direction = glm::normalize(glm::vec3(-0.6f, -0.7f, 0.2f));
+    bool enabled = true;
+};
+
+struct PointLightComponent
+{
+    glm::vec3 color = glm::vec3(1.0f);
+    float intensity = 1.0f;
+    float falloffStart = 1.0f;
+    float falloffEnd = 25.0f;
+    bool enabled = true;
+};
+
+struct SpotLightComponent
+{
+    glm::vec3 color = glm::vec3(1.0f);
+    float intensity = 1.0f;
+    glm::vec3 direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
+    float falloffStart = 1.0f;
+    float falloffEnd = 35.0f;
+    float spotPower = 32.0f;
+    bool enabled = true;
+};
+
+struct DirectionalLightData
+{
+    glm::vec3 strength = glm::vec3(1.0f);
+    glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);
+};
+
+struct PointLightData
+{
+    glm::vec3 strength = glm::vec3(1.0f);
+    glm::vec3 position = glm::vec3(0.0f);
+    float falloffStart = 1.0f;
+    float falloffEnd = 25.0f;
+};
+
+struct SpotLightData
+{
+    glm::vec3 strength = glm::vec3(1.0f);
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    float falloffStart = 1.0f;
+    float falloffEnd = 35.0f;
+    float spotPower = 32.0f;
+};
+
+constexpr int RenderDirectionalLightCount = 1;
+constexpr int RenderPointLightCount = 2;
+constexpr int RenderSpotLightCount = 3;
+
+struct SceneLightData
+{
+    glm::vec4 ambient = glm::vec4(0.25f, 0.25f, 0.28f, 1.0f);
+    std::vector<DirectionalLightData> directionalLights;
+    std::vector<PointLightData> pointLights;
+    std::vector<SpotLightData> spotLights;
+};
+
 
 
 
@@ -99,10 +163,12 @@ public:
     virtual void SetResourceManager(class ResourceManager* resourceManager) = 0;
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
+    virtual bool ReloadShaders() = 0;
     virtual void SetTimeData(float TotalTime, float DeltaTime) = 0;
 
     virtual void SetTransform(const TransformComponent& world) = 0;
     virtual void SetCamera(const CameraComponent& camera, const TransformComponent& transform) = 0;
+    virtual void SetLights(const SceneLightData& lights) = 0;
     virtual void UpdCB() = 0;
 
     virtual void SetMaterial(MaterialID material) = 0;

@@ -82,7 +82,7 @@ struct CollisionManifold
 {
     bool colliding = false;
     glm::vec3 normal = glm::vec3(0.0f);
-    float penetrationDepth = 0.0f;
+    float penetrationDepth = 0.1f;
 };
 
 inline AABB MakeAABB(const glm::vec3& position, const ColliderComponent& collider)

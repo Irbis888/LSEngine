@@ -154,6 +154,7 @@ float4 PS(VertexOut pin) : SV_Target0
     float4 litColor = ambient + directLight;
     // Common convention to take alpha from diffuse albedo.
     litColor.a = diffuseAlbedo.a;
+    //litColor.rgb = 1.0 - litColor.rgb;
 
     return litColor;
 }

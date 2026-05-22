@@ -206,6 +206,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MESH_UPLOAD_GUIDE.md" />
+    <None Include="Scenes\DemoScene.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

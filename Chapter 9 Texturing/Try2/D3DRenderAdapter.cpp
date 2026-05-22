@@ -209,20 +209,6 @@ void D3DRenderAdapter::UpdateMainPassCB()
     mMainPassCB.TotalTime = mTotalTime;
     mMainPassCB.DeltaTime = mDeltaTime;
 
-    // Set default ambient light
-    mMainPassCB.AmbientLight = DirectX::XMFLOAT4(0.75f, 0.75f, 0.85f, 1.0f);
-
-    // Initialize lights to inactive (intensity 0)
-    for (int i = 0; i < MaxLights; ++i)
-    {
-        mMainPassCB.Lights[i].Strength = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
-        mMainPassCB.Lights[i].Direction = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);
-    }
-
-    // Add a default directional light
-    mMainPassCB.Lights[0].Strength = DirectX::XMFLOAT3(0.9f, 0.9f, 0.9f);
-    mMainPassCB.Lights[0].Direction = DirectX::XMFLOAT3(-0.5773f, -0.5773f, 0.0f);  // Normalized diagonal
-
     // Copy to GPU constant buffer
     mCurrFrameResource->PassCB->CopyData(0, mMainPassCB);
 }
@@ -336,6 +322,64 @@ void D3DRenderAdapter::EndFrame()
 // -------------------------------------------------------------
 // RESIZE (минимальный)
 // -------------------------------------------------------------
+
+bool D3DRenderAdapter::ReloadShaders()
+{
+    auto previousShaders = mShaders;
+    auto previousPSOs = mPSOs;
+    auto previousInputLayout = mInputLayout;
+
+    try
+    {
+        BuildShadersAndInputLayout();
+        BuildPSOs();
+
+        if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
+        {
+            mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+            mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+        }
+
+        OutputDebugStringA("Shaders reloaded successfully.\n");
+        return true;
+    }
+    catch (const DxException& e)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed. Keeping previous shaders.\n");
+        OutputDebugStringW(e.ToString().c_str());
+        OutputDebugStringW(L"\n");
+    }
+    catch (const std::exception& e)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed. Keeping previous shaders: ");
+        OutputDebugStringA(e.what());
+        OutputDebugStringA("\n");
+    }
+    catch (...)
+    {
+        mShaders = previousShaders;
+        mPSOs = previousPSOs;
+        mInputLayout = previousInputLayout;
+
+        OutputDebugStringA("Shader reload failed with unknown error. Keeping previous shaders.\n");
+    }
+
+    if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
+    {
+        mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+        mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    }
+
+    return false;
+}
 
 void D3DRenderAdapter::OnResize(int width, int height)
 {
@@ -648,6 +692,81 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
     // Store near/far plane distances
     mMainPassCB.NearZ = nearZ;
     mMainPassCB.FarZ = farZ;
+}
+
+void D3DRenderAdapter::SetLights(const SceneLightData& lights)
+{
+    mMainPassCB.AmbientLight = DirectX::XMFLOAT4(
+        lights.ambient.x,
+        lights.ambient.y,
+        lights.ambient.z,
+        lights.ambient.w);
+
+    for (int i = 0; i < MaxLights; ++i)
+    {
+        mMainPassCB.Lights[i] = Light{};
+        mMainPassCB.Lights[i].Strength = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
+    }
+
+    int lightIndex = 0;
+    for (const DirectionalLightData& light : lights.directionalLights)
+    {
+        if (lightIndex >= RenderDirectionalLightCount || lightIndex >= MaxLights) break;
+
+        mMainPassCB.Lights[lightIndex].Strength = DirectX::XMFLOAT3(
+            light.strength.x,
+            light.strength.y,
+            light.strength.z);
+        mMainPassCB.Lights[lightIndex].Direction = DirectX::XMFLOAT3(
+            light.direction.x,
+            light.direction.y,
+            light.direction.z);
+
+        ++lightIndex;
+    }
+
+    lightIndex = RenderDirectionalLightCount;
+    for (const PointLightData& light : lights.pointLights)
+    {
+        if (lightIndex >= RenderDirectionalLightCount + RenderPointLightCount || lightIndex >= MaxLights) break;
+
+        mMainPassCB.Lights[lightIndex].Strength = DirectX::XMFLOAT3(
+            light.strength.x,
+            light.strength.y,
+            light.strength.z);
+        mMainPassCB.Lights[lightIndex].Position = DirectX::XMFLOAT3(
+            light.position.x,
+            light.position.y,
+            light.position.z);
+        mMainPassCB.Lights[lightIndex].FalloffStart = light.falloffStart;
+        mMainPassCB.Lights[lightIndex].FalloffEnd = light.falloffEnd;
+
+        ++lightIndex;
+    }
+
+    lightIndex = RenderDirectionalLightCount + RenderPointLightCount;
+    for (const SpotLightData& light : lights.spotLights)
+    {
+        if (lightIndex >= RenderDirectionalLightCount + RenderPointLightCount + RenderSpotLightCount || lightIndex >= MaxLights) break;
+
+        mMainPassCB.Lights[lightIndex].Strength = DirectX::XMFLOAT3(
+            light.strength.x,
+            light.strength.y,
+            light.strength.z);
+        mMainPassCB.Lights[lightIndex].Position = DirectX::XMFLOAT3(
+            light.position.x,
+            light.position.y,
+            light.position.z);
+        mMainPassCB.Lights[lightIndex].Direction = DirectX::XMFLOAT3(
+            light.direction.x,
+            light.direction.y,
+            light.direction.z);
+        mMainPassCB.Lights[lightIndex].FalloffStart = light.falloffStart;
+        mMainPassCB.Lights[lightIndex].FalloffEnd = light.falloffEnd;
+        mMainPassCB.Lights[lightIndex].SpotPower = light.spotPower;
+
+        ++lightIndex;
+    }
 }
 
 void D3DRenderAdapter::SetMaterial(MaterialID material) {
