@@ -1,0 +1,260 @@
+{
+    "version": 1,
+    "name": "DemoScene",
+    "entities": [
+        {
+            "tag": "Sponza",
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [0.3, 0.3, 0.3]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/sponza.obj"
+            }
+        },
+        {
+            "tag": "PhysicsFloor",
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [80.0, 1.0, 80.0]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "plane",
+                "material": {
+                    "name": "DemoPlatform",
+                    "color": [0.95, 0.15, 0.98],
+                    "roughness": 0.7
+                }
+            },
+            "rigidbody": {
+                "type": "static",
+                "velocity": [0.0, 0.0, 0.0],
+                "acceleration": [0.0, 0.0, 0.0],
+                "mass": 1.0,
+                "useGravity": true
+            },
+            "collider": {
+                "type": "aabb",
+                "offset": [0.0, 0.0, 0.0],
+                "halfExtents": [0.5, 0.1, 0.5],
+                "radius": 0.5,
+                "isTrigger": false,
+                "restitution": 0.0,
+                "friction": 0.8
+            }
+        },
+        {
+            "tag": "FallingCubeA",
+            "transform": {
+                "position": [-5.0, 12.0, -6.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [2.0, 2.0, 2.0]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "cube",
+                "material": {
+                    "name": "FallingCubeAMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.45,
+                    "albedo": "bricks2.dds",
+                    "normal": "bricks2_nmap.dds"
+                }
+            },
+            "rigidbody": {
+                "type": "dynamic",
+                "velocity": [0.0, 0.0, 0.0],
+                "acceleration": [0.0, 0.0, 0.0],
+                "mass": 2.0,
+                "useGravity": true
+            },
+            "collider": {
+                "type": "aabb",
+                "offset": [0.0, 0.0, 0.0],
+                "halfExtents": [0.5, 0.5, 0.5],
+                "radius": 0.5,
+                "isTrigger": false,
+                "restitution": 0.05,
+                "friction": 0.6
+            }
+        },
+        {
+            "tag": "FallingCubeB",
+            "transform": {
+                "position": [1.0, 18.0, -5.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [2.5, 2.5, 2.5]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "cube",
+                "material": {
+                    "name": "FallingCubeBMaterial",
+                    "color": [0.5, 0.2, 0.8],
+                    "roughness": 0.55
+                }
+            },
+            "rigidbody": {
+                "type": "dynamic",
+                "velocity": [0.8, 0.0, 0.0],
+                "acceleration": [0.0, 0.0, 0.0],
+                "mass": 3.0,
+                "useGravity": true
+            },
+            "collider": {
+                "type": "aabb",
+                "offset": [0.0, 0.0, 0.0],
+                "halfExtents": [0.5, 0.5, 0.5],
+                "radius": 0.5,
+                "isTrigger": false,
+                "restitution": 0.05,
+                "friction": 0.6
+            }
+        },
+        {
+            "tag": "FallingSphereA",
+            "transform": {
+                "position": [5.0, 15.0, -4.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [2.0, 2.0, 2.0]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "sphere",
+                "material": {
+                    "name": "FallingSphereAMaterial",
+                    "color": [0.15, 0.55, 0.85],
+                    "roughness": 0.35
+                }
+            },
+            "rigidbody": {
+                "type": "dynamic",
+                "velocity": [-0.5, 0.0, 0.0],
+                "acceleration": [0.0, 0.0, 0.0],
+                "mass": 1.0,
+                "useGravity": true
+            },
+            "collider": {
+                "type": "sphere",
+                "offset": [0.0, 0.0, 0.0],
+                "halfExtents": [0.5, 0.5, 0.5],
+                "radius": 0.5,
+                "isTrigger": false,
+                "restitution": 0.2,
+                "friction": 0.4
+            }
+        },
+        {
+            "tag": "FallingSphereB",
+            "transform": {
+                "position": [-1.0, 23.0, 1.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.5, 1.5, 1.5]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "sphere",
+                "material": {
+                    "name": "FallingSphereBMaterial",
+                    "color": [0.15, 0.55, 0.85],
+                    "roughness": 0.35
+                }
+            },
+            "rigidbody": {
+                "type": "dynamic",
+                "velocity": [0.0, 0.0, 0.0],
+                "acceleration": [0.0, 0.0, 0.0],
+                "mass": 1.0,
+                "useGravity": true
+            },
+            "collider": {
+                "type": "sphere",
+                "offset": [0.0, 0.0, 0.0],
+                "halfExtents": [0.5, 0.5, 0.5],
+                "radius": 0.5,
+                "isTrigger": false,
+                "restitution": 0.2,
+                "friction": 0.4
+            }
+        },
+        {
+            "tag": "SunLight",
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "directionalLight": {
+                "color": [1.0, 0.96, 0.88],
+                "intensity": 1.15,
+                "direction": [-0.55, -0.8, 0.25],
+                "enabled": true
+            }
+        },
+        {
+            "tag": "WarmPointLight",
+            "transform": {
+                "position": [-8.0, 7.0, -8.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "pointLight": {
+                "color": [1.0, 0.45, 0.25],
+                "intensity": 3.0,
+                "falloffStart": 2.0,
+                "falloffEnd": 35.0,
+                "enabled": true
+            }
+        },
+        {
+            "tag": "CoolPointLight",
+            "transform": {
+                "position": [7.0, 6.0, 3.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "pointLight": {
+                "color": [0.2, 0.55, 1.0],
+                "intensity": 2.5,
+                "falloffStart": 2.0,
+                "falloffEnd": 30.0,
+                "enabled": true
+            }
+        },
+        {
+            "tag": "SpotLight",
+            "transform": {
+                "position": [0.0, 14.0, -10.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "spotLight": {
+                "color": [1.0, 0.9, 0.7],
+                "intensity": 2.0,
+                "direction": [0.0, -0.9, 0.35],
+                "falloffStart": 2.0,
+                "falloffEnd": 45.0,
+                "spotPower": 24.0,
+                "enabled": true
+            }
+        },
+        {
+            "tag": "MainCamera",
+            "transform": {
+                "position": [-1.0, 10.0, -25.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "camera": {
+                "fov": 1.8,
+                "nearZ": 0.1,
+                "farZ": 1500.0,
+                "aspectRatio": 1.3333334
+            }
+        }
+    ]
+}
