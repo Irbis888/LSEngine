@@ -6,15 +6,29 @@
 
 using Microsoft::WRL::ComPtr;
 
+struct Dx12ImGuiBindings
+{
+    ID3D12Device* Device = nullptr;
+    ID3D12CommandQueue* CommandQueue = nullptr;
+    ID3D12GraphicsCommandList* CommandList = nullptr;
+    ID3D12DescriptorHeap* SrvHeap = nullptr;
+    UINT SrvDescriptorSize = 0;
+    DXGI_FORMAT RtvFormat = DXGI_FORMAT_UNKNOWN;
+    DXGI_FORMAT DsvFormat = DXGI_FORMAT_UNKNOWN;
+    int NumFramesInFlight = 2;
+};
+
 class D3DRenderAdapter : public IRenderAdapter
 {
 public:
     void Init(void* windowHandle, uint32_t width, uint32_t height) override;
     void BeginFrame() override;
     void EndFrame() override;
+    bool ReloadShaders() override;
 
     void SetTransform(const TransformComponent& world) override;
     void SetCamera(const CameraComponent& camera, const TransformComponent& transform) override;
+    void SetLights(const SceneLightData& lights) override;
 
     void SetMaterial(MaterialID material) override;
     void SetTimeData(float TotalTime, float DeltaTime) override;
@@ -46,6 +60,8 @@ public:
 
     void OnResize(int width, int height) override;
 	void FlushCommandQueue();
+
+    Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
     HWND      mhMainWnd = nullptr;

@@ -1,9 +1,10 @@
-﻿// Try2.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
+// Try2.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
 //
 
 #include <iostream>
 #include <entt/entt.hpp>
 #include "Application.h"
+#include "ImGuiBridge.h"
 #include <string>
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -59,6 +60,8 @@ int main()
         TestApp theApp(hInstance);
         if (!theApp.Initialize())
             return 0;
+
+        ImGuiBridge::SetEngine(theApp.GetEngine());
 
         return theApp.Run();
     }

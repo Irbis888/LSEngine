@@ -107,6 +107,53 @@ void DemoScene::Build(World& world, ResourceManager& resources)
         sphereB,
         ColliderComponent{ ColliderType::Sphere, glm::vec3(0.0f), glm::vec3(0.5f), 0.5f, false, 0.2f, 0.4f });
 
+    entt::entity sun = factory.CreateEmpty("SunLight");
+    world.registry.emplace<DirectionalLightComponent>(
+        sun,
+        DirectionalLightComponent{
+            glm::vec3(1.0f, 0.96f, 0.88f),
+            1.15f,
+            glm::normalize(glm::vec3(-0.55f, -0.8f, 0.25f)),
+            true });
+
+    entt::entity warmPoint = factory.CreateEmpty(
+        "WarmPointLight",
+        glm::vec3(-8.0f, 7.0f, -8.0f));
+    world.registry.emplace<PointLightComponent>(
+        warmPoint,
+        PointLightComponent{
+            glm::vec3(1.0f, 0.45f, 0.25f),
+            3.0f,
+            2.0f,
+            35.0f,
+            true });
+
+    entt::entity coolPoint = factory.CreateEmpty(
+        "CoolPointLight",
+        glm::vec3(7.0f, 6.0f, 3.0f));
+    world.registry.emplace<PointLightComponent>(
+        coolPoint,
+        PointLightComponent{
+            glm::vec3(0.2f, 0.55f, 1.0f),
+            2.5f,
+            2.0f,
+            30.0f,
+            true });
+
+    entt::entity spot = factory.CreateEmpty(
+        "SpotLight",
+        glm::vec3(0.0f, 14.0f, -10.0f));
+    world.registry.emplace<SpotLightComponent>(
+        spot,
+        SpotLightComponent{
+            glm::vec3(1.0f, 0.9f, 0.7f),
+            2.0f,
+            glm::normalize(glm::vec3(0.0f, -0.9f, 0.35f)),
+            2.0f,
+            45.0f,
+            24.0f,
+            true });
+
     factory.CreateCamera(
         "MainCamera",
         glm::vec3(-1.0f, 10.0f, -25.0f),

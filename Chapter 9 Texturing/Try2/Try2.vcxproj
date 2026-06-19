@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -70,6 +70,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <IMGUI_WORKS>$(SolutionDir)..\..\IMGUI_works</IMGUI_WORKS>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(ProjectDir)Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
@@ -105,14 +108,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\SPS\CompGraph\LSDEngine\LSEngine\Common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc143-mt.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -123,10 +126,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>assimp-vc143-mt.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -148,6 +155,25 @@
     <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Try2.cpp" />
     <ClCompile Include="World.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiBridge.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiPlatform.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorContext.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\LegendPanel.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorUI.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\HierarchyPanel.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\InspectorPanel.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\ViewportPanel.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\StatisticsPanel.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\GizmoController.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_draw.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_tables.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_demo.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_dx12.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src\ImGuizmo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Common\DDSTextureLoader.h" />
@@ -168,6 +194,9 @@
     <ClInclude Include="SceneFactory.h" />
     <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="World.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiBridge.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiPlatform.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorContext.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\Default.hlsl">
@@ -179,6 +208,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MESH_UPLOAD_GUIDE.md" />
+    <None Include="Scenes\DemoScene.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

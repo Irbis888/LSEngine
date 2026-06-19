@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "ImGuiBridge.h"
 #include <WindowsX.h>
 #include <wrl.h>
 
@@ -111,6 +112,7 @@ int Application::Run()
 			mFrameContext.timer = mTimer;
 			mFrameContext.input = mInput;
 
+			ImGuiBridge::ProcessInput(mInput);
 
 			while (accumulator >= fixed_dt && steps < maxSteps)
 			{
@@ -128,6 +130,9 @@ int Application::Run()
 				FrameContext context{ mTimer, InputState(), 0.0f };
 				Update(mFrameContext);
 				Draw(mFrameContext);
+				ImGuiBridge::BeginFrame(mFrameContext);
+				ImGuiBridge::RenderEditorUI(mFrameContext);
+				ImGuiBridge::RenderOverlay(static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
 				mRenderAdapter->EndFrame();
 				memset(mInput.keysPressed, 0, sizeof(bool) * 256);
 				memset(mInput.keysReleased, 0, sizeof(bool) * 256);
@@ -145,6 +150,7 @@ int Application::Run()
 		}
 	}
 
+	ImGuiBridge::OnApplicationShutdown();
 	return (int)msg.wParam;
 }
 
@@ -154,6 +160,9 @@ bool Application::Initialize()
 		return false;
 	mRenderAdapter = Application::CreateRenderer(mRenderAPI);
 	mRenderAdapter->Init(mhMainWnd, mClientWidth, mClientHeight);
+
+	ImGuiBridge::SetAppInstance(mhAppInst);
+	ImGuiBridge::OnApplicationInit(mhMainWnd, static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
 
 	mEngine = std::make_unique<Engine>(mRenderAdapter.get());
 	mEngine->Init(mTimer);
@@ -167,10 +176,14 @@ void Application::OnResize()
 	if (!mRenderAdapter)
 		return;
 	mRenderAdapter->OnResize(mClientWidth, mClientHeight);
+	ImGuiBridge::OnResize();
 }
 
 LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGuiBridge::WndProcHandler(hwnd, msg, wParam, lParam))
+		return true;
+
 	switch (msg)
 	{
 		// WM_ACTIVATE is sent when the window is activated or deactivated.  

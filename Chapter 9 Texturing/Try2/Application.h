@@ -33,6 +33,8 @@ public:
 
     int Run();
 
+    Engine* GetEngine() { return mEngine.get(); }
+
     std::unique_ptr<IRenderAdapter> CreateRenderer(RenderAPI api);
     virtual bool Initialize();
     virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
