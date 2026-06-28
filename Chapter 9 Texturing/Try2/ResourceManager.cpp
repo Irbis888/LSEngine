@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 //--------------------------------------------------------------
 // ID генераторы
@@ -10,6 +11,27 @@
 static MeshID gNextMeshID = 1;
 static MaterialID gNextMaterialID = 1;
 static TextureID gNextTextureID = 1;
+
+namespace
+{
+    std::string WideToUtf8(const std::wstring& value)
+    {
+        if (value.empty())
+        {
+            return {};
+        }
+
+        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (size <= 0)
+        {
+            return {};
+        }
+
+        std::string result(size - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
+        return result;
+    }
+}
 
 //--------------------------------------------------------------
 // Mesh
@@ -60,7 +82,9 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         }
 
         // --- NORMAL ---
-        if (aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
+        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texPath) == AI_SUCCESS ||
+            aiMat->GetTexture(aiTextureType_HEIGHT, 0, &texPath) == AI_SUCCESS ||
+            aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
         {
             std::wstring wpath(texPath.C_Str(), texPath.C_Str() + strlen(texPath.C_Str()));
             mat.normal = LoadTexture(wpath);
@@ -307,6 +331,70 @@ MaterialID ResourceManager::CreateSolidMaterial(
     return CreateMaterial(mat);
 }
 
+MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
+{
+    Material mat;
+    mat.name = desc.name;
+    mat.color = desc.color;
+    mat.roughness = desc.roughness;
+
+    if (!desc.albedoTexture.empty())
+    {
+        mat.albedo = LoadTexture(desc.albedoTexture);
+    }
+
+    if (!desc.normalTexture.empty())
+    {
+        mat.normal = LoadTexture(desc.normalTexture);
+    }
+
+    return CreateMaterial(mat);
+}
+
+MaterialID ResourceManager::CreateTexturedMaterial(
+    const std::string& name,
+    const std::wstring& albedoTexture,
+    const std::wstring& normalTexture,
+    const glm::vec3& color,
+    float roughness)
+{
+    MaterialDesc desc;
+    desc.name = name;
+    desc.albedoTexture = albedoTexture;
+    desc.normalTexture = normalTexture;
+    desc.color = color;
+    desc.roughness = roughness;
+
+    return CreateTexturedMaterial(desc);
+}
+
+void ResourceManager::SetMeshMaterial(MeshID meshId, MaterialID materialId)
+{
+    GetMaterial(materialId);
+
+    Mesh& mesh = GetMesh(meshId);
+    for (Mesh::Submesh& submesh : mesh.submeshes)
+    {
+        submesh.material = materialId;
+    }
+
+    ++mesh.materialVersion;
+}
+
+void ResourceManager::SetSubmeshMaterial(MeshID meshId, uint32_t submeshIndex, MaterialID materialId)
+{
+    GetMaterial(materialId);
+
+    Mesh& mesh = GetMesh(meshId);
+    if (submeshIndex >= mesh.submeshes.size())
+    {
+        throw std::out_of_range("Submesh index out of range");
+    }
+
+    mesh.submeshes[submeshIndex].material = materialId;
+    ++mesh.materialVersion;
+}
+
 Material& ResourceManager::GetMaterial(MaterialID id)
 {
     auto it = mMaterials.find(id);
@@ -320,15 +408,22 @@ Material& ResourceManager::GetMaterial(MaterialID id)
 
 TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 {
+    auto cached = mTextureIDsByFilename.find(filename);
+    if (cached != mTextureIDsByFilename.end())
+    {
+        return cached->second;
+    }
+
     Texture tex;
 
     tex.filename = filename;
 
     // имя можно вытащить из пути (пока просто копия)
-    tex.name = std::string(filename.begin(), filename.end());
+    tex.name = WideToUtf8(filename);
 
     TextureID id = gNextTextureID++;
     mTextures[id] = std::move(tex);
+    mTextureIDsByFilename[filename] = id;
 
     return id;
 }

@@ -1,5 +1,6 @@
 #include "D3DRenderAdapter.h"
 
+#include <filesystem>
 #include <stdexcept>
 #include <assert.h>
 #include "ResourceManager.h"
@@ -10,6 +11,73 @@
 using namespace Microsoft::WRL;
 
 static const int SwapChainBufferCount = 2;
+
+namespace
+{
+    std::string WideToUtf8(const std::wstring& value)
+    {
+        if (value.empty())
+        {
+            return {};
+        }
+
+        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (size <= 0)
+        {
+            return {};
+        }
+
+        std::string result(size - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
+        return result;
+    }
+
+    std::wstring ResolveTexturePath(const std::wstring& filename)
+    {
+        namespace fs = std::filesystem;
+
+        if (filename.empty())
+        {
+            return filename;
+        }
+
+        fs::path path(filename);
+        if (path.is_absolute() || fs::exists(path))
+        {
+            return path.wstring();
+        }
+
+        auto firstPart = path.begin();
+        if (firstPart != path.end() && firstPart->wstring() == L"..")
+        {
+            return path.wstring();
+        }
+
+        return (fs::path(L"../../Textures") / path).wstring();
+    }
+
+    void SyncSubmeshMaterials(MeshGPU& gpuMesh, const Mesh& cpuMesh)
+    {
+        if (gpuMesh.materialVersion == cpuMesh.materialVersion &&
+            gpuMesh.submeshes.size() == cpuMesh.submeshes.size())
+        {
+            return;
+        }
+
+        gpuMesh.submeshes.clear();
+        gpuMesh.submeshes.reserve(cpuMesh.submeshes.size());
+        for (const Mesh::Submesh& cpuSubmesh : cpuMesh.submeshes)
+        {
+            SubmeshGPU gpuSubmesh;
+            gpuSubmesh.indexOffset = cpuSubmesh.indexOffset;
+            gpuSubmesh.indexCount = cpuSubmesh.indexCount;
+            gpuSubmesh.material = cpuSubmesh.material;
+            gpuMesh.submeshes.push_back(gpuSubmesh);
+        }
+
+        gpuMesh.materialVersion = cpuMesh.materialVersion;
+    }
+}
 
 // -------------------------------------------------------------
 // INIT
@@ -998,6 +1066,7 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
         gpuSubmesh.material = cpuSubmesh.material;
         meshGPU->submeshes.push_back(gpuSubmesh);
     }
+    meshGPU->materialVersion = cpuMesh.materialVersion;
 
     // Store upload buffers in the mesh (will be disposed after GPU finishes)
     meshGPU->vertexUploadBuffer = vbUploadBuffer;
@@ -1017,6 +1086,12 @@ MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
     auto it = mGeometries.find(meshId);
     if (it != mGeometries.end())
     {
+        if (mResourceManager)
+        {
+            Mesh& cpuMesh = mResourceManager->GetMesh(meshId);
+            SyncSubmeshMaterials(*it->second, cpuMesh);
+        }
+
         return it->second.get();
     }
 
@@ -1151,12 +1226,9 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
 
 int D3DRenderAdapter::LoadTexture(const std::wstring& filename)
 {
-	std::wstring fn = L"../../Textures/" + filename; // Assuming textures are in this relative path
+	std::wstring fn = ResolveTexturePath(filename);
     // Check if texture already loaded
-    std::string filenameStr;
-    size_t size = WideCharToMultiByte(CP_UTF8, 0, fn.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    filenameStr.resize(size - 1);
-    WideCharToMultiByte(CP_UTF8, 0, fn.c_str(), -1, &filenameStr[0], size, nullptr, nullptr);
+    std::string filenameStr = WideToUtf8(fn);
 	//filenameStr = "../Textures/" + filenameStr; // Assuming textures are in this relative path
 
     auto it = mTextures.find(filenameStr);

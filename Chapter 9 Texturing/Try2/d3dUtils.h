@@ -124,6 +124,7 @@ struct MeshGPU
     UINT indexCount;
 
     std::vector<SubmeshGPU> submeshes;
+    uint32_t materialVersion = 0;
 
     // Upload buffers (temporary, disposed after GPU finishes with them)
     ComPtr<ID3D12Resource> vertexUploadBuffer;

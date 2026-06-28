@@ -8,15 +8,19 @@ void DemoScene::Build(World& world, ResourceManager& resources)
 
     MeshID sponzaMesh = resources.LoadMesh("../../Common/sponza.obj");
 
-    MaterialID platformMaterial = resources.CreateSolidMaterial(
+    MaterialID platformMaterial = resources.CreateTexturedMaterial(
         "DemoPlatform",
+        L"tile.dds",
+        L"tile_nmap.dds",
         glm::vec3(0.55f, 0.55f, 0.58f),
         0.7f);
 
-    MaterialID cubeMaterial = resources.CreateSolidMaterial(
+    MaterialID cubeMaterial = resources.CreateTexturedMaterial(
         "DemoCube",
-        glm::vec3(0.5f, 0.2f, 0.8f),
-        0.55f);
+        L"bricks2.dds",
+        L"bricks2_nmap.dds",
+        glm::vec3(1.0f),
+        0.45f);
 
     MaterialID sphereMaterial = resources.CreateSolidMaterial(
         "DemoSphere",

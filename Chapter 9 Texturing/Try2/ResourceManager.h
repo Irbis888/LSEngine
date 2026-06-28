@@ -48,6 +48,16 @@ struct Mesh
     };
 
     std::vector<Submesh> submeshes;
+    uint32_t materialVersion = 1;
+};
+
+struct MaterialDesc
+{
+    std::string name;
+    std::wstring albedoTexture;
+    std::wstring normalTexture;
+    glm::vec3 color = glm::vec3(1.0f);
+    float roughness = 0.5f;
 };
 
 struct Material
@@ -86,12 +96,22 @@ public:
         const std::string& name,
         const glm::vec3& color,
         float roughness = 0.5f);
+    MaterialID CreateTexturedMaterial(const MaterialDesc& desc);
+    MaterialID CreateTexturedMaterial(
+        const std::string& name,
+        const std::wstring& albedoTexture,
+        const std::wstring& normalTexture = L"",
+        const glm::vec3& color = glm::vec3(1.0f),
+        float roughness = 0.5f);
+
+    void SetMeshMaterial(MeshID mesh, MaterialID material);
+    void SetSubmeshMaterial(MeshID mesh, uint32_t submeshIndex, MaterialID material);
 
     Mesh& GetMesh(MeshID id);
     Material& GetMaterial(MaterialID id);
 
     TextureID LoadTexture(const std::wstring& filename);
-    Texture& ResourceManager::GetTexture(TextureID id);
+    Texture& GetTexture(TextureID id);
 
     void PrintAllMeshes() const;
     void PrintAllMaterials() const;
@@ -101,4 +121,5 @@ private:
     std::unordered_map<MeshID, Mesh> mMeshes;
     std::unordered_map<MaterialID, Material> mMaterials;
     std::unordered_map<TextureID, Texture> mTextures;
+    std::unordered_map<std::wstring, TextureID> mTextureIDsByFilename;
 };
