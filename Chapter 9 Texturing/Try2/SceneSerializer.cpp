@@ -72,7 +72,16 @@ namespace
         const std::string source = value.value("source", "primitive");
         if (source == "model")
         {
-            return resources.LoadMesh(value.at("path").get<std::string>());
+            const MeshID mesh = resources.LoadMesh(value.at("path").get<std::string>());
+            if (value.contains("material"))
+            {
+                const MaterialID material = JsonToMaterial(
+                    resources,
+                    value.at("material"),
+                    entityName + "Material");
+                resources.SetMeshMaterial(mesh, material);
+            }
+            return mesh;
         }
 
         if (source != "primitive")

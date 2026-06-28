@@ -1,0 +1,197 @@
+{
+    "version": 1,
+    "name": "CharacterShowcase",
+    "entities": [
+        {
+            "tag": "ShowcasePlane",
+            "transform": {
+                "position": [0.0, 0.0, 3.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [50.0, 1.0, 40.0]
+            },
+            "mesh": {
+                "source": "primitive",
+                "primitive": "plane",
+                "material": {
+                    "name": "ShowcasePlaneMaterial",
+                    "color": [0.7, 0.72, 0.75],
+                    "roughness": 0.75,
+                    "albedo": "tile.dds",
+                    "normal": "tile_nmap.dds"
+                }
+            }
+        },
+        {
+            "tag": "PortraitLeft",
+            "transform": {
+                "position": [-9.0, 3.0, -5.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/negr.obj",
+                "material": {
+                    "name": "PortraitLeftMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.45,
+                    "albedo": "textures/texture.dds",
+                    "normal": "textures/texture_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "PortraitCenter",
+            "transform": {
+                "position": [0.0, 3.0, -5.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/negr.obj",
+                "material": {
+                    "name": "PortraitCenterMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.45,
+                    "albedo": "textures/texture.dds",
+                    "normal": "textures/texture_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "PortraitRight",
+            "transform": {
+                "position": [9.0, 3.0, -5.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/negr.obj",
+                "material": {
+                    "name": "PortraitRightMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.45,
+                    "albedo": "textures/texture.dds",
+                    "normal": "textures/texture_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "DiabloLeft",
+            "transform": {
+                "position": [-9.0, 3.0, 7.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/diablo3_pose.obj",
+                "material": {
+                    "name": "DiabloLeftMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.4,
+                    "albedo": "textures/diablo3_pose_diffuse.dds",
+                    "normal": "textures/diablo3_pose_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "DiabloCenter",
+            "transform": {
+                "position": [0.0, 3.0, 7.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/diablo3_pose.obj",
+                "material": {
+                    "name": "DiabloCenterMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.4,
+                    "albedo": "textures/diablo3_pose_diffuse.dds",
+                    "normal": "textures/diablo3_pose_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "DiabloRight",
+            "transform": {
+                "position": [9.0, 3.0, 7.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [3.0, 3.0, 3.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/diablo3_pose.obj",
+                "material": {
+                    "name": "DiabloRightMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.4,
+                    "albedo": "textures/diablo3_pose_diffuse.dds",
+                    "normal": "textures/diablo3_pose_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "ShowcaseSun",
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "directionalLight": {
+                "color": [1.0, 0.96, 0.9],
+                "intensity": 1.4,
+                "direction": [-0.5, -0.8, 0.3],
+                "enabled": true
+            }
+        },
+        {
+            "tag": "WarmFillLight",
+            "transform": {
+                "position": [-12.0, 8.0, -2.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "pointLight": {
+                "color": [1.0, 0.55, 0.3],
+                "intensity": 3.0,
+                "falloffStart": 2.0,
+                "falloffEnd": 40.0,
+                "enabled": true
+            }
+        },
+        {
+            "tag": "CoolFillLight",
+            "transform": {
+                "position": [12.0, 8.0, 8.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "pointLight": {
+                "color": [0.3, 0.55, 1.0],
+                "intensity": 3.0,
+                "falloffStart": 2.0,
+                "falloffEnd": 40.0,
+                "enabled": true
+            }
+        },
+        {
+            "tag": "MainCamera",
+            "transform": {
+                "position": [0.0, 10.0, -28.0],
+                "rotation": [0.15, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "camera": {
+                "fov": 1.3,
+                "nearZ": 0.1,
+                "farZ": 1500.0,
+                "aspectRatio": 1.7777778
+            }
+        }
+    ]
+}

@@ -32,6 +32,9 @@ static void DrawLegendPanel(EditorContext& ctx)
             "Toggle again to hide the overlay.");
         DrawBullet("Select an object",
             "Open Scene Hierarchy, click a row. Its components appear in Inspector.");
+        DrawBullet("Create a primitive",
+            "Use Create > Cube/Sphere/Plane or the + Create Primitive button in Scene Hierarchy. "
+            "Choose its transform and material, then press Create.");
     }
 
     if (ImGui::CollapsingHeader("Edit vs Play", ImGuiTreeNodeFlags_DefaultOpen))
@@ -104,6 +107,8 @@ static void DrawLegendPanel(EditorContext& ctx)
             "Clears ECS and loads Scenes/EditorSave.json. Unsaved edits are lost.");
         DrawBullet("Exit",
             "Closes the application.");
+        DrawBullet("Scenes menu",
+            "Switch between Demo Scene and Character Showcase while in Edit mode.");
     }
 
     if (ImGui::CollapsingHeader("Abbreviations & terms", ImGuiTreeNodeFlags_DefaultOpen))

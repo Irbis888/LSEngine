@@ -208,6 +208,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MESH_UPLOAD_GUIDE.md" />
+    <None Include="Scenes\CharacterShowcase.json" />
     <None Include="Scenes\DemoScene.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

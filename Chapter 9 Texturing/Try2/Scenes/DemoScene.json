@@ -15,6 +15,44 @@
             }
         },
         {
+            "tag": "TexturedPortrait",
+            "transform": {
+                "position": [0.0, 4.0, -2.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [4.0, 4.0, 4.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/negr.obj",
+                "material": {
+                    "name": "PortraitMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.45,
+                    "albedo": "textures/texture.dds",
+                    "normal": "textures/texture_nm.dds"
+                }
+            }
+        },
+        {
+            "tag": "TexturedDiablo",
+            "transform": {
+                "position": [8.0, 4.0, -2.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [4.0, 4.0, 4.0]
+            },
+            "mesh": {
+                "source": "model",
+                "path": "../../Common/diablo3_pose.obj",
+                "material": {
+                    "name": "DiabloMaterial",
+                    "color": [1.0, 1.0, 1.0],
+                    "roughness": 0.4,
+                    "albedo": "textures/diablo3_pose_diffuse.dds",
+                    "normal": "textures/diablo3_pose_nm.dds"
+                }
+            }
+        },
+        {
             "tag": "PhysicsFloor",
             "transform": {
                 "position": [0.0, 0.0, 0.0],

@@ -7,6 +7,24 @@ void DemoScene::Build(World& world, ResourceManager& resources)
     SceneFactory factory(world.registry, resources);
 
     MeshID sponzaMesh = resources.LoadMesh("../../Common/sponza.obj");
+    MeshID portraitMesh = resources.LoadMesh("../../Common/negr.obj");
+    MeshID diabloMesh = resources.LoadMesh("../../Common/diablo3_pose.obj");
+
+    MaterialID portraitMaterial = resources.CreateTexturedMaterial(
+        "PortraitMaterial",
+        L"textures/texture.dds",
+        L"textures/texture_nm.dds",
+        glm::vec3(1.0f),
+        0.45f);
+    resources.SetMeshMaterial(portraitMesh, portraitMaterial);
+
+    MaterialID diabloMaterial = resources.CreateTexturedMaterial(
+        "DiabloMaterial",
+        L"textures/diablo3_pose_diffuse.dds",
+        L"textures/diablo3_pose_nm.dds",
+        glm::vec3(1.0f),
+        0.4f);
+    resources.SetMeshMaterial(diabloMesh, diabloMaterial);
 
     MaterialID platformMaterial = resources.CreateTexturedMaterial(
         "DemoPlatform",
@@ -33,6 +51,20 @@ void DemoScene::Build(World& world, ResourceManager& resources)
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f),
         glm::vec3(0.3f));
+
+    factory.CreateMeshEntity(
+        "TexturedPortrait",
+        portraitMesh,
+        glm::vec3(0.0f, 4.0f, -2.0f),
+        glm::vec3(0.0f),
+        glm::vec3(4.0f));
+
+    factory.CreateMeshEntity(
+        "TexturedDiablo",
+        diabloMesh,
+        glm::vec3(8.0f, 4.0f, -2.0f),
+        glm::vec3(0.0f),
+        glm::vec3(4.0f));
 
     entt::entity floor = factory.CreatePrimitive(
         "PhysicsFloor",

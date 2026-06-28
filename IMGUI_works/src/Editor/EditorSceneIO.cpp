@@ -41,6 +41,11 @@ void EditorSceneIO::SaveScene(EditorContext& ctx)
 
 void EditorSceneIO::LoadScene(EditorContext& ctx)
 {
+    LoadScene(ctx, DefaultSavePath());
+}
+
+void EditorSceneIO::LoadScene(EditorContext& ctx, const char* path)
+{
     if (!ctx.engine)
     {
         ctx.statusMessage = "Load failed: engine not bound.";
@@ -48,11 +53,11 @@ void EditorSceneIO::LoadScene(EditorContext& ctx)
     }
 
     std::string error;
-    if (ctx.engine->LoadScene(DefaultSavePath(), error))
+    if (ctx.engine->LoadScene(path, error))
     {
         ctx.selected = entt::null;
         ctx.registry = &ctx.engine->GetRegistry();
-        ctx.statusMessage = std::string("Loaded from ") + DefaultSavePath();
+        ctx.statusMessage = std::string("Loaded from ") + path;
     }
     else
         ctx.statusMessage = "Load failed: " + error;

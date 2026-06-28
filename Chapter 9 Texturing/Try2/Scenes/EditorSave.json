@@ -1,0 +1,485 @@
+{
+    "entities": [
+        {
+            "camera": {
+                "aspectRatio": 1.3333333730697632,
+                "farZ": 1500.0,
+                "fov": 1.7999999523162842,
+                "nearZ": 0.10000000149011612
+            },
+            "tag": "MainCamera",
+            "transform": {
+                "position": [
+                    -1.0,
+                    10.0,
+                    -25.0
+                ],
+                "rotation": [
+                    -0.21699999272823334,
+                    0.6230001449584961,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "spotLight": {
+                "color": [
+                    1.0,
+                    0.8999999761581421,
+                    0.699999988079071
+                ],
+                "direction": [
+                    0.0,
+                    -0.9320046305656433,
+                    0.36244624853134155
+                ],
+                "enabled": true,
+                "falloffEnd": 45.0,
+                "falloffStart": 2.0,
+                "intensity": 2.0,
+                "spotPower": 24.0
+            },
+            "tag": "SpotLight",
+            "transform": {
+                "position": [
+                    0.0,
+                    14.0,
+                    -10.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "pointLight": {
+                "color": [
+                    0.20000000298023224,
+                    0.550000011920929,
+                    1.0
+                ],
+                "enabled": true,
+                "falloffEnd": 30.0,
+                "falloffStart": 2.0,
+                "intensity": 2.5
+            },
+            "tag": "CoolPointLight",
+            "transform": {
+                "position": [
+                    7.0,
+                    6.0,
+                    3.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "pointLight": {
+                "color": [
+                    1.0,
+                    0.44999998807907104,
+                    0.25
+                ],
+                "enabled": true,
+                "falloffEnd": 35.0,
+                "falloffStart": 2.0,
+                "intensity": 3.0
+            },
+            "tag": "WarmPointLight",
+            "transform": {
+                "position": [
+                    -8.0,
+                    7.0,
+                    -8.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "directionalLight": {
+                "color": [
+                    1.0,
+                    0.9599999785423279,
+                    0.8799999952316284
+                ],
+                "direction": [
+                    -0.5486301183700562,
+                    -0.7980074286460876,
+                    0.2493773102760315
+                ],
+                "enabled": true,
+                "intensity": 1.149999976158142
+            },
+            "tag": "SunLight",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "collider": {
+                "friction": 0.4000000059604645,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.20000000298023224,
+                "type": "sphere"
+            },
+            "mesh": {
+                "id": 7
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 1.0,
+                "type": "dynamic",
+                "useGravity": true,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": "FallingSphereB",
+            "transform": {
+                "position": [
+                    -1.0,
+                    23.0,
+                    1.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.5,
+                    1.5,
+                    1.5
+                ]
+            }
+        },
+        {
+            "collider": {
+                "friction": 0.4000000059604645,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.20000000298023224,
+                "type": "sphere"
+            },
+            "mesh": {
+                "id": 6
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 1.0,
+                "type": "dynamic",
+                "useGravity": true,
+                "velocity": [
+                    -0.5,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": "FallingSphereA",
+            "transform": {
+                "position": [
+                    5.0,
+                    15.0,
+                    -4.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    2.0,
+                    2.0
+                ]
+            }
+        },
+        {
+            "collider": {
+                "friction": 0.6000000238418579,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.05000000074505806,
+                "type": "aabb"
+            },
+            "mesh": {
+                "id": 5
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 3.0,
+                "type": "dynamic",
+                "useGravity": true,
+                "velocity": [
+                    0.800000011920929,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": "FallingCubeB",
+            "transform": {
+                "position": [
+                    1.0,
+                    18.0,
+                    -5.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.5,
+                    2.5,
+                    2.5
+                ]
+            }
+        },
+        {
+            "collider": {
+                "friction": 0.6000000238418579,
+                "halfExtents": [
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.05000000074505806,
+                "type": "aabb"
+            },
+            "mesh": {
+                "id": 4
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 2.0,
+                "type": "dynamic",
+                "useGravity": true,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": "FallingCubeA",
+            "transform": {
+                "position": [
+                    -5.0,
+                    12.0,
+                    -6.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    2.0,
+                    2.0,
+                    2.0
+                ]
+            }
+        },
+        {
+            "collider": {
+                "friction": 0.800000011920929,
+                "halfExtents": [
+                    0.5,
+                    0.10000000149011612,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.0,
+                "type": "aabb"
+            },
+            "mesh": {
+                "id": 3
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 1.0,
+                "type": "static",
+                "useGravity": true,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "tag": "PhysicsFloor",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    80.0,
+                    1.0,
+                    80.0
+                ]
+            }
+        },
+        {
+            "mesh": {
+                "id": 2
+            },
+            "tag": "TexturedPortrait",
+            "transform": {
+                "position": [
+                    0.0,
+                    4.0,
+                    -2.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    4.0,
+                    4.0,
+                    4.0
+                ]
+            }
+        },
+        {
+            "mesh": {
+                "id": 1
+            },
+            "tag": "Sponza",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.30000001192092896,
+                    0.30000001192092896,
+                    0.30000001192092896
+                ]
+            }
+        }
+    ],
+    "version": 1
+}

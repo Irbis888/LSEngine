@@ -75,6 +75,17 @@ static void DrawHierarchyPanel(EditorContext& ctx)
 
     ImGui::Text("Entities: %zu", entities.size());
 
+    const bool canCreatePrimitive = Editor_CanEditComponents() && ctx.resources;
+    if (!canCreatePrimitive)
+        ImGui::BeginDisabled();
+    if (ImGui::Button("+ Create Primitive..."))
+        ctx.showPrimitiveCreator = true;
+    ImGui::SetItemTooltip("Create a plane, cube, or sphere mesh.");
+    if (!canCreatePrimitive)
+        ImGui::EndDisabled();
+
+    ImGui::Separator();
+
     for (auto entity : entities)
     {
         const bool selected = ctx.selected == entity;

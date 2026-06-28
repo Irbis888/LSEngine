@@ -37,6 +37,7 @@ struct EditorContext
     bool showStatistics = true;
     bool showLegend = true;
     bool showDemo = false;
+    bool showPrimitiveCreator = false;
 
     /// Debug: when true, Stop reloads Scenes/EditorPlaySnapshot.json. When false, Stop only exits Play mode.
     bool restoreSceneOnStop = false;
