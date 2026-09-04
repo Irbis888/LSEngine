@@ -1,0 +1,2796 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>TotalOverview</title>
+  <style>
+
+html {
+color: #1a1a1a;
+background-color: #fdfdfd;
+}
+body {
+margin: 0 auto;
+max-width: 36em;
+padding-left: 50px;
+padding-right: 50px;
+padding-top: 50px;
+padding-bottom: 50px;
+hyphens: auto;
+overflow-wrap: break-word;
+text-rendering: optimizeLegibility;
+font-kerning: normal;
+}
+@media (max-width: 600px) {
+body {
+font-size: 0.9em;
+padding: 12px;
+}
+h1 {
+font-size: 1.8em;
+}
+}
+@media print {
+html {
+background-color: white;
+}
+body {
+background-color: transparent;
+color: black;
+font-size: 12pt;
+}
+p, h2, h3 {
+orphans: 3;
+widows: 3;
+}
+h2, h3, h4 {
+page-break-after: avoid;
+}
+}
+p {
+margin: 1em 0;
+}
+a {
+color: #1a1a1a;
+}
+a:visited {
+color: #1a1a1a;
+}
+img {
+max-width: 100%;
+}
+svg {
+height: auto;
+max-width: 100%;
+}
+h1, h2, h3, h4, h5, h6 {
+margin-top: 1.4em;
+}
+h5, h6 {
+font-size: 1em;
+font-style: italic;
+}
+h6 {
+font-weight: normal;
+}
+ol, ul {
+padding-left: 1.7em;
+margin-top: 1em;
+}
+li > ol, li > ul {
+margin-top: 0;
+}
+blockquote {
+margin: 1em 0 1em 1.7em;
+padding-left: 1em;
+border-left: 2px solid #e6e6e6;
+color: #606060;
+}
+code {
+white-space: pre-wrap;
+font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+font-size: 85%;
+margin: 0;
+hyphens: manual;
+}
+pre {
+margin: 1em 0;
+overflow: auto;
+}
+pre code {
+padding: 0;
+overflow: visible;
+overflow-wrap: normal;
+}
+.sourceCode {
+background-color: transparent;
+overflow: visible;
+}
+hr {
+border: none;
+border-top: 1px solid #1a1a1a;
+height: 1px;
+margin: 1em 0;
+}
+table {
+margin: 1em 0;
+border-collapse: collapse;
+width: 100%;
+overflow-x: auto;
+display: block;
+font-variant-numeric: lining-nums tabular-nums;
+}
+table caption {
+margin-bottom: 0.75em;
+}
+tbody {
+margin-top: 0.5em;
+border-top: 1px solid #1a1a1a;
+border-bottom: 1px solid #1a1a1a;
+}
+th {
+border-top: 1px solid #1a1a1a;
+padding: 0.25em 0.5em 0.25em 0.5em;
+}
+td {
+padding: 0.125em 0.5em 0.25em 0.5em;
+}
+header {
+margin-bottom: 4em;
+text-align: center;
+}
+#TOC li {
+list-style: none;
+}
+#TOC ul {
+padding-left: 1.3em;
+}
+#TOC > ul {
+padding-left: 0;
+}
+#TOC a:not(:hover) {
+text-decoration: none;
+}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+</style>
+  <style>
+.mermaid,
+.diagram {
+display: block;
+width: 100%;
+max-width: 100%;
+margin: 1em auto;
+text-align: center;
+}
+.mermaid svg,
+.diagram svg {
+display: block;
+max-width: 100%;
+height: auto !important;
+margin-left: auto;
+margin-right: auto;
+}
+.mermaid-error {
+margin: 1em auto;
+padding: 0.75em 1em;
+border: 1px solid #b00020;
+background: #fff5f5;
+color: #111;
+font-family: monospace;
+font-size: 0.9em;
+white-space: pre-wrap;
+}
+@media print {
+.mermaid,
+.diagram {
+page-break-inside: avoid;
+break-inside: avoid;
+}
+}
+</style>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      flowchart: {
+        htmlLabels: true,
+        curve: 'basis',
+        useMaxWidth: true
+      },
+      sequence: {
+        useMaxWidth: true
+      },
+      gantt: {
+        useMaxWidth: true
+      }
+    });
+
+    function normalizeMermaidBlocks() {
+      const selectors = [
+        'pre > code.language-mermaid',
+        'pre > code.mermaid',
+        'pre.mermaid > code',
+        'pre.sourceCode.mermaid > code',
+        'div.sourceCode.mermaid pre > code',
+        'pre > code[class~="language-mermaid"]',
+        'pre > code[class~="mermaid"]'
+      ];
+
+      const blocks = Array.from(document.querySelectorAll(selectors.join(',')));
+      const uniqueBlocks = [...new Set(blocks)];
+
+      uniqueBlocks.forEach((code, index) => {
+        const source = code.textContent.trim();
+        if (!source) return;
+
+        const container = document.createElement('div');
+        container.className = 'mermaid diagram';
+        container.id = `mermaid-diagram-${index + 1}`;
+        container.textContent = source;
+
+        const pre = code.closest('pre');
+        const sourceWrapper =
+          pre && pre.parentElement && pre.parentElement.classList.contains('sourceCode')
+            ? pre.parentElement
+            : pre;
+
+        if (sourceWrapper) {
+          sourceWrapper.replaceWith(container);
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      normalizeMermaidBlocks();
+
+      try {
+        await mermaid.run({ querySelector: '.mermaid' });
+        document.documentElement.classList.add('mermaid-ready');
+      } catch (error) {
+        const message = document.createElement('div');
+        message.className = 'mermaid-error';
+        message.textContent = 'Mermaid diagram render error:\n' + error;
+        document.body.prepend(message);
+        console.error(error);
+      }
+    });
+  </script>
+</head>
+<body>
+<section id="движок-try2-полный-обзор" class="level1">
+<h1>Движок Try2 — полный обзор</h1>
+<p>Единый объединённый справочник по движку <strong>Try2</strong> DirectX 12 (<a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.sln"><code>Try2.sln</code></a>). Документ объединяет <a href="README.md">README.md</a>, <a href="01-project-overview.md">01-project-overview.md</a>, <a href="02-technologies-and-patterns.md">02-technologies-and-patterns.md</a>, <a href="03-code-structure.md">03-code-structure.md</a> и сжатую <a href="04-editor-additions.md">04-editor-additions.md</a>.</p>
+<p>Подробнее о слиянии и ImGui: <a href="../Changes/README.md">Changes/README.md</a>.</p>
+<hr />
+<section id="содержание" class="level2">
+<h2>Содержание</h2>
+<section id="вводная-часть" class="level3">
+<h3>Вводная часть</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Раздел</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#карта-документов">Карта документов</a></td>
+<td>Связь этого файла с раздельными документами ORu и Changes</td>
+</tr>
+<tr>
+<td><a href="#область-охвата">Область охвата</a></td>
+<td>В области и вне области документации Try2</td>
+</tr>
+<tr>
+<td><a href="#краткая-сборка">Краткая сборка</a></td>
+<td>Открытие решения, зависимости, опциональный редактор <code>.imgui_on</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="часть-1-обзор-проекта" class="level3">
+<h3>Часть 1 — Обзор проекта</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Раздел</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#краткое-резюме">Краткое резюме</a></td>
+<td>Что такое Try2: ECS, отложенный рендеринг, редактор, JSON-сцены</td>
+</tr>
+<tr>
+<td><a href="#происхождение-проекта">Происхождение проекта</a></td>
+<td>Luna → Try2; влитые ветки FromScratch и ImGui</td>
+</tr>
+<tr>
+<td><a href="#приложение-try2">Приложение Try2</a></td>
+<td>Решение, точка входа, цикл кадра, матрица возможностей</td>
+</tr>
+<tr>
+<td><a href="#прочие-материалы-в-lsengine">Прочие материалы в LSEngine</a></td>
+<td>IMGUI_works, Common, TexColumns, дубликат шейдеров</td>
+</tr>
+<tr>
+<td><a href="#в-работе-и-известные-пробелы">В работе и известные пробелы</a></td>
+<td>Заглушка Vulkan, пробелы редактора, связность</td>
+</tr>
+<tr>
+<td><a href="#как-собрать">Как собрать</a></td>
+<td>Пошаговая сборка и запуск</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="часть-2-технологии-и-паттерны" class="level3">
+<h3>Часть 2 — Технологии и паттерны</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Раздел</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#основной-стек-продукт-try2">Основной стек</a></td>
+<td>C++20, D3D12, EnTT, Assimp, ImGui, nlohmann/json</td>
+</tr>
+<tr>
+<td><a href="#уровни-зависимостей">Уровни зависимостей</a></td>
+<td>Try2, IMGUI_works, Common compiled/headers, вспомогательное</td>
+</tr>
+<tr>
+<td><a href="#архитектурные-паттерны-try2">Архитектурные паттерны</a></td>
+<td>Адаптер, конвейеры ECS, мост редактора, Edit/Play, освещение</td>
+</tr>
+<tr>
+<td><a href="#конвейер-шейдеров-try2shaders">Конвейер шейдеров</a></td>
+<td>Семь файлов HLSL и поток GPU-проходов</td>
+</tr>
+<tr>
+<td><a href="#наблюдения-по-дизайну">Наблюдения по дизайну</a></td>
+<td>Сильные стороны и технический долг</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="часть-3-структура-кода" class="level3">
+<h3>Часть 3 — Структура кода</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Раздел</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#раскладка-проекта-try2">Раскладка проекта Try2</a></td>
+<td>Дерево каталогов: Try2, IMGUI_works, Common, Scenes</td>
+</tr>
+<tr>
+<td><a href="#таблица-ответственности-модулей">Таблица ответственности модулей</a></td>
+<td>Все основные модули и файлы-хуки редактора</td>
+</tr>
+<tr>
+<td><a href="#компоненты-ecs">Компоненты ECS</a></td>
+<td>Transform, mesh, camera, свет, физика, теги</td>
+</tr>
+<tr>
+<td><a href="#диаграмма-a--жизненный-цикл-приложения-try2">Диаграммы A–I</a></td>
+<td>Жизненный цикл, системы, ECS, рендеринг, физика, сборка, редактор</td>
+</tr>
+<tr>
+<td><a href="#последовательность-за-кадр-try2">Последовательность за кадр</a></td>
+<td>Диаграмма последовательности одного кадра</td>
+</tr>
+<tr>
+<td><a href="#краткий-справочник-классов-и-api">Краткий справочник классов и API</a></td>
+<td>Application, Engine, системы, редактор, рендерер</td>
+</tr>
+<tr>
+<td><a href="#индекс-исходных-файлов">Индекс исходных файлов</a></td>
+<td>Многоуровневый список: Try2, IMGUI_works, Common, вспомогательное</td>
+</tr>
+<tr>
+<td><a href="#ключевые-функции-try2">Ключевые функции</a></td>
+<td>Engine, RenderSystem, serializer, EditorSceneIO, ImGuiBridge</td>
+</tr>
+<tr>
+<td><a href="#порядок-чтения-для-контрибьюторов-try2">Порядок чтения</a></td>
+<td>Рекомендуемый путь онбординга по кодовой базе</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="часть-4-дополнения-редактора" class="level3">
+<h3>Часть 4 — Дополнения редактора</h3>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr>
+<th>Раздел</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#сводка">Сводка</a></td>
+<td>Таблица статуса пунктов 1–10</td>
+</tr>
+<tr>
+<td><a href="#архитектура">Архитектура</a></td>
+<td>Поток EditorSceneIO → Engine → serializer</td>
+</tr>
+<tr>
+<td><a href="#ключевое-поведение">Ключевое поведение</a></td>
+<td>Ленивый init, save/load, снимок Play, Inspector, статистика</td>
+</tr>
+<tr>
+<td><a href="#оставшиеся-пробелы">Оставшиеся пробелы</a></td>
+<td>Docking, viewport RT, undo, заглушки</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="карта-документов" class="level2">
+<h2>Карта документов</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ресурс</th>
+<th>Когда использовать</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Этот файл (<code>TotalOverview.md</code>)</strong></td>
+<td>Полная архитектура в одном месте</td>
+</tr>
+<tr>
+<td><a href="README.md">README.md</a></td>
+<td>Краткий указатель на раздельные документы</td>
+</tr>
+<tr>
+<td><a href="01-project-overview.md">01-project-overview.md</a></td>
+<td>Только повествование</td>
+</tr>
+<tr>
+<td><a href="02-technologies-and-patterns.md">02-technologies-and-patterns.md</a></td>
+<td>Только стек и паттерны</td>
+</tr>
+<tr>
+<td><a href="03-code-structure.md">03-code-structure.md</a></td>
+<td>Только диаграммы и индекс файлов</td>
+</tr>
+<tr>
+<td><a href="04-editor-additions.md">04-editor-additions.md</a></td>
+<td>Пункты редактора 1–10 — проверка и пути к файлам</td>
+</tr>
+<tr>
+<td><a href="../Changes/README.md">Changes/README.md</a></td>
+<td>Детали слияния, внутренности ImGui</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="область-охвата" class="level2">
+<h2>Область охвата</h2>
+<table>
+<colgroup>
+<col style="width: 41%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr>
+<th>В области</th>
+<th>Вне области</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Продукт:</strong> <a href="../LSEngine/Chapter%209%20Texturing/Try2/"><code>Try2/</code></a> и <a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.sln"><code>Try2.sln</code></a></td>
+<td>Приложение TexColumns (<code>TexColumns.sln</code>)</td>
+</tr>
+<tr>
+<td><strong>GUI (компилируется):</strong> <a href="../LSEngine/IMGUI_works/"><code>LSEngine/IMGUI_works/</code></a> через <code>Try2.vcxproj</code></td>
+<td>Внутренности вендоров Dear ImGui / ImGuizmo</td>
+</tr>
+<tr>
+<td><strong>Сцены:</strong> <a href="../LSEngine/Chapter%209%20Texturing/Try2/Scenes/"><code>Try2/Scenes/</code></a> (напр. <code>DemoScene.json</code>)</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Скомпилированные зависимости:</strong> <code>../../Common/</code> — <code>GameTimer</code>, <code>MathHelper</code>, <code>DDSTextureLoader</code></td>
+<td>Неиспользуемые модули Luna в Common (<code>d3dApp</code>, <code>Camera</code>, <code>model</code>, …)</td>
+</tr>
+<tr>
+<td><strong>Заголовочные зависимости:</strong> EnTT, GLM, Assimp, nlohmann, <code>d3dx12.h</code></td>
+<td>Внутренности вендорных библиотек</td>
+</tr>
+<tr>
+<td><strong>Вспомогательный include:</strong> <code>../TexColumns/CustomBuffer.h</code></td>
+<td>Дублирующее дерево <code>LSEngine/Shaders/</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="краткая-сборка" class="level2">
+<h2>Краткая сборка</h2>
+<ol type="1">
+<li>Откройте <strong><code>LSEngine/Chapter 9 Texturing/Try2/Try2.sln</code></strong> в Visual Studio 2022.</li>
+<li>Конфигурация: <strong>Debug | x64</strong>.</li>
+<li>Убедитесь, что <code>Try2/Libs/assimp-vc143-mt.lib</code> на месте.</li>
+<li>Убедитесь, что <strong><code>LSEngine/IMGUI_works/</code></strong> существует (корень LSEngine, рядом с <code>Chapter 9 Texturing/</code>).</li>
+<li>Задайте <code>AdditionalIncludeDirectories</code> = <code>$(SolutionDir)..\..\Common</code>, если жёсткий путь в <code>Try2.vcxproj</code> не подходит вашей машине.</li>
+<li><strong>Опциональный редактор:</strong> создайте <strong><code>.imgui_on</code></strong> рядом с <code>Try2.exe</code>. Нажмите <strong><code>~</code></strong>, чтобы переключить UI (ленивая инициализация ImGui).</li>
+</ol>
+<hr />
+</section>
+</section>
+<section id="часть-1-обзор-проекта-1" class="level1">
+<h1>Часть 1 — Обзор проекта</h1>
+<section id="краткое-резюме" class="level2">
+<h2>Краткое резюме</h2>
+<p><strong>Try2</strong> — игровой движок на Windows с DirectX 12, собранный как единое решение Visual Studio (<a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.sln"><code>Try2.sln</code></a>). Он вырос из курса Frank Luna <em>Introduction to 3D Game Programming with DirectX 12</em>, но теперь имеет собственную архитектуру:</p>
+<ul>
+<li><strong>ECS</strong>-мир на EnTT (<code>World</code>, компоненты, системы)</li>
+<li><strong>Адаптер рендерера</strong> — <code>IRenderAdapter</code> / <code>D3DRenderAdapter</code> изолирует D3D12 от игровой логики</li>
+<li><strong>Отложенный рендеринг</strong> — geometry pass → lighting pass → resolve pass (<code>Try2/Shaders/</code>)</li>
+<li><strong>ECS-освещение</strong> — компоненты направленного, точечного и прожекторного света управляют отложенным проходом</li>
+<li><strong>Сцены на данных</strong> — загрузка JSON через <code>SceneSerializer</code> с запасным вариантом <code>DemoScene</code></li>
+<li><strong>Опциональный редактор сцен</strong> — Dear ImGui + ImGuizmo в <a href="../LSEngine/IMGUI_works/"><code>LSEngine/IMGUI_works/</code></a>, интеграция через <code>ImGuiBridge</code></li>
+<li><strong>Assimp</strong> для загрузки ассетов и лёгкий слой <strong>физики</strong> (AABB, гравитация; только в режиме Play при активном редакторе)</li>
+<li><strong>Инструменты разработки</strong> — <strong>F5</strong> перезагружает HLSL-шейдеры во время выполнения</li>
+</ul>
+<p>Папка <strong>LSEngine</strong> — корень git-репозитория. <strong>Try2</strong> (<code>Chapter 9 Texturing/Try2/</code>) — активный продукт; <strong><code>IMGUI_works/</code></strong> в корне LSEngine содержит редактор (компилируется в Try2); <strong>Common/</strong> — общие заголовки и ассеты; остальные папки глав — исторические примеры.</p>
+<hr />
+</section>
+<section id="происхождение-проекта" class="level2">
+<h2>Происхождение проекта</h2>
+<pre class="mermaid"><code>flowchart LR
+  luna[Luna DX12 Book]
+  ch9[Chapter 9 Texturing]
+  try2[Try2 ECS Engine]
+  gui[ImGui editor merged]
+  tex[TexColumns sample]
+  luna --&gt; ch9 --&gt; try2
+  try2 --&gt; gui
+  ch9 -.-&gt;|&quot;auxiliary fork&quot;| tex</code></pre>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 31%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Этап</th>
+<th>Что это</th>
+<th>Связь с Try2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Основа Luna</td>
+<td><code>GameTimer</code>, <code>MathHelper</code>, <code>d3dx12.h</code></td>
+<td><strong>Компилируется или подключается</strong> в Try2</td>
+</tr>
+<tr>
+<td>Глава 9</td>
+<td>Примеры главы по текстурированию</td>
+<td>Исторический контекст</td>
+</tr>
+<tr>
+<td><strong>Ядро Try2</strong></td>
+<td>ECS + отложенный конвейер</td>
+<td><strong>Текущий продукт</strong> (<code>Try2.sln</code>)</td>
+</tr>
+<tr>
+<td>Слияние FromScratch</td>
+<td>JSON-сцены, свет, F5 reload</td>
+<td><strong>Влито</strong> в Try2 (<code>Engine</code>, <code>RenderSystem</code>, serializer)</td>
+</tr>
+<tr>
+<td>ImGui / <code>FS_w_GUI</code></td>
+<td>WYSIWYG-редактор в <code>LSEngine/IMGUI_works/</code></td>
+<td><strong>Влито</strong> — опционально через <code>.imgui_on</code></td>
+</tr>
+<tr>
+<td>TexColumns</td>
+<td>Монолитное forward-демо <code>D3DApp</code></td>
+<td><strong>Не в Try2.sln</strong>; переиспользуется <code>CustomBuffer.h</code></td>
+</tr>
+<tr>
+<td>Будущее</td>
+<td><code>RenderAPI::Vulkan</code></td>
+<td>Только заглушка в <code>Application.h</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="приложение-try2" class="level2">
+<h2>Приложение Try2</h2>
+<section id="решение-и-точка-входа" class="level3">
+<h3>Решение и точка входа</h3>
+<table>
+<colgroup>
+<col style="width: 58%" />
+<col style="width: 41%" />
+</colgroup>
+<thead>
+<tr>
+<th>Свойство</th>
+<th>Значение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Решение</td>
+<td><a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.sln"><code>Try2.sln</code></a> — <strong>один проект</strong></td>
+</tr>
+<tr>
+<td>Проект</td>
+<td><code>Try2.vcxproj</code> (включает исходники <code>IMGUI_works</code>)</td>
+</tr>
+<tr>
+<td>Точка входа</td>
+<td><code>main()</code> в <code>Try2.cpp</code></td>
+</tr>
+<tr>
+<td>Оболочка приложения</td>
+<td><code>TestApp</code> → <code>Application</code></td>
+</tr>
+<tr>
+<td>Ядро движка</td>
+<td><code>Engine</code> + <code>World</code> + ECS-системы</td>
+</tr>
+<tr>
+<td>API редактора</td>
+<td>Только <code>ImGuiBridge</code> (см. <a href="../Changes/IMGUI-Editor-System.md">Changes/IMGUI-Editor-System.md</a>)</td>
+</tr>
+<tr>
+<td>Подсистема</td>
+<td>Консоль (хостит окно рендера Win32)</td>
+</tr>
+<tr>
+<td>Стандарт C++</td>
+<td>C++20</td>
+</tr>
+</tbody>
+</table>
+<p><code>TestApp</code> переопределяет <code>Update</code>, <code>PhysicsUpdate</code> и <code>Draw</code> и передаёт каждый вызов в <code>Engine</code>. После <code>Initialize</code> в <code>Try2.cpp</code> вызывается <code>ImGuiBridge::SetEngine</code>.</p>
+</section>
+<section id="цикл-кадра-кратко" class="level3">
+<h3>Цикл кадра (кратко)</h3>
+<p>Try2.exe собирается из исходников <strong>Chapter 9</strong> плюс <strong><code>LSEngine/IMGUI_works</code></strong> (мост, панели, Dear ImGui, ImGuizmo). Во время выполнения движок и редактор — один процесс:</p>
+<ol type="1">
+<li>Сообщения Win32 → <code>InputState</code> (<code>MsgProc</code> пересылает в ImGui только если контекст уже есть — <strong>без инициализации ImGui на первом сообщении</strong>)</li>
+<li><code>ImGuiBridge::ProcessInput</code> — <strong><code>~</code></strong> переключает видимость и запускает <strong>ленивую</strong> настройку DX12/ImGui при наличии лицензии (<code>.imgui_on</code> рядом с exe)</li>
+<li>Фиксированные шаги физики <strong>60 Гц</strong> — <strong>пропускаются в режиме Edit</strong> (<code>Editor_IsPhysicsEnabled</code>)</li>
+<li><code>BeginFrame</code> → <code>Update</code> (камера, <strong>F5</strong> перезагрузка шейдеров) → <code>Draw</code> (свет + меши)</li>
+<li><code>ImGuiBridge::BeginFrame</code> → <code>RenderEditorUI</code> (панели в <code>IMGUI_works/src/Editor/</code>) → <code>RenderOverlay</code> (UI на том же command list)</li>
+<li><code>EndFrame</code> → present</li>
+</ol>
+</section>
+<section id="возможности" class="level3">
+<h3>Возможности</h3>
+<table>
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 62%" />
+</colgroup>
+<thead>
+<tr>
+<th>Область</th>
+<th>Функции</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ввод</strong></td>
+<td>Состояние клавиатуры/мыши; захват ImGui при видимом UI</td>
+</tr>
+<tr>
+<td><strong>ECS</strong></td>
+<td>Transform, mesh, camera, tag, rigidbody, collider, <strong>направленный/точечный/прожекторный свет</strong></td>
+</tr>
+<tr>
+<td><strong>Ассеты</strong></td>
+<td>Меши Assimp, процедурные примитивы, материалы, текстуры</td>
+</tr>
+<tr>
+<td><strong>Сцены</strong></td>
+<td>Загрузка при старте <code>DemoScene.json</code>; <strong>File → Save/Load</strong> через <code>Engine::SaveScene</code> / <code>LoadScene</code></td>
+</tr>
+<tr>
+<td><strong>Сериализация</strong></td>
+<td><code>SceneSerializer</code> — сущности, меши, материалы, свет</td>
+</tr>
+<tr>
+<td><strong>Рендеринг</strong></td>
+<td>Отложенный G-buffer, ECS-свет, resolve, ленивая загрузка на GPU</td>
+</tr>
+<tr>
+<td><strong>Физика</strong></td>
+<td>Гравитация, AABB-коллизии; <strong>счётчик столкновений</strong> за кадр; <strong>только Play</strong> при лицензированном редакторе</td>
+</tr>
+<tr>
+<td><strong>UI редактора</strong></td>
+<td>Hierarchy (все сущности), Inspector (вкл. <strong>свет</strong>, отключён в Play), Viewport, Statistics (<strong>FPS среднее за 1 с</strong>), <strong>Legend / Help</strong>, ImGuizmo; нужны <code>.imgui_on</code> + <strong><code>~</code></strong></td>
+</tr>
+<tr>
+<td><strong>I/O редактора</strong></td>
+<td>Save → <code>Scenes/EditorSave.json</code>; снимок Play → <code>Scenes/EditorPlaySnapshot.json</code>; опциональное восстановление при Stop</td>
+</tr>
+<tr>
+<td><strong>Инструменты</strong></td>
+<td><strong>F5</strong> — <code>D3DRenderAdapter::ReloadShaders()</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="прочие-материалы-в-lsengine" class="level2">
+<h2>Прочие материалы в LSEngine</h2>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 17%" />
+<col style="width: 54%" />
+</colgroup>
+<thead>
+<tr>
+<th>Расположение</th>
+<th>Роль</th>
+<th>Связь с Try2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../LSEngine/IMGUI_works/"><code>LSEngine/IMGUI_works/</code></a></td>
+<td>ImGui, ImGuizmo, панели редактора</td>
+<td><strong>Компилируется в Try2</strong> через <code>$(IMGUI_WORKS)</code> = <code>../../IMGUI_works</code> из Try2</td>
+</tr>
+<tr>
+<td><a href="../LSEngine/Common/"><code>LSEngine/Common/</code></a></td>
+<td>Утилиты Luna + вендорные заголовки</td>
+<td>Частично: 3 <code>.cpp</code> компилируются; entt/glm/assimp/nlohmann подключаются</td>
+</tr>
+<tr>
+<td><a href="../LSEngine/Common/obj/"><code>../../Common/obj/</code></a></td>
+<td>Примеры мешей</td>
+<td>Пути во время выполнения из сцен / <code>DemoScene</code></td>
+</tr>
+<tr>
+<td><a href="../LSEngine/Chapter%209%20Texturing/TexColumns/"><code>../TexColumns/</code></a></td>
+<td>Пример Luna</td>
+<td><strong>Только заголовок:</strong> <code>CustomBuffer.h</code></td>
+</tr>
+<tr>
+<td><a href="../LSEngine/Shaders/"><code>../../Shaders/</code></a></td>
+<td>Дубликат HLSL</td>
+<td>Используйте <strong><code>Try2/Shaders/</code></strong></td>
+</tr>
+<tr>
+<td><code>Common/d3dApp</code>, <code>Camera</code>, <code>model</code>, …</td>
+<td>Другой код Luna</td>
+<td>Try2 не линкует</td>
+</tr>
+</tbody>
+</table>
+<p>Подробнее о слиянии и редакторе: <a href="../Changes/README.md">Changes/README.md</a>.</p>
+<hr />
+</section>
+<section id="в-работе-и-известные-пробелы" class="level2">
+<h2>В работе и известные пробелы</h2>
+<table>
+<colgroup>
+<col style="width: 42%" />
+<col style="width: 57%" />
+</colgroup>
+<thead>
+<tr>
+<th>Область</th>
+<th>Статус</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Vulkan</strong></td>
+<td>Объявлен <code>RenderAPI::Vulkan</code>; реализован только DX12</td>
+</tr>
+<tr>
+<td><strong>Лицензия редактора</strong></td>
+<td>UI отключён без <code>.imgui_on</code> рядом с исполняемым файлом</td>
+</tr>
+<tr>
+<td><strong>Заглушки редактора</strong></td>
+<td>Undo, docking, offscreen viewport RT, панели ассетов/материалов (см. <a href="04-editor-additions.md">04-editor-additions.md</a>)</td>
+</tr>
+<tr>
+<td><strong>I/O редактора</strong></td>
+<td>Save/Load через <code>Scenes/EditorSave.json</code>; снимок Play <code>Scenes/EditorPlaySnapshot.json</code></td>
+</tr>
+<tr>
+<td><strong>Отладка редактора</strong></td>
+<td>Опциональное <strong>восстановление при Stop</strong> (по умолчанию выкл.); кнопка <strong>Restore Snapshot</strong> в любой момент</td>
+</tr>
+<tr>
+<td><strong>Пути сборки</strong></td>
+<td><code>Try2.vcxproj</code> может жёстко задавать include — лучше <code>$(SolutionDir)..\..\Common</code></td>
+</tr>
+<tr>
+<td><strong>Связь CustomBuffer</strong></td>
+<td>Заголовок из TexColumns; <code>CustomBuffer.cpp</code> не в vcxproj</td>
+</tr>
+<tr>
+<td><strong>RenderSystem</strong></td>
+<td>Неиспользуемый член <code>ResourceManager*</code></td>
+</tr>
+<tr>
+<td><strong>Кучи дескрипторов</strong></td>
+<td>Движок: индексы 0–899; ImGui: 900–963 на общей CBV/SRV-куче</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="как-собрать" class="level2">
+<h2>Как собрать</h2>
+<ol type="1">
+<li>Откройте <strong><code>LSEngine/Chapter 9 Texturing/Try2/Try2.sln</code></strong> (не TexColumns).</li>
+<li>Выберите <strong>Debug | x64</strong>.</li>
+<li>Положите <strong><code>assimp-vc143-mt.lib</code></strong> в <code>Try2/Libs/</code>.</li>
+<li>Убедитесь, что <strong><code>LSEngine/IMGUI_works/</code></strong> существует (рядом с <code>Chapter 9 Texturing/</code>, не внутри неё) — требуется vcxproj.</li>
+<li>Исправьте <strong><code>AdditionalIncludeDirectories</code></strong> при необходимости для <code>LSEngine/Common</code>.</li>
+<li>Запустите; рабочая директория должна находить <code>Scenes/DemoScene.json</code> и пути мешей под <code>Common/obj/</code>.</li>
+<li>Чтобы включить редактор: добавьте <strong><code>.imgui_on</code></strong> рядом с <code>Try2.exe</code>, запустите, нажмите <strong><code>~</code></strong>.</li>
+</ol>
+<hr />
+</section>
+<section id="что-читать-дальше" class="level2">
+<h2>Что читать дальше</h2>
+<ul>
+<li>Технологии и паттерны → <a href="02-technologies-and-patterns.md">02-technologies-and-patterns.md</a></li>
+<li>Структура, диаграммы, индекс файлов → <a href="03-code-structure.md">03-code-structure.md</a></li>
+<li>Дополнения редактора (пункты 1–10) → <a href="04-editor-additions.md">04-editor-additions.md</a></li>
+<li>Базовая интеграция слияния + ImGui → <a href="../Changes/README.md">Changes/README.md</a></li>
+</ul>
+<hr />
+</section>
+</section>
+<section id="часть-2-технологии-и-паттерны-1" class="level1">
+<h1>Часть 2 — Технологии и паттерны</h1>
+<p>Стек технологий, зависимости и паттерны проектирования <strong>в проекте Try2</strong> (<a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.vcxproj"><code>Try2.vcxproj</code></a>). Модули и диаграммы — в <a href="03-code-structure.md">03-code-structure.md</a>. Подробности слияния и редактора — в <a href="../Changes/README.md">Changes/README.md</a>.</p>
+<hr />
+<section id="основной-стек-продукт-try2" class="level2">
+<h2>Основной стек (продукт Try2)</h2>
+<table>
+<colgroup>
+<col style="width: 27%" />
+<col style="width: 33%" />
+<col style="width: 38%" />
+</colgroup>
+<thead>
+<tr>
+<th>Категория</th>
+<th>Технология</th>
+<th>Роль в Try2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Язык</td>
+<td>C++20</td>
+<td>ECS, контейнеры STL, <code>std::unique_ptr</code></td>
+</tr>
+<tr>
+<td>Платформа</td>
+<td>Win32 API</td>
+<td>Окно, цикл сообщений, ввод в <code>Application</code></td>
+</tr>
+<tr>
+<td>Графический API</td>
+<td>Direct3D 12</td>
+<td><code>D3DRenderAdapter</code> — устройство, очереди, PSO, дескрипторы</td>
+</tr>
+<tr>
+<td>DXGI</td>
+<td>DXGI 1.4</td>
+<td>Swap chain и back buffer’ы</td>
+</tr>
+<tr>
+<td>Шейдеры</td>
+<td>HLSL + D3DCompile</td>
+<td><strong><code>Try2/Shaders/</code></strong>; горячая перезагрузка <strong>F5</strong> через <code>ReloadShaders()</code></td>
+</tr>
+<tr>
+<td>Математика CPU</td>
+<td>GLM</td>
+<td>Трансформы ECS, физика, свет, меши</td>
+</tr>
+<tr>
+<td>Константы GPU</td>
+<td>DirectXMath</td>
+<td>Структуры <code>FrameRes.h</code>, выровненные с HLSL</td>
+</tr>
+<tr>
+<td>ECS</td>
+<td>EnTT</td>
+<td><code>World::registry</code>, итерация <code>view</code> в системах</td>
+</tr>
+<tr>
+<td>Ассеты</td>
+<td>Assimp + <code>assimp-vc143-mt.lib</code></td>
+<td><code>ResourceManager::LoadMesh</code></td>
+</tr>
+<tr>
+<td>Сериализация</td>
+<td>nlohmann/json</td>
+<td><code>SceneSerializer</code> — сцены, материалы, свет</td>
+</tr>
+<tr>
+<td>UI</td>
+<td>Dear ImGui + ImGuizmo</td>
+<td>Редактор в <code>LSEngine/IMGUI_works/</code>; бэкенды DX12/Win32</td>
+</tr>
+<tr>
+<td>COM</td>
+<td>WRL <code>ComPtr</code></td>
+<td>Время жизни ресурсов D3D12</td>
+</tr>
+<tr>
+<td>Сборка</td>
+<td>MSBuild / VS 2022</td>
+<td>Решение из одного проекта; toolset <code>v143</code> / <code>v145</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="уровни-зависимостей" class="level2">
+<h2>Уровни зависимостей</h2>
+<p>Что реально подтягивает <a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.vcxproj"><code>Try2.vcxproj</code></a>.</p>
+<section id="уровень-1-код-try2-компилируется-в-проекте" class="level3">
+<h3>Уровень 1 — код Try2 (компилируется в проекте)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Application</code></td>
+<td>Цикл Win32, ввод, шаг физики, хуки ImGui, фабрика рендерера</td>
+</tr>
+<tr>
+<td><code>Engine</code></td>
+<td>Списки систем, загрузка/сохранение сцены, F5 reload, шлюз физики, <code>GetRegistry</code> / <code>GetResources</code>, <code>SaveScene</code> / <code>LoadScene</code></td>
+</tr>
+<tr>
+<td><code>World</code></td>
+<td>Обёртка <code>entt::registry</code></td>
+</tr>
+<tr>
+<td><code>Commons</code></td>
+<td>Компоненты (вкл. свет), <code>IRenderAdapter</code>, <code>ISystem</code>, <code>FrameContext</code></td>
+</tr>
+<tr>
+<td><code>CameraControllerSystem</code></td>
+<td>FPS-камера; учитывает <code>ImGuiBridge::WantsCaptureInput</code></td>
+</tr>
+<tr>
+<td><code>PhysicsSystem</code></td>
+<td>Интеграция + коллизии; пары через <code>PhysicsStats</code></td>
+</tr>
+<tr>
+<td><code>RenderSystem</code></td>
+<td>Камера, <strong>ECS-свет</strong> → <code>SetLights</code>, отрисовка мешей</td>
+</tr>
+<tr>
+<td><code>ResourceManager</code></td>
+<td>CPU-ассеты, Assimp</td>
+</tr>
+<tr>
+<td><code>D3DRenderAdapter</code></td>
+<td>Рендерер D3D12, <code>ReloadShaders</code>, <code>GetImGuiBindings</code></td>
+</tr>
+<tr>
+<td><code>FrameRes</code> / <code>d3dUtils</code></td>
+<td>Кольца CB, компиляция шейдеров, хелперы</td>
+</tr>
+<tr>
+<td><code>SceneFactory</code>, <code>DemoScene</code>, <code>SceneSerializer</code></td>
+<td>Настройка уровня и JSON I/O</td>
+</tr>
+<tr>
+<td><code>Try2.cpp</code></td>
+<td><code>main()</code>, <code>TestApp</code>, <code>ImGuiBridge::SetEngine</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="уровень-1b-imgui_works-компилируется-через-imgui_works" class="level3">
+<h3>Уровень 1b — IMGUI_works (компилируется через <code>$(IMGUI_WORKS)</code>)</h3>
+<p>Путь: <code>$(SolutionDir)../../IMGUI_works</code> → <a href="../LSEngine/IMGUI_works/"><code>LSEngine/IMGUI_works/</code></a> (тот же git-репозиторий, что и Try2; не внутри Chapter 9).</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImGuiBridge</code></td>
+<td><strong>Единственный</strong> публичный API Try2 для редактора</td>
+</tr>
+<tr>
+<td><code>ImGuiPlatform</code></td>
+<td>Проверка лицензии <code>.imgui_on</code>, переключение <code>~</code></td>
+</tr>
+<tr>
+<td><code>EditorContext</code> + панели</td>
+<td>Hierarchy, Inspector, Viewport, Statistics, панель gizmo</td>
+</tr>
+<tr>
+<td><code>HierarchyPanel</code>, <code>InspectorPanel</code>, …</td>
+<td>UI ECS читает/пишет через <code>EditorContext</code></td>
+</tr>
+<tr>
+<td><code>GizmoController</code></td>
+<td><code>ImGuizmo::Manipulate</code> в режиме Edit</td>
+</tr>
+<tr>
+<td><code>EditorSceneIO</code></td>
+<td>Save/Load, снимок Play, опциональное восстановление при Stop</td>
+</tr>
+<tr>
+<td><code>LegendPanel</code></td>
+<td>Legend / Help, аббревиатуры, документация отладочного восстановления</td>
+</tr>
+<tr>
+<td>ThirdParty imgui</td>
+<td>Ядро + <code>imgui_impl_win32</code> + <code>imgui_impl_dx12</code></td>
+</tr>
+<tr>
+<td>ImGuizmo</td>
+<td>Gizmo перемещения / вращения / масштаба</td>
+</tr>
+</tbody>
+</table>
+<p>Try2 <strong>не должен</strong> подключать заголовки ImGui напрямую, кроме как через <code>ImGuiBridge.h</code>.</p>
+</section>
+<section id="уровень-2-компилируется-из-....common" class="level3">
+<h3>Уровень 2 — компилируется из <code>../../Common/</code></h3>
+<table>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GameTimer.cpp</code></td>
+<td>Тайминг кадра в <code>Application</code></td>
+</tr>
+<tr>
+<td><code>MathHelper.cpp</code></td>
+<td>Матрицы для GPU constant buffer’ов</td>
+</tr>
+<tr>
+<td><code>DDSTextureLoader.cpp</code></td>
+<td>Загрузка DDS-текстур в рендерере</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="уровень-3-только-заголовки-из-....common" class="level3">
+<h3>Уровень 3 — только заголовки из <code>../../Common/</code></h3>
+<table>
+<thead>
+<tr>
+<th>Зависимость</th>
+<th>Используется</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>entt/entt.hpp</code></td>
+<td><code>World</code>, системы, редактор</td>
+</tr>
+<tr>
+<td><code>glm/</code></td>
+<td>Компоненты, физика, меши, свет</td>
+</tr>
+<tr>
+<td><code>assimp/</code></td>
+<td><code>ResourceManager</code></td>
+</tr>
+<tr>
+<td><code>nlohmann/json.hpp</code></td>
+<td><code>SceneSerializer</code></td>
+</tr>
+<tr>
+<td><code>d3dx12.h</code></td>
+<td><code>d3dUtils</code>, <code>D3DRenderAdapter</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="уровень-4-вспомогательный-include-не-в-try2.sln" class="level3">
+<h3>Уровень 4 — вспомогательный include (не в Try2.sln)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>../TexColumns/CustomBuffer.h</code></td>
+<td>Хелпер G-buffer / render target; используется <code>D3DRenderAdapter</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>CustomBuffer.cpp</code> <strong>не</strong> указан в <code>Try2.vcxproj</code> — известный риск связности.</p>
+</section>
+<section id="не-используется-сборкой-try2" class="level3">
+<h3>Не используется сборкой Try2</h3>
+<table>
+<thead>
+<tr>
+<th>Элемент</th>
+<th>Примечание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d3dApp</code>, <code>Camera</code>, <code>GeometryGenerator</code>, <code>model</code></td>
+<td>Только другие решения</td>
+</tr>
+<tr>
+<td><code>TexColumns.sln</code></td>
+<td>Отдельный вспомогательный пример</td>
+</tr>
+<tr>
+<td><code>LSEngine/Shaders/</code></td>
+<td>Дубликат; авторитетный набор — <strong><code>Try2/Shaders/</code></strong></td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart TB
+  subgraph product [Try2.sln]
+    try2proj[Try2.vcxproj]
+    localSrc[Try2 sources and Shaders]
+    imguiWorks[IMGUI_works bridge and editor]
+  end
+  subgraph deps [Dependencies]
+    commonCompiled[Common: GameTimer MathHelper DDSTextureLoader]
+    commonHeaders[Common: entt glm assimp nlohmann d3dx12]
+    texHeader[TexColumns: CustomBuffer.h]
+    assets[Common obj and Scenes JSON]
+  end
+  subgraph notInBuild [Not in Try2.sln]
+    texProj[TexColumns.sln]
+    lunaUnused[Common: d3dApp Camera model etc]
+    rootShaders[LSEngine Shaders duplicate]
+  end
+  try2proj --&gt; localSrc
+  try2proj --&gt; imguiWorks
+  try2proj --&gt; commonCompiled
+  try2proj --&gt; commonHeaders
+  try2proj --&gt; texHeader
+  try2proj --&gt; assets</code></pre>
+<hr />
+</section>
+</section>
+<section id="архитектурные-паттерны-try2" class="level2">
+<h2>Архитектурные паттерны (Try2)</h2>
+<section id="адаптер-рендерера" class="level3">
+<h3>1. Адаптер рендерера</h3>
+<p><code>IRenderAdapter</code> ← <code>D3DRenderAdapter</code>. Системы не подключают <code>d3d12.h</code> напрямую. Расширен методами <code>SetLights</code> и <code>ReloadShaders</code>.</p>
+</section>
+<section id="конвейеры-ecs-систем" class="level3">
+<h3>2. Конвейеры ECS-систем</h3>
+<table>
+<colgroup>
+<col style="width: 41%" />
+<col style="width: 25%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Конвейер</th>
+<th>Когда</th>
+<th>Система</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Update</td>
+<td>Каждый визуальный кадр</td>
+<td><code>CameraControllerSystem</code>; <strong>F5</strong> в <code>Engine::Update</code></td>
+</tr>
+<tr>
+<td>Physics</td>
+<td>Шаги 1/60 с, <strong>только Play</strong> при активном редакторе</td>
+<td><code>PhysicsSystem</code></td>
+</tr>
+<tr>
+<td>Render</td>
+<td>Каждый визуальный кадр</td>
+<td><code>RenderSystem</code> (камера, свет, меши)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="мост-редактора-изоляция" class="level3">
+<h3>3. Мост редактора (изоляция)</h3>
+<p>Весь GUI-код в <a href="../LSEngine/IMGUI_works/"><code>LSEngine/IMGUI_works/</code></a>. Try2 (в Chapter 9) компилирует его через <code>$(IMGUI_WORKS)</code> и вызывает только <code>ImGuiBridge::*</code>. Опционально во время выполнения через <code>.imgui_on</code> рядом с <code>Try2.exe</code>.</p>
+</section>
+<section id="edit-vs-play" class="level3">
+<h3>4. Edit vs Play</h3>
+<p><code>EditorContext::mode</code> управляет физикой и редактированием компонентов:</p>
+<table>
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 26%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr>
+<th>Режим</th>
+<th>Физика</th>
+<th>Inspector / gizmo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Edit</strong></td>
+<td>Выкл.</td>
+<td>Полное редактирование через <code>Editor_CanEditComponents()</code></td>
+</tr>
+<tr>
+<td><strong>Play</strong></td>
+<td>Вкл.</td>
+<td>Inspector отключён; gizmo пропускается</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Play</strong> записывает <code>Scenes/EditorPlaySnapshot.json</code> перед симуляцией. <strong>Stop</strong> возвращает в Edit; перезагружает снимок только если <code>restoreSceneOnStop</code> = true (по умолчанию <strong>false</strong>). <strong>Restore Snapshot</strong> вручную перезагружает файл play в любой момент.</p>
+</section>
+<section id="сцены-на-данных" class="level3">
+<h3>5. Сцены на данных</h3>
+<p><code>Engine::Init</code> ищет <code>DemoScene.json</code>, загружает через <code>SceneSerializer::Load(world, resourceManager, path)</code>, при ошибке или отсутствии — <code>DemoScene::Build</code>.</p>
+</section>
+<section id="ecs-освещение" class="level3">
+<h3>6. ECS-освещение</h3>
+<p>Компоненты света на сущностях → <code>RenderSystem</code> строит <code>SceneLightData</code> → <code>IRenderAdapter::SetLights</code> → constant buffer’ы прохода (лимиты: 1 направленный, 2 точечных, 3 прожектора).</p>
+</section>
+<section id="контекст-кадра" class="level3">
+<h3>7. Контекст кадра</h3>
+<p><code>FrameContext</code> объединяет <code>GameTimer</code>, <code>InputState</code> и <code>physDT</code> для каждого <code>ISystem::Update</code> и панелей редактора.</p>
+</section>
+<section id="кадры-в-полёте" class="level3">
+<h3>8. Кадры в полёте</h3>
+<p>2 буфера swap chain, 2 слота <code>FrameRes</code>, ожидание fence в <code>BeginFrame</code>. Шрифты/текстуры ImGui используют индексы дескрипторов <strong>900–963</strong> на общей shader-visible куче (движок — <strong>0–899</strong>).</p>
+</section>
+<section id="отложенный-g-buffer" class="level3">
+<h3>9. Отложенный G-buffer</h3>
+<p>Geometry → lighting → resolve; <code>LightingUtil.hlsl</code> общий с до 16 источниками света на GPU в CB прохода (лимиты ECS ниже).</p>
+</section>
+<section id="ленивая-загрузка-на-gpu" class="level3">
+<h3>10. Ленивая загрузка на GPU</h3>
+<p><code>ResourceManager</code> хранит CPU-меши; <code>D3DRenderAdapter::UploadMesh</code> при первом <code>DrawMesh</code>.</p>
+</section>
+<section id="физика-с-фиксированным-шагом" class="level3">
+<h3>11. Физика с фиксированным шагом</h3>
+<p><code>Application::Run</code> — аккумулятор 60 Гц, макс. 5 шагов за кадр; блокируется, когда редактор в Edit.</p>
+</section>
+<section id="оверлей-imgui-после-3d" class="level3">
+<h3>12. Оверлей ImGui после 3D</h3>
+<p>Сначала сцена; <code>RenderOverlay</code> рисует UI на том же command list перед present — см. <a href="../Changes/IMGUI-Editor-System.md">Changes/IMGUI-Editor-System.md</a>.</p>
+</section>
+<section id="io-сцен-редактора" class="level3">
+<h3>13. I/O сцен редактора</h3>
+<p><code>EditorSceneIO</code> вызывает <code>Engine::SaveScene</code> / <code>LoadScene</code>, которые делегируют <code>SceneSerializer</code>. Меню File и Play/Stop используют пути под <code>Scenes/</code> относительно рабочей директории.</p>
+</section>
+<section id="ленивая-инициализация-imgui" class="level3">
+<h3>14. Ленивая инициализация ImGui</h3>
+<p>При наличии <code>.imgui_on</code> ресурсы ImGui/DX12 для шрифтов <strong>не</strong> создаются, пока пользователь не нажмёт <strong><code>~</code></strong>. <code>WndProcHandler</code> пересылает сообщения только после <code>g_Initialized</code> = true.</p>
+</section>
+<section id="редактирование-компонентов-только-в-edit" class="level3">
+<h3>15. Редактирование компонентов только в Edit</h3>
+<p><code>Editor_CanEditComponents()</code> возвращает true только в Edit. Inspector использует <code>ImGui::BeginDisabled</code> в Play; gizmo уже пропускается вне Edit.</p>
+</section>
+<section id="телеметрия-физики" class="level3">
+<h3>16. Телеметрия физики</h3>
+<p><code>PhysicsStats</code> в <code>PhysicsCommons.h</code> считает пары столкновений за шаг физики. Панель Statistics показывает <strong>Collisions (this frame)</strong> и скользящее <strong>FPS (1s avg)</strong>.</p>
+<hr />
+</section>
+</section>
+<section id="конвейер-шейдеров-try2shaders" class="level2">
+<h2>Конвейер шейдеров (<code>Try2/Shaders/</code>)</h2>
+<p>Авторитетное расположение шейдеров. Семь файлов HLSL. <strong>F5</strong> перекомпилирует PSO без перезапуска.</p>
+<table>
+<colgroup>
+<col style="width: 57%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr>
+<th>Шейдер</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LightingUtil.hlsl</code></td>
+<td>Общий свет, материалы, Blinn-Phong / Fresnel</td>
+</tr>
+<tr>
+<td><code>GeometryPass.hlsl</code></td>
+<td><strong>G-buffer</strong> — albedo, normal, world pos, roughness, velocity</td>
+</tr>
+<tr>
+<td><code>LightingPass.hlsl</code></td>
+<td>Полноэкранное отложенное освещение (ECS <code>SceneLightData</code>)</td>
+</tr>
+<tr>
+<td><code>ResolvePass.hlsl</code></td>
+<td>Смешивание истории, HDR</td>
+</tr>
+<tr>
+<td><code>Default.hlsl</code></td>
+<td>Forward-путь (legacy / опционально)</td>
+</tr>
+<tr>
+<td><code>TransparentUnlit.hlsl</code></td>
+<td>Прозрачный оверлей</td>
+</tr>
+<tr>
+<td><code>Debug.hlsl</code></td>
+<td>Отладочный вывод текстуры</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart LR
+  geo[GeometryPass]
+  light[LightingPass]
+  resolve[ResolvePass]
+  trans[TransparentUnlit]
+  debug[Debug]
+  geo --&gt; light --&gt; resolve
+  resolve --&gt; trans
+  resolve --&gt; debug</code></pre>
+<hr />
+</section>
+<section id="наблюдения-по-дизайну" class="level2">
+<h2>Наблюдения по дизайну</h2>
+<section id="сильные-стороны" class="level3">
+<h3>Сильные стороны</h3>
+<ul>
+<li>Фокус на одном решении с редактором в <code>LSEngine/IMGUI_works/</code> (тот же репозиторий, вне Chapter 9)</li>
+<li>JSON-сцены + ECS-свет объединяют контент и рендеринг</li>
+<li>Тонкий API <code>ImGuiBridge</code> ограничивает связность движка и UI</li>
+</ul>
+</section>
+<section id="связность-которую-стоит-устранить" class="level3">
+<h3>Связность, которую стоит устранить</h3>
+<table>
+<colgroup>
+<col style="width: 46%" />
+<col style="width: 53%" />
+</colgroup>
+<thead>
+<tr>
+<th>Элемент</th>
+<th>Примечания</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CustomBuffer</code> в TexColumns</td>
+<td>Перенести в <code>Try2/</code> или <code>Common/</code></td>
+</tr>
+<tr>
+<td>Жёстко заданные пути include</td>
+<td>Макросы <code>$(SolutionDir)</code> для Common и IMGUI_works</td>
+</tr>
+<tr>
+<td>Заглушка <code>RenderAPI::Vulkan</code></td>
+<td>Бэкенда пока нет</td>
+</tr>
+<tr>
+<td>Неиспользуемый <code>ResourceManager*</code> в <code>RenderSystem</code></td>
+<td>Мелкая уборка</td>
+</tr>
+<tr>
+<td>Общая куча дескрипторов</td>
+<td>Документированное разделение; избегать коллизий индексов при добавлении SRV движка</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="связанная-документация" class="level2">
+<h2>Связанная документация</h2>
+<ul>
+<li>Обзор проекта → <a href="01-project-overview.md">01-project-overview.md</a></li>
+<li>Структура кода → <a href="03-code-structure.md">03-code-structure.md</a></li>
+<li>Дополнения редактора → <a href="04-editor-additions.md">04-editor-additions.md</a></li>
+<li>Слияние + ImGui (полностью) → <a href="../Changes/README.md">Changes/README.md</a></li>
+</ul>
+<hr />
+</section>
+</section>
+<section id="часть-3-структура-кода-1" class="level1">
+<h1>Часть 3 — Структура кода</h1>
+<p>Структурный справочник проекта <strong>Try2</strong>: раскладка, модули, ECS, API, диаграммы Mermaid и многоуровневый индекс исходников. Охват — <a href="../LSEngine/Chapter%209%20Texturing/Try2/Try2.sln"><code>Try2.sln</code></a>, если не помечено как вспомогательное.</p>
+<ul>
+<li>Обзор → <a href="01-project-overview.md">01-project-overview.md</a></li>
+<li>Технологии → <a href="02-technologies-and-patterns.md">02-technologies-and-patterns.md</a></li>
+<li>Дополнения редактора → <a href="04-editor-additions.md">04-editor-additions.md</a></li>
+<li>Слияние + ImGui → <a href="../Changes/README.md">Changes/README.md</a></li>
+</ul>
+<hr />
+<section id="раскладка-проекта-try2" class="level2">
+<h2>Раскладка проекта Try2</h2>
+<pre><code>LSEngine/                                 # Корень git-репозитория
+├── IMGUI_works/                          # Редактор + Dear ImGui + ImGuizmo (компилируется в Try2)
+│   ├── src/ImGuiBridge.*, ImGuiPlatform.*
+│   ├── src/Editor/                      # Панели, EditorContext, Gizmo
+│   └── ThirdParty/imgui, ImGuizmo
+├── Common/                               # GameTimer, EnTT, GLM, obj-ассеты
+└── Chapter 9 Texturing/Try2/            # Корень продукта — открывайте Try2.sln здесь
+    ├── Try2.sln
+    ├── Try2.vcxproj                     # IMGUI_WORKS = ../../IMGUI_works
+    ├── Try2.cpp, Application.*, Engine.*, ...
+    ├── Scenes/DemoScene.json            # Сцена по умолчанию на данных
+    ├── Shaders/                         # Авторитетные HLSL (7 файлов)
+    ├── Libs/assimp-vc143-mt.lib
+    │
+    │  Компилируется из ../../Common/:
+    │    GameTimer, MathHelper, DDSTextureLoader
+    │
+    └── Header include из ../TexColumns/:
+          CustomBuffer.h</code></pre>
+<p><strong>Рантайм-ассеты:</strong> <code>../../Common/obj/</code>, JSON сцен под <code>Scenes/</code>.</p>
+<hr />
+</section>
+<section id="таблица-ответственности-модулей" class="level2">
+<h2>Таблица ответственности модулей</h2>
+<section id="код-try2" class="level3">
+<h3>Код Try2</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Try2.cpp</code> / <code>TestApp</code></td>
+<td>Точка входа; <code>ImGuiBridge::SetEngine</code> после init</td>
+</tr>
+<tr>
+<td><code>Application</code></td>
+<td>Цикл Win32, жизненный цикл ImGui, оверлей после <code>Draw</code></td>
+</tr>
+<tr>
+<td><code>Engine</code></td>
+<td>Системы, JSON load/save, F5 reload, шлюз физики, <code>SaveScene</code>/<code>LoadScene</code>, доступ для редактора</td>
+</tr>
+<tr>
+<td><code>World</code></td>
+<td>Держатель <code>entt::registry</code></td>
+</tr>
+<tr>
+<td><code>Commons.h</code></td>
+<td>Компоненты (вкл. свет), <code>SceneLightData</code>, <code>IRenderAdapter</code></td>
+</tr>
+<tr>
+<td><code>CameraControllerSystem</code></td>
+<td>FPS-камера; пропуск при захвате ввода ImGui</td>
+</tr>
+<tr>
+<td><code>PhysicsSystem</code></td>
+<td>Интеграция + AABB; подсчёт <code>PhysicsStats</code></td>
+</tr>
+<tr>
+<td><code>RenderSystem</code></td>
+<td>Камера, <strong>сбор ECS-света</strong>, отрисовка мешей</td>
+</tr>
+<tr>
+<td><code>PhysicsCommons.h</code></td>
+<td>Математика коллайдеров + пространство имён <code>PhysicsStats</code></td>
+</tr>
+<tr>
+<td><code>ResourceManager</code></td>
+<td>CPU-ассеты, Assimp</td>
+</tr>
+<tr>
+<td><code>D3DRenderAdapter</code></td>
+<td>D3D12, отложенные проходы, <code>ReloadShaders</code>, <code>GetImGuiBindings</code></td>
+</tr>
+<tr>
+<td><code>FrameRes</code> / <code>d3dUtils</code></td>
+<td>Кольца CB, компиляция шейдеров</td>
+</tr>
+<tr>
+<td><code>SceneFactory</code> / <code>DemoScene</code></td>
+<td>Рецепты сущностей; процедурный запасной уровень</td>
+</tr>
+<tr>
+<td><code>SceneSerializer</code></td>
+<td>JSON load/save с мешами, материалами, светом</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="lsengineimgui_works-компилируется-в-try2" class="level3">
+<h3>LSEngine/IMGUI_works (компилируется в Try2)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImGuiBridge</code></td>
+<td>Публичный API: init, frame, overlay, <code>WantsCaptureInput</code>, <code>SetEngine</code>; ленивый init на <code>~</code></td>
+</tr>
+<tr>
+<td><code>ImGuiPlatform</code></td>
+<td>Проверка <code>.imgui_on</code>, переключение <code>~</code></td>
+</tr>
+<tr>
+<td><code>EditorContext</code></td>
+<td>Registry/resources, выделение, Edit/Play, <code>statusMessage</code>, <code>restoreSceneOnStop</code>, переключатели панелей</td>
+</tr>
+<tr>
+<td><code>EditorSceneIO</code></td>
+<td>File Save/Load, снимок Play, <code>RestorePlaySnapshot</code></td>
+</tr>
+<tr>
+<td><code>EditorUI</code></td>
+<td>Меню (File), панель (Play/Stop), строка статуса, оркестрация панелей</td>
+</tr>
+<tr>
+<td><code>HierarchyPanel</code></td>
+<td>Список <strong>всех</strong> сущностей (tag, mesh, camera, свет, физика)</td>
+</tr>
+<tr>
+<td><code>InspectorPanel</code></td>
+<td>Transform, tag, mesh, rigidbody, collider, <strong>свет</strong>; отключён в Play</td>
+</tr>
+<tr>
+<td><code>ViewportPanel</code></td>
+<td>Оформление viewport (сцена рисуется под UI)</td>
+</tr>
+<tr>
+<td><code>StatisticsPanel</code></td>
+<td>Мгновенный FPS + среднее за 1 с, число сущностей, коллизии</td>
+</tr>
+<tr>
+<td><code>LegendPanel</code></td>
+<td>Legend / Help — горячие клавиши, глоссарий gizmo, пути файлов</td>
+</tr>
+<tr>
+<td><code>GizmoController</code></td>
+<td>ImGuizmo в режиме Edit</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="связано-из-common" class="level3">
+<h3>Связано из Common</h3>
+<table>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GameTimer</code></td>
+<td>Тайминг кадра</td>
+</tr>
+<tr>
+<td><code>MathHelper</code></td>
+<td>Матрицы GPU</td>
+</tr>
+<tr>
+<td><code>DDSTextureLoader</code></td>
+<td>Текстуры DDS</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="вспомогательный-заголовок" class="level3">
+<h3>Вспомогательный заголовок</h3>
+<table>
+<thead>
+<tr>
+<th>Модуль</th>
+<th>Ответственность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CustomBuffer</code> (TexColumns)</td>
+<td>Хелперы G-buffer RT в <code>D3DRenderAdapter</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="хуки-try2-для-редактора-минимальная-поверхность" class="level3">
+<h3>Хуки Try2 для редактора (минимальная поверхность)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Хук</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Application.cpp</code></td>
+<td>init/shutdown/resize <code>ImGuiBridge</code>; оверлей в цикле; пересылка <code>WndProc</code></td>
+</tr>
+<tr>
+<td><code>Try2.cpp</code></td>
+<td><code>SetEngine</code></td>
+</tr>
+<tr>
+<td><code>Engine.cpp</code></td>
+<td><code>Editor_IsPhysicsEnabled()</code> в <code>PhysicsUpdate</code>; <code>SaveScene</code>/<code>LoadScene</code></td>
+</tr>
+<tr>
+<td><code>EditorSceneIO</code> (через меню)</td>
+<td>Вызовы <code>Engine::SaveScene</code> / <code>LoadScene</code></td>
+</tr>
+<tr>
+<td><code>CameraControllerSystem.cpp</code></td>
+<td>Ранний выход при <code>WantsCaptureInput()</code></td>
+</tr>
+<tr>
+<td><code>D3DRenderAdapter</code></td>
+<td><code>Dx12ImGuiBindings</code>, поддиапазон дескрипторов для ImGui</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="компоненты-ecs" class="level2">
+<h2>Компоненты ECS</h2>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 47%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr>
+<th>Компонент</th>
+<th>Поля (кратко)</th>
+<th>Используется</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TransformComponent</code></td>
+<td><code>position</code>, <code>rotation</code>, <code>scale</code></td>
+<td>Все системы; мировая матрица</td>
+</tr>
+<tr>
+<td><code>MeshComponent</code></td>
+<td><code>meshID</code></td>
+<td><code>RenderSystem</code></td>
+</tr>
+<tr>
+<td><code>CameraComponent</code></td>
+<td><code>fov</code>, planes, <code>aspectRatio</code>, кэш матриц</td>
+<td>Камера + рендер</td>
+</tr>
+<tr>
+<td><code>TagComponent</code></td>
+<td><code>tag</code></td>
+<td>Serializer, панель Hierarchy</td>
+</tr>
+<tr>
+<td><code>RigidbodyComponent</code></td>
+<td><code>type</code>, <code>velocity</code>, <code>mass</code>, <code>useGravity</code></td>
+<td><code>PhysicsSystem</code>, Inspector</td>
+</tr>
+<tr>
+<td><code>ColliderComponent</code></td>
+<td>AABB/sphere, restitution, friction</td>
+<td><code>PhysicsSystem</code>, Inspector</td>
+</tr>
+<tr>
+<td><code>DirectionalLightComponent</code></td>
+<td><code>color</code>, <code>intensity</code>, <code>direction</code>, <code>enabled</code></td>
+<td><code>RenderSystem</code></td>
+</tr>
+<tr>
+<td><code>PointLightComponent</code></td>
+<td>color, intensity, falloff, <code>enabled</code></td>
+<td><code>RenderSystem</code> (нужен <code>Transform</code>)</td>
+</tr>
+<tr>
+<td><code>SpotLightComponent</code></td>
+<td>color, direction, spot power, falloff, <code>enabled</code></td>
+<td><code>RenderSystem</code> (нужен <code>Transform</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Лимиты GPU</strong> (<code>Commons.h</code>): <code>RenderDirectionalLightCount</code> = 1, <code>RenderPointLightCount</code> = 2, <code>RenderSpotLightCount</code> = 3.</p>
+<section id="типичные-сущности" class="level3">
+<h3>Типичные сущности</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr>
+<th>Тип</th>
+<th>Компоненты</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Статический пол</td>
+<td><code>Transform</code>, <code>Mesh</code>, <code>Tag</code>, <code>Rigidbody</code>(Static), <code>Collider</code></td>
+</tr>
+<tr>
+<td>Динамическое тело</td>
+<td><code>Transform</code>, <code>Mesh</code>, <code>Tag</code>, <code>Rigidbody</code>(Dynamic), <code>Collider</code></td>
+</tr>
+<tr>
+<td>Камера</td>
+<td><code>Transform</code>, <code>Camera</code>, <code>Tag</code></td>
+</tr>
+<tr>
+<td>Направленный свет</td>
+<td><code>DirectionalLight</code> (опционально <code>Tag</code>)</td>
+</tr>
+<tr>
+<td>Точечный свет</td>
+<td><code>Transform</code>, <code>PointLight</code>, <code>Tag</code></td>
+</tr>
+<tr>
+<td>Прожектор</td>
+<td><code>Transform</code>, <code>SpotLight</code>, <code>Tag</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="диаграмма-a-жизненный-цикл-приложения-try2" class="level2">
+<h2>Диаграмма A — Жизненный цикл приложения Try2</h2>
+<pre class="mermaid"><code>flowchart TB
+  subgraph entry [Entry]
+    main[&quot;main in Try2.cpp&quot;]
+    testApp[TestApp]
+  end
+  subgraph init [Initialization]
+    initWin[InitMainWindow]
+    createR[CreateRenderer DX12]
+    imguiInit[ImGuiBridge OnApplicationInit]
+    engInit[Engine Init scene JSON or DemoScene]
+    setEng[ImGuiBridge SetEngine]
+  end
+  subgraph loop [Run loop per frame]
+    peek[PeekMessage Dispatch]
+    imguiIn[ImGuiBridge ProcessInput]
+    tick[GameTimer Tick]
+    physAccum[Physics accumulator]
+    physStep[PhysicsUpdate if Play mode]
+    beginF[BeginFrame]
+    update[Update F5 reload]
+    draw[Draw RenderSystem]
+    imguiUI[ImGui BeginFrame RenderEditorUI RenderOverlay]
+    endF[EndFrame Present]
+  end
+  main --&gt; testApp --&gt; initWin --&gt; createR --&gt; imguiInit --&gt; engInit --&gt; setEng
+  setEng --&gt; loop
+  peek --&gt; imguiIn --&gt; tick --&gt; physAccum --&gt; physStep
+  physStep --&gt; physAccum
+  tick --&gt; beginF --&gt; update --&gt; draw --&gt; imguiUI --&gt; endF</code></pre>
+<hr />
+</section>
+<section id="диаграмма-b-системы-движка-try2-и-слой-редактора" class="level2">
+<h2>Диаграмма B — Системы движка Try2 и слой редактора</h2>
+<pre class="mermaid"><code>flowchart TB
+  eng[Engine]
+  subgraph updatePipe [Update pipeline ISystem]
+    camSys[CameraControllerSystem]
+  end
+  subgraph physPipe [Physics pipeline ISystem]
+    physSys[PhysicsSystem]
+  end
+  subgraph renderPipe [Render pipeline ISystem]
+    rendSys[RenderSystem]
+  end
+  subgraph editorLayer [Editor layer not ISystem]
+    bridge[ImGuiBridge]
+    sceneIO[EditorSceneIO]
+    panels[Editor panels and Gizmo]
+  end
+  world[(entt registry)]
+  eng --&gt; updatePipe --&gt; world
+  eng --&gt; physPipe --&gt; world
+  eng --&gt; renderPipe --&gt; world
+  renderPipe --&gt; adapter[IRenderAdapter]
+  bridge --&gt; sceneIO
+  bridge --&gt; panels
+  sceneIO --&gt; eng
+  bridge --&gt; world
+  bridge --&gt; adapter</code></pre>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 37%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Фаза</th>
+<th>Частота</th>
+<th>Компонент</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Update</code></td>
+<td>1× / кадр</td>
+<td><code>CameraControllerSystem</code>; F5 обрабатывает <code>Engine</code></td>
+</tr>
+<tr>
+<td><code>PhysicsUpdate</code></td>
+<td>0–5× / 60 Гц</td>
+<td><code>PhysicsSystem</code> если <code>Editor_IsPhysicsEnabled()</code></td>
+</tr>
+<tr>
+<td><code>Draw</code></td>
+<td>1× / кадр</td>
+<td><code>RenderSystem</code></td>
+</tr>
+<tr>
+<td>UI редактора</td>
+<td>1× / кадр после <code>Draw</code></td>
+<td><code>ImGuiBridge</code> → <code>Editor_*</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="диаграмма-c-поток-сущностей-ecs-try2" class="level2">
+<h2>Диаграмма C — Поток сущностей ECS Try2</h2>
+<pre class="mermaid"><code>flowchart LR
+  subgraph creation [Entity creation]
+    json[SceneSerializer Load]
+    demo[DemoScene Build fallback]
+    factory[SceneFactory]
+    res[ResourceManager]
+  end
+  subgraph components [Components]
+    T[Transform]
+    M[Mesh]
+    C[Camera]
+    L[Light components]
+    Rb[Rigidbody]
+    Co[Collider]
+    Tg[Tag]
+  end
+  subgraph consumers [Consumers]
+    cam[CameraControllerSystem]
+    phys[PhysicsSystem]
+    rend[RenderSystem]
+    editor[Editor panels]
+  end
+  json --&gt; res
+  demo --&gt; factory --&gt; res
+  factory --&gt; components
+  json --&gt; components
+  cam --&gt; T
+  cam --&gt; C
+  phys --&gt; T
+  phys --&gt; Rb
+  phys --&gt; Co
+  rend --&gt; T
+  rend --&gt; M
+  rend --&gt; C
+  rend --&gt; L
+  editor --&gt; Tg
+  editor --&gt; T</code></pre>
+<hr />
+</section>
+<section id="диаграмма-d-контракт-адаптера-рендеринга-try2" class="level2">
+<h2>Диаграмма D — Контракт адаптера рендеринга Try2</h2>
+<pre class="mermaid"><code>flowchart TB
+  rs[RenderSystem]
+  subgraph adapterAPI [IRenderAdapter]
+    setTime[SetTimeData]
+    setCam[SetCamera]
+    setLights[SetLights]
+    updCB[UpdCB]
+    setXform[SetTransform]
+    drawMesh[DrawMesh]
+    reload[ReloadShaders]
+    beginF[BeginFrame]
+    endF[EndFrame]
+  end
+  subgraph d3d [D3DRenderAdapter]
+    frameRes[FrameRes]
+    upload[UploadMesh]
+    imguiBind[GetImGuiBindings]
+  end
+  rs --&gt; setTime --&gt; setCam --&gt; setLights --&gt; updCB
+  rs --&gt; setXform --&gt; drawMesh
+  beginF --&gt; d3d
+  drawMesh --&gt; upload
+  endF --&gt; d3d
+  adapterAPI --&gt; d3d
+  imguiBind --&gt; bridge[ImGuiBridge RenderOverlay]</code></pre>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 32%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr>
+<th>Метод</th>
+<th>Вызывающий</th>
+<th>Назначение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SetLights</code></td>
+<td><code>RenderSystem</code></td>
+<td>Загрузка <code>SceneLightData</code> из ECS light view</td>
+</tr>
+<tr>
+<td><code>ReloadShaders</code></td>
+<td><code>Engine::Update</code> по F5</td>
+<td>Пересборка PSO из <code>Try2/Shaders/</code></td>
+</tr>
+<tr>
+<td><code>GetImGuiBindings</code></td>
+<td><code>ImGuiBridge</code> (ленивый init)</td>
+<td>Device, queue, command list, срез SRV-кучи</td>
+</tr>
+<tr>
+<td><code>BeginFrame</code> / <code>EndFrame</code></td>
+<td><code>Application</code></td>
+<td>Синхронизация кадра и present</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="диаграмма-e-отложенные-gpu-проходы-try2" class="level2">
+<h2>Диаграмма E — Отложенные GPU-проходы Try2</h2>
+<pre class="mermaid"><code>flowchart TB
+  begin[BeginFrame]
+  subgraph gbuffer [Geometry pass]
+    drawOpaque[Draw meshes]
+    writeRTs[G-buffer RTs]
+  end
+  subgraph lighting [Lighting pass]
+    fsTri[Fullscreen triangle]
+    shade[ComputeLighting from SceneLightData]
+  end
+  subgraph resolve [Resolve pass]
+    blendHist[History blend]
+    hdr[HDR adjust]
+  end
+  optional[Transparent / Debug]
+  imguiDraw[ImGui overlay]
+  endNode[EndFrame Present]
+  begin --&gt; gbuffer --&gt; lighting --&gt; resolve --&gt; optional --&gt; imguiDraw --&gt; endNode</code></pre>
+<hr />
+</section>
+<section id="диаграмма-f-путь-ресурсов-try2" class="level2">
+<h2>Диаграмма F — Путь ресурсов Try2</h2>
+<pre class="mermaid"><code>flowchart LR
+  disk[&quot;JSON obj textures&quot;]
+  ser[SceneSerializer]
+  assimp[Assimp]
+  rm[ResourceManager]
+  adapter[D3DRenderAdapter]
+  gpuMesh[MeshGPU]
+  draw[DrawMesh]
+  disk --&gt; ser --&gt; rm
+  disk --&gt; assimp --&gt; rm
+  rm --&gt; adapter
+  adapter --&gt;|&quot;first draw&quot;| gpuMesh --&gt; draw</code></pre>
+<hr />
+</section>
+<section id="диаграмма-g-цикл-физики-try2" class="level2">
+<h2>Диаграмма G — Цикл физики Try2</h2>
+<pre class="mermaid"><code>flowchart TB
+  gate{Editor_IsPhysicsEnabled?}
+  start[PhysicsSystem Update]
+  integrate[Integrate]
+  resolve[ResolveCollisions]
+  gate --&gt;|no Edit mode| skip[Skip physics]
+  gate --&gt;|yes Play mode| start --&gt; integrate --&gt; resolve</code></pre>
+<hr />
+</section>
+<section id="диаграмма-h-зависимости-сборки-try2" class="level2">
+<h2>Диаграмма H — Зависимости сборки Try2</h2>
+<pre class="mermaid"><code>flowchart TB
+  try2[Try2.vcxproj]
+  subgraph compiled [Compiled into Try2]
+    try2src[Try2 cpp files]
+    imguiSrc[IMGUI_works bridge editor imgui]
+    gt[Common GameTimer]
+    mh[Common MathHelper]
+    dds[Common DDSTextureLoader]
+  end
+  subgraph headers [Header-only]
+    vendored[entt glm assimp nlohmann]
+    d3dx12[d3dx12.h]
+    cbHeader[TexColumns CustomBuffer.h]
+  end
+  subgraph runtime [Runtime]
+    scenes[Try2 Scenes JSON]
+    objMeshes[Common obj]
+    assimpLib[Libs assimp]
+  end
+  try2 --&gt; try2src
+  try2 --&gt; imguiSrc
+  try2 --&gt; gt
+  try2 --&gt; mh
+  try2 --&gt; dds
+  try2 --&gt; vendored
+  try2 --&gt; d3dx12
+  try2 --&gt; cbHeader
+  try2 --&gt; scenes
+  try2 --&gt; objMeshes
+  try2 --&gt; assimpLib</code></pre>
+<hr />
+</section>
+<section id="диаграмма-i-связка-редактора-и-ecs" class="level2">
+<h2>Диаграмма I — Связка редактора и ECS</h2>
+<pre class="mermaid"><code>flowchart TB
+  setEng[ImGuiBridge SetEngine]
+  bind[BindEditorFromEngine]
+  ctx[EditorContext global]
+  reg[entt registry]
+  res[ResourceManager]
+  sceneIO[EditorSceneIO]
+  hier[HierarchyPanel]
+  insp[InspectorPanel]
+  legend[LegendPanel]
+  giz[GizmoController]
+  setEng --&gt; bind --&gt; ctx
+  ctx --&gt; reg
+  ctx --&gt; res
+  ctx --&gt; sceneIO
+  ctx --&gt; hier
+  ctx --&gt; insp
+  ctx --&gt; legend
+  ctx --&gt; giz
+  eng[Engine GetRegistry GetResources SaveScene LoadScene] --&gt; setEng
+  sceneIO --&gt; eng</code></pre>
+<hr />
+</section>
+<section id="последовательность-за-кадр-try2" class="level2">
+<h2>Последовательность за кадр (Try2)</h2>
+<pre class="mermaid"><code>sequenceDiagram
+  participant App as Application
+  participant Bridge as ImGuiBridge
+  participant Eng as Engine
+  participant Cam as CameraControllerSystem
+  participant Phys as PhysicsSystem
+  participant Rend as RenderSystem
+  participant RAd as D3DRenderAdapter
+
+  App-&gt;&gt;Bridge: ProcessInput
+  alt Editor Play mode
+    loop Physics 60Hz
+      App-&gt;&gt;Eng: PhysicsUpdate
+      Eng-&gt;&gt;Phys: Update
+    end
+  end
+  App-&gt;&gt;RAd: BeginFrame
+  App-&gt;&gt;Eng: Update
+  Note over Eng: F5 ReloadShaders
+  Eng-&gt;&gt;Cam: Update
+  App-&gt;&gt;Eng: Draw
+  Eng-&gt;&gt;Rend: Update
+  Rend-&gt;&gt;RAd: SetCamera SetLights UpdCB DrawMesh
+  App-&gt;&gt;Bridge: BeginFrame RenderEditorUI
+  App-&gt;&gt;Bridge: RenderOverlay
+  Bridge-&gt;&gt;RAd: ImGui_ImplDX12_RenderDrawData
+  App-&gt;&gt;RAd: EndFrame</code></pre>
+<hr />
+</section>
+<section id="краткий-справочник-классов-и-api" class="level2">
+<h2>Краткий справочник классов и API</h2>
+<section id="application-и-мост" class="level3">
+<h3>Application и мост</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Класс / API</th>
+<th>Ключевые члены</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Application</code></td>
+<td><code>Run</code>, <code>Initialize</code>, <code>MsgProc</code>, хуки ImGui</td>
+</tr>
+<tr>
+<td><code>TestApp</code></td>
+<td>Делегирует в <code>mEngine</code></td>
+</tr>
+<tr>
+<td><code>ImGuiBridge</code></td>
+<td><code>SetEngine</code>, <code>OnApplicationInit</code>, <code>RenderOverlay</code>, <code>WantsCaptureInput</code>, <code>IsLicensed</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="ядро-движка" class="level3">
+<h3>Ядро движка</h3>
+<table>
+<colgroup>
+<col style="width: 43%" />
+<col style="width: 56%" />
+</colgroup>
+<thead>
+<tr>
+<th>Класс</th>
+<th>Ключевой API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Engine</code></td>
+<td><code>Init</code>, <code>Update</code>, <code>PhysicsUpdate</code>, <code>Draw</code>, <code>GetRegistry</code>, <code>GetResources</code>, <code>GetWorld</code>, <code>SaveScene</code>, <code>LoadScene</code></td>
+</tr>
+<tr>
+<td><code>World</code></td>
+<td><code>registry</code></td>
+</tr>
+<tr>
+<td><code>FrameContext</code></td>
+<td><code>timer</code>, <code>input</code>, <code>physDT</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="системы" class="level3">
+<h3>Системы</h3>
+<table>
+<thead>
+<tr>
+<th>Класс</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CameraControllerSystem</code></td>
+<td>FPS-камера; шлюз ввода ImGui</td>
+</tr>
+<tr>
+<td><code>PhysicsSystem</code></td>
+<td>Интеграция + коллизии</td>
+</tr>
+<tr>
+<td><code>RenderSystem</code></td>
+<td>Свет + камера + меши</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="редактор-imgui_works" class="level3">
+<h3>Редактор (IMGUI_works)</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Editor_SetContext</code> / <code>Editor_GetContext</code></td>
+<td>Глобальное состояние редактора</td>
+</tr>
+<tr>
+<td><code>Editor_IsPhysicsEnabled</code></td>
+<td>Play vs Edit</td>
+</tr>
+<tr>
+<td><code>Editor_CanEditComponents</code></td>
+<td>Редактирование Inspector/gizmo только в Edit</td>
+</tr>
+<tr>
+<td><code>Editor_BeginFrame</code> / <code>Editor_RenderUI</code></td>
+<td>Проход панелей</td>
+</tr>
+<tr>
+<td><code>Editor_RenderGizmo</code></td>
+<td>ImGuizmo</td>
+</tr>
+<tr>
+<td><code>Editor_DrawLegend</code></td>
+<td>Окно Legend / Help</td>
+</tr>
+<tr>
+<td><code>EditorSceneIO</code></td>
+<td>Save, Load, BeginPlay, EndPlay, RestorePlaySnapshot</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="рендеринг" class="level3">
+<h3>Рендеринг</h3>
+<table>
+<thead>
+<tr>
+<th>Класс</th>
+<th>Ключевой API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRenderAdapter</code></td>
+<td><code>SetLights</code>, <code>ReloadShaders</code>, кадр, отрисовка</td>
+</tr>
+<tr>
+<td><code>D3DRenderAdapter</code></td>
+<td><code>GetImGuiBindings</code>, <code>BuildPSOs</code>, <code>UploadMesh</code></td>
+</tr>
+<tr>
+<td><code>Dx12ImGuiBindings</code></td>
+<td>POD GPU-дескрипторы для бэкенда ImGui</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="индекс-исходных-файлов" class="level2">
+<h2>Индекс исходных файлов</h2>
+<section id="уровень-1-исходники-проекта-try2" class="level3">
+<h3>Уровень 1 — исходники проекта Try2</h3>
+<table>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Try2.cpp</code></td>
+<td><code>main()</code>, <code>TestApp</code>, <code>SetEngine</code></td>
+</tr>
+<tr>
+<td><code>Application.cpp/h</code></td>
+<td>Цикл, Win32, интеграция ImGui</td>
+</tr>
+<tr>
+<td><code>Engine.cpp/h</code></td>
+<td>Системы, load/save сцены, F5, шлюз физики</td>
+</tr>
+<tr>
+<td><code>PhysicsCommons.h</code></td>
+<td>Математика коллайдеров, <code>PhysicsStats</code></td>
+</tr>
+<tr>
+<td><code>World.cpp/h</code></td>
+<td>Registry</td>
+</tr>
+<tr>
+<td><code>Commons.cpp/h</code></td>
+<td>Компоненты, свет, интерфейсы</td>
+</tr>
+<tr>
+<td><code>CameraControllerSystem.cpp/h</code></td>
+<td>Камера + захват ImGui</td>
+</tr>
+<tr>
+<td><code>PhysicsSystem.cpp/h</code></td>
+<td>Физика</td>
+</tr>
+<tr>
+<td><code>RenderSystem.cpp/h</code></td>
+<td>Свет, камера, отрисовка</td>
+</tr>
+<tr>
+<td><code>ResourceManager.cpp/h</code></td>
+<td>Ассеты</td>
+</tr>
+<tr>
+<td><code>D3DRenderAdapter.cpp/h</code></td>
+<td>Рендерер, привязки ImGui, reload</td>
+</tr>
+<tr>
+<td><code>FrameRes.cpp/h</code>, <code>d3dUtils.cpp/h</code></td>
+<td>GPU-хелперы</td>
+</tr>
+<tr>
+<td><code>SceneFactory.cpp/h</code>, <code>DemoScene.cpp/h</code></td>
+<td>Настройка уровня</td>
+</tr>
+<tr>
+<td><code>SceneSerializer.cpp/h</code></td>
+<td>JSON I/O</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Данные:</strong> <code>Scenes/DemoScene.json</code></p>
+<p><strong>Шейдеры:</strong> <code>Try2/Shaders/</code> (7 файлов HLSL)</p>
+</section>
+<section id="уровень-1b-imgui_works-компилируется-try2" class="level3">
+<h3>Уровень 1b — IMGUI_works (компилируется Try2)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/ImGuiBridge.cpp/h</code></td>
+<td>Публичный API</td>
+</tr>
+<tr>
+<td><code>src/ImGuiPlatform.cpp/h</code></td>
+<td>Лицензия + переключение</td>
+</tr>
+<tr>
+<td><code>src/Editor/EditorContext.cpp/h</code></td>
+<td>Состояние редактора, <code>statusMessage</code>, <code>restoreSceneOnStop</code></td>
+</tr>
+<tr>
+<td><code>src/Editor/EditorSceneIO.cpp/h</code></td>
+<td>I/O save/load/снимок play</td>
+</tr>
+<tr>
+<td><code>src/Editor/EditorUI.cpp</code></td>
+<td>Меню, панель, статус</td>
+</tr>
+<tr>
+<td><code>src/Editor/HierarchyPanel.cpp</code></td>
+<td>Список всех сущностей</td>
+</tr>
+<tr>
+<td><code>src/Editor/InspectorPanel.cpp</code></td>
+<td>Компоненты + свет</td>
+</tr>
+<tr>
+<td><code>src/Editor/ViewportPanel.cpp</code></td>
+<td>UI viewport</td>
+</tr>
+<tr>
+<td><code>src/Editor/StatisticsPanel.cpp</code></td>
+<td>Среднее FPS, коллизии</td>
+</tr>
+<tr>
+<td><code>src/Editor/LegendPanel.cpp</code></td>
+<td>Legend / Help</td>
+</tr>
+<tr>
+<td><code>src/Editor/GizmoController.cpp</code></td>
+<td>ImGuizmo</td>
+</tr>
+<tr>
+<td>ThirdParty</td>
+<td>ядро imgui + бэкенды, ImGuizmo (без построчного списка)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="уровень-2-common-компилируется" class="level3">
+<h3>Уровень 2 — Common (компилируется)</h3>
+<table>
+<thead>
+<tr>
+<th>Файл</th>
+<th>Роль</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GameTimer.cpp/h</code></td>
+<td>Тайминг</td>
+</tr>
+<tr>
+<td><code>MathHelper.cpp/h</code></td>
+<td>Матрицы</td>
+</tr>
+<tr>
+<td><code>DDSTextureLoader.cpp/h</code></td>
+<td>DDS</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="уровень-3-вспомогательное" class="level3">
+<h3>Уровень 3 — Вспомогательное</h3>
+<table>
+<thead>
+<tr>
+<th>Элемент</th>
+<th>Примечание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TexColumns/CustomBuffer.*</code></td>
+<td>Используется заголовок; <code>.cpp</code> не в vcxproj</td>
+</tr>
+<tr>
+<td><code>TexColumns.sln</code></td>
+<td>Не сборка продукта</td>
+</tr>
+<tr>
+<td><code>LSEngine/Shaders/</code></td>
+<td>Дубликат <code>Try2/Shaders/</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+</section>
+<section id="ключевые-функции-try2" class="level2">
+<h2>Ключевые функции (Try2)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Подсистема</th>
+<th>Функции</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Engine::Init</code></td>
+<td>Регистрация систем; <code>SceneSerializer::Load</code> или <code>DemoScene::Build</code></td>
+</tr>
+<tr>
+<td><code>Engine::Update</code></td>
+<td>Update-системы; <strong>F5</strong> → <code>ReloadShaders()</code></td>
+</tr>
+<tr>
+<td><code>Engine::PhysicsUpdate</code></td>
+<td>No-op в Edit при лицензированном редакторе</td>
+</tr>
+<tr>
+<td><code>Engine::SaveScene</code> / <code>LoadScene</code></td>
+<td>JSON I/O во время выполнения для меню File</td>
+</tr>
+<tr>
+<td><code>RenderSystem::Update</code></td>
+<td>Сбор light view → <code>SetLights</code>; отрисовка мешей</td>
+</tr>
+<tr>
+<td><code>SceneSerializer::Load</code></td>
+<td>Десериализация world + общий <code>ResourceManager</code></td>
+</tr>
+<tr>
+<td><code>EditorSceneIO::BeginPlay</code></td>
+<td>Снимок в <code>EditorPlaySnapshot.json</code>, mode = Play</td>
+</tr>
+<tr>
+<td><code>PhysicsStats::AddCollision</code></td>
+<td>Инкремент за пару столкновений в физике</td>
+</tr>
+<tr>
+<td><code>ImGuiBridge::SetEngine</code></td>
+<td>Привязка registry/resources к <code>EditorContext</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+</section>
+<section id="порядок-чтения-для-контрибьюторов-try2" class="level2">
+<h2>Порядок чтения (для контрибьюторов Try2)</h2>
+<ol type="1">
+<li><code>Try2.cpp</code></li>
+<li><code>Application.cpp</code> — цикл, порядок оверлея ImGui</li>
+<li><code>Engine.cpp</code> — загрузка сцены, F5, шлюз физики</li>
+<li><code>RenderSystem.h</code> — ECS-свет</li>
+<li><code>D3DRenderAdapter.cpp</code> — отложенные проходы, привязки ImGui</li>
+<li><a href="../LSEngine/IMGUI_works/src/ImGuiBridge.h"><code>IMGUI_works/src/ImGuiBridge.h</code></a> — поверхность API редактора</li>
+<li><a href="04-editor-additions.md">04-editor-additions.md</a> — save/load, снимок Play, статистика, ленивый init</li>
+<li><a href="../Changes/IMGUI-Editor-System.md">Changes/IMGUI-Editor-System.md</a> — базовая интеграция ImGui</li>
+<li><code>Try2/Shaders/GeometryPass.hlsl</code> + <code>LightingPass.hlsl</code></li>
+</ol>
+<hr />
+</section>
+</section>
+<section id="часть-4-дополнения-редактора-1" class="level1">
+<h1>Часть 4 — Дополнения редактора</h1>
+<p>Сжатый справочник по улучшениям редактора <strong>пункты 1–10</strong>. Полные детали, шаги проверки и пути к файлам: <a href="04-editor-additions.md">04-editor-additions.md</a>.</p>
+<section id="сводка" class="level2">
+<h2>Сводка</h2>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 45%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr>
+<th>№</th>
+<th>Функция</th>
+<th>Статус</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>File → Save / Load</td>
+<td>Готово — <code>Scenes/EditorSave.json</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Снимок Play / восстановление при Stop</td>
+<td>Готово — <code>Scenes/EditorPlaySnapshot.json</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Inspector + gizmo заблокированы в Play</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Компоненты света в Inspector</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Счётчик коллизий в Statistics</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Среднее FPS за 1 секунду</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Ленивая инициализация ImGui (только при видимости)</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Hierarchy показывает все сущности</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Окно Legend / Help</td>
+<td>Готово</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Отладка: опциональное восстановление при Stop + Restore Snapshot</td>
+<td>Готово</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="архитектура" class="level2">
+<h2>Архитектура</h2>
+<pre class="mermaid"><code>flowchart TB
+  subgraph ui [Editor UI]
+    Menu[File Save Load]
+    TB[Play Stop]
+    Hier[Hierarchy all entities]
+    Insp[Inspector + lights]
+    Stats[Statistics FPS collisions]
+  end
+  subgraph io [EditorSceneIO]
+    Save[SaveScene]
+    Load[LoadScene]
+    Snap[BeginPlay EndPlay]
+  end
+  subgraph engine [Try2 Engine]
+    Ser[SceneSerializer]
+    Phys[PhysicsSystem + PhysicsStats]
+  end
+  Menu --&gt; Save --&gt; Ser
+  Menu --&gt; Load --&gt; Ser
+  TB --&gt; Snap --&gt; Ser
+  Insp --&gt; ECS[entt registry]
+  Phys --&gt; Stats</code></pre>
+</section>
+<section id="ключевое-поведение" class="level2">
+<h2>Ключевое поведение</h2>
+<table>
+<colgroup>
+<col style="width: 35%" />
+<col style="width: 65%" />
+</colgroup>
+<thead>
+<tr>
+<th>Тема</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Активация</strong></td>
+<td>ImGui/DX12 init только после <strong><code>~</code></strong> при наличии <code>.imgui_on</code>; <code>WndProc</code> не создаёт контекст на первом сообщении</td>
+</tr>
+<tr>
+<td><strong>Меню File</strong></td>
+<td>Save/Load через <code>EditorSceneIO</code> → <code>Engine::SaveScene</code> / <code>LoadScene</code> → <code>SceneSerializer</code></td>
+</tr>
+<tr>
+<td><strong>Play/Stop</strong></td>
+<td>Play пишет снимок; Stop возвращает в Edit; перезагрузка только если <code>restoreSceneOnStop</code> (по умолчанию <strong>выкл.</strong>); <strong>Restore Snapshot</strong> в любой момент</td>
+</tr>
+<tr>
+<td><strong>Inspector</strong></td>
+<td>Все основные компоненты + <strong>свет</strong>; <code>Editor_CanEditComponents()</code> отключает редактирование в Play</td>
+</tr>
+<tr>
+<td><strong>Hierarchy</strong></td>
+<td>Все типы сущностей (не только с тегом)</td>
+</tr>
+<tr>
+<td><strong>Statistics</strong></td>
+<td>Мгновенный FPS + <strong>среднее за 1 с</strong>; <strong>счётчик коллизий</strong> через <code>PhysicsStats</code></td>
+</tr>
+<tr>
+<td><strong>Legend</strong></td>
+<td><code>Editor_DrawLegend</code> — горячие клавиши, глоссарий gizmo, пути файлов</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="оставшиеся-пробелы" class="level2">
+<h2>Оставшиеся пробелы</h2>
+<table>
+<thead>
+<tr>
+<th>Элемент</th>
+<th>Примечания</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ImGui docking</td>
+<td>Нужна ветка ImGui с docking</td>
+</tr>
+<tr>
+<td>Viewport render-to-texture</td>
+<td>Offscreen RT для встроенного вида</td>
+</tr>
+<tr>
+<td>Undo/redo, браузер ассетов, редактор материалов</td>
+<td>Окна PLACEHOLDER</td>
+</tr>
+<tr>
+<td>Иерархия родитель-потомок</td>
+<td>Нужен <code>HierarchyComponent</code></td>
+</tr>
+<tr>
+<td>Статистика памяти GPU</td>
+<td>PLACEHOLDER</td>
+</tr>
+</tbody>
+</table>
+<p>См. <a href="04-editor-additions.md">04-editor-additions.md</a> для ручной проверки.</p>
+<hr />
+<p><em>Конец полного обзора. Раздельные версии: <a href="README.md">README</a> · <a href="01-project-overview.md">01</a> · <a href="02-technologies-and-patterns.md">02</a> · <a href="03-code-structure.md">03</a> · <a href="04-editor-additions.md">04</a></em></p>
+</section>
+</section>
+</body>
+</html>
