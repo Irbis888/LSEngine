@@ -5,6 +5,7 @@
 #include <entt/entt.hpp>
 #include "Application.h"
 #include "ImGuiBridge.h"
+#include <tracy/Tracy.hpp>
 #include <string>
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -38,14 +39,17 @@ TestApp::TestApp(HINSTANCE hInstance)
 
 void TestApp::PhysicsUpdate(const FrameContext& context)
 {
+	ZoneScopedN("PhysicsUpdate");
     mEngine->PhysicsUpdate(context);
 }
 void TestApp::Update(const FrameContext& context)
 {
+	ZoneScopedN("Update");
 	mEngine->Update(context);
 }
 void TestApp::Draw(const FrameContext& context)
 {
+	ZoneScopedN("Draw");
 	mEngine->Draw(context);
 }
 

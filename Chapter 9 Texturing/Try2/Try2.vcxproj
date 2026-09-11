@@ -106,11 +106,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\external\tracy\public;$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -140,6 +141,7 @@
     <ClCompile Include="..\..\Common\DDSTextureLoader.cpp" />
     <ClCompile Include="..\..\Common\GameTimer.cpp" />
     <ClCompile Include="..\..\Common\MathHelper.cpp" />
+    <ClCompile Include="..\..\external\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="CameraControllerSystem.cpp" />
     <ClCompile Include="Commons.cpp" />

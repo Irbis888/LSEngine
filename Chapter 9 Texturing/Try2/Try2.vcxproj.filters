@@ -72,6 +72,66 @@
     <ClCompile Include="PhysicsSystem.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiBridge.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiPlatform.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorContext.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\LegendPanel.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorUI.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\HierarchyPanel.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\InspectorPanel.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\ViewportPanel.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\StatisticsPanel.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\GizmoController.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_draw.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_tables.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_widgets.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_demo.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src\ImGuizmo.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\external\tracy\public\TracyClient.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Common\GameTimer.h">
@@ -126,6 +186,15 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsSystem.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiBridge.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiPlatform.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorContext.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
