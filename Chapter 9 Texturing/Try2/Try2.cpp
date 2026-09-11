@@ -5,7 +5,7 @@
 #include <entt/entt.hpp>
 #include "Application.h"
 #include "ImGuiBridge.h"
-#include <tracy/Tracy.hpp>
+
 #include <string>
 
 #pragma comment(lib, "d3dcompiler.lib")

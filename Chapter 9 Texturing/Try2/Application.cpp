@@ -147,7 +147,9 @@ int Application::Run()
 			{
 				Sleep(100);
 			}
+			FrameMark;
 		}
+		
 	}
 
 	ImGuiBridge::OnApplicationShutdown();

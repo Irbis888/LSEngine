@@ -16,6 +16,7 @@
 #include <windows.h>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
+#include <tracy/Tracy.hpp>
 
 #include "PhysicsCommons.h"
 
