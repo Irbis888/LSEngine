@@ -298,10 +298,12 @@ void D3DRenderAdapter::BeginFrame()
     mNextObjectCBIndex = 0;
     mCurrentObjectCBIndex = 0;
     mNextMaterialCBIndex = 0;
-
+    
+    ZoneScopedN("WaitForFence");
     // If GPU has not finished processing commands up to this fence, wait
     if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
     {
+		
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
         ThrowIfFailed(mFence->SetEventOnCompletion(mCurrFrameResource->Fence, eventHandle));
         WaitForSingleObject(eventHandle, INFINITE);
@@ -374,7 +376,7 @@ void D3DRenderAdapter::EndFrame()
     ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
     mCommandQueue->ExecuteCommandLists(1, cmdsLists);
 
-    ThrowIfFailed(mSwapChain->Present(1, 0));
+    ThrowIfFailed(mSwapChain->Present(0, 0));
 
     mCurrBackBuffer = (mCurrBackBuffer + 1) % SwapChainBufferCount;
 
