@@ -59,11 +59,6 @@ void Engine::Init(const GameTimer& gt) {
 		DemoScene::Build(world, mResourceManager);
 	}
 
-	/*mResourceManager.PrintAllMeshes();
-	mResourceManager.PrintAllTextures();
-	mResourceManager.PrintAllMaterials();*/
-
-
 }
 void Engine::Update(const FrameContext& context)
 {

@@ -10,6 +10,7 @@ namespace EditorSceneIO
     inline const char* PlaySnapshotPath() { return "Scenes/EditorPlaySnapshot.json"; }
     inline const char* DemoScenePath() { return "Scenes/DemoScene.json"; }
     inline const char* CharacterShowcasePath() { return "Scenes/CharacterShowcase.json"; }
+    inline const char* PhysicsStress256Path() { return "Scenes/PhysicsStress256.json"; }
 
     void SaveScene(EditorContext& ctx);
     void LoadScene(EditorContext& ctx);

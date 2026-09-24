@@ -210,5 +210,8 @@
     <None Include="Scenes\DemoScene.json">
       <Filter>Scenes</Filter>
     </None>
+    <None Include="Scenes\PhysicsStress256.json">
+      <Filter>Scenes</Filter>
+    </None>
   </ItemGroup>
 </Project>

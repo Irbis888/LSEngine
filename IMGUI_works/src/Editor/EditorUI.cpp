@@ -222,6 +222,16 @@ static void DrawMainMenu(EditorContext& ctx)
         }
         ImGui::SetItemTooltip("Load the plane with three portraits and three Diablo models.");
 
+        if (ImGui::MenuItem(
+                "Physics Stress (256 Bodies)",
+                EditorSceneIO::PhysicsStress256Path(),
+                false,
+                canSwitchScene))
+        {
+            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsStress256Path());
+        }
+        ImGui::SetItemTooltip("Load a physics stress scene with 256 falling rigid bodies.");
+
         if (!canSwitchScene)
         {
             ImGui::Separator();

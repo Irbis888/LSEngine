@@ -212,6 +212,7 @@
     <None Include="MESH_UPLOAD_GUIDE.md" />
     <None Include="Scenes\CharacterShowcase.json" />
     <None Include="Scenes\DemoScene.json" />
+    <None Include="Scenes\PhysicsStress256.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
