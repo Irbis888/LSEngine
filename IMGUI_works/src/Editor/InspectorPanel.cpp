@@ -121,11 +121,23 @@ static void DrawInspectorPanel(EditorContext& ctx)
 
     if (ctx.registry->all_of<ColliderComponent>(entity))
     {
-        if (ImGui::CollapsingHeader("BoxCollider", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("Collider", ImGuiTreeNodeFlags_DefaultOpen))
         {
             auto& col = ctx.registry->get<ColliderComponent>(entity);
+            int shape = static_cast<int>(col.type);
+            if (ImGui::Combo("Shape", &shape, "Box (AABB)\0Sphere\0\0"))
+                col.type = static_cast<ColliderType>(shape);
             ImGui::DragFloat3("Offset", &col.offset.x, 0.05f);
-            ImGui::DragFloat3("Half Extents", &col.halfExtents.x, 0.05f, 0.01f, 50.0f);
+            if (col.type == ColliderType::Sphere)
+            {
+                ImGui::DragFloat("Radius", &col.radius, 0.05f, 0.01f, 50.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+                ImGui::SetItemTooltip("Local radius; world radius uses the largest absolute scale component.");
+            }
+            else
+            {
+                ImGui::DragFloat3("Half Extents", &col.halfExtents.x, 0.05f, 0.01f, 50.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+                ImGui::SetItemTooltip("Axis-aligned box. Transform rotation does not rotate this collider.");
+            }
             ImGui::DragFloat("Restitution", &col.restitution, 0.01f, 0.0f, 1.0f);
             ImGui::DragFloat("Friction", &col.friction, 0.01f, 0.0f, 1.0f);
         }

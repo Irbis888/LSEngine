@@ -232,6 +232,16 @@ static void DrawMainMenu(EditorContext& ctx)
         }
         ImGui::SetItemTooltip("Load a physics stress scene with 256 falling rigid bodies.");
 
+        if (ImGui::MenuItem(
+                "Physics Mixed (256 Cubes + 256 Spheres)",
+                EditorSceneIO::PhysicsMixed512Path(),
+                false,
+                canSwitchScene))
+        {
+            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsMixed512Path());
+        }
+        ImGui::SetItemTooltip("Load 256 orange cubes and 256 blue spheres, mixed above a large floor.");
+
         if (!canSwitchScene)
         {
             ImGui::Separator();

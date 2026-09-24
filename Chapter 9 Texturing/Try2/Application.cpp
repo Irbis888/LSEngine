@@ -106,7 +106,7 @@ int Application::Run()
 			dt = min(dt, 0.1f);
 			accumulator += dt;
 			int steps = 0;
-			const int maxSteps = 5;
+			const int maxSteps = 10;
 
 			mFrameContext.physDT = fixed_dt;
 			mFrameContext.timer = mTimer;

@@ -142,7 +142,7 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     // Create frame resources (one per frame in flight)
     for (int i = 0; i < NumFrameResources; ++i)
     {
-        mFrameResources.push_back(std::make_unique<FrameRes>(md3dDevice.Get(), 1, 1024, 512));
+        mFrameResources.push_back(std::make_unique<FrameRes>(md3dDevice.Get(), 1, 1024, 1024));
     }
     mCurrFrameResourceIndex = 0;
     mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();

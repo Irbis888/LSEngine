@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Commons.h"
+#include "PhysicsBroadPhase.h"
 
 class PhysicsSystem : public ISystem
 {
@@ -8,6 +9,7 @@ public:
     void Update(entt::registry& reg, const FrameContext& context) override;
 
 private:
+    PhysicsBroadPhase mBroadPhase;
     void Integrate(entt::registry& reg, float dt);
     void ResolveCollisions(entt::registry& reg);
     void ResolveCollision(

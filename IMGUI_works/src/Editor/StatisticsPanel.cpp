@@ -85,7 +85,14 @@ static void DrawStatisticsPanel(EditorContext& ctx, const FrameContext& frame)
         ImGui::Text("Mesh renderers: %zu", meshCount);
     }
 
-    ImGui::Text("Collisions (this frame): %d", PhysicsStats::GetFrameCollisionCount());
+    const auto& broadPhase = PhysicsStats::BroadPhase();
+    ImGui::Text("Possible pairs (physics step): %zu", broadPhase.possiblePairs);
+    ImGui::Text("Broad phase AABB checks: %zu", broadPhase.aabbTests);
+    ImGui::SetItemTooltip("Includes re-queries when collision resolution moves a body.");
+    ImGui::Text("Narrow phase checks: %zu", broadPhase.narrowPhaseTests);
+    ImGui::Text("Grid cells: %zu | Large colliders: %zu", broadPhase.gridCells, broadPhase.largeColliders);
+    ImGui::SetItemTooltip("Colliders spanning more than 64 cells use a separate list (for example, large floors).");
+    ImGui::Text("Collisions (last physics step): %d", PhysicsStats::GetFrameCollisionCount());
     ImGui::TextDisabled("GPU memory: [PLACEHOLDER]");
 
     ImGui::End();

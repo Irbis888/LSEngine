@@ -38,43 +38,66 @@ void PhysicsSystem::Integrate(entt::registry& reg, float dt)
 
 void PhysicsSystem::ResolveCollisions(entt::registry& reg)
 {
+    ZoneScopedN("PhysicsCollisions");
     auto view = reg.view<TransformComponent, ColliderComponent>();
     std::vector<entt::entity> entities(view.begin(), view.end());
+    std::vector<AABB> bounds;
+    bounds.reserve(entities.size());
+    for (entt::entity entity : entities)
+    {
+        const auto& transform = view.get<TransformComponent>(entity);
+        bounds.push_back(MakeScaledAABB(transform.position, transform.scale, view.get<ColliderComponent>(entity)));
+    }
+    {
+        ZoneScopedN("PhysicsBroadPhaseBuild");
+        mBroadPhase.Build(bounds);
+    }
 
+    auto& stats = PhysicsStats::BroadPhase();
+    stats = {};
+    stats.possiblePairs = entities.empty() ? 0 : entities.size() * (entities.size() - 1) / 2;
+    std::vector<size_t> candidates;
     for (size_t i = 0; i < entities.size(); ++i)
     {
-        for (size_t j = i + 1; j < entities.size(); ++j)
+        mBroadPhase.Query(i, i + 1, candidates);
+        size_t cursor = 0;
+        while (cursor < candidates.size())
         {
-            entt::entity a = entities[i];
-            entt::entity b = entities[j];
-
+            const size_t j = candidates[cursor++];
+            const entt::entity a = entities[i];
+            const entt::entity b = entities[j];
             auto& aTransform = view.get<TransformComponent>(a);
             const auto& aCollider = view.get<ColliderComponent>(a);
             auto& bTransform = view.get<TransformComponent>(b);
             const auto& bCollider = view.get<ColliderComponent>(b);
 
-            const AABB aBounds = MakeScaledAABB(aTransform.position, aTransform.scale, aCollider);
-            const AABB bBounds = MakeScaledAABB(bTransform.position, bTransform.scale, bCollider);
-            const CollisionManifold collision = GetAABBCollision(aBounds, bBounds);
-
+            ++stats.narrowPhaseTests;
+            const CollisionManifold collision = GetColliderCollision(mBroadPhase.Bounds(i), aCollider.type, mBroadPhase.Bounds(j), bCollider.type);
             if (!collision.colliding)
                 continue;
 
             PhysicsStats::AddCollision();
-
-            RigidbodyComponent* aBody = reg.try_get<RigidbodyComponent>(a);
-            RigidbodyComponent* bBody = reg.try_get<RigidbodyComponent>(b);
-
+            const glm::vec3 aPosition = aTransform.position;
+            const glm::vec3 bPosition = bTransform.position;
             ResolveCollision(
-                aTransform,
-                aBody,
-                aCollider,
-                bTransform,
-                bBody,
-                bCollider,
-                collision);
+                aTransform, reg.try_get<RigidbodyComponent>(a), aCollider,
+                bTransform, reg.try_get<RigidbodyComponent>(b), bCollider, collision);
+
+            // Keep the grid current as the sequential solver pushes bodies.
+            // Sorting candidates and resuming after j preserves the old pair order.
+            if (bTransform.position != bPosition)
+                mBroadPhase.Update(j, MakeScaledAABB(bTransform.position, bTransform.scale, bCollider));
+            if (aTransform.position != aPosition)
+            {
+                mBroadPhase.Update(i, MakeScaledAABB(aTransform.position, aTransform.scale, aCollider));
+                mBroadPhase.Query(i, j + 1, candidates);
+                cursor = 0;
+            }
         }
     }
+    stats.aabbTests = mBroadPhase.AabbTests();
+    stats.gridCells = mBroadPhase.CellCount();
+    stats.largeColliders = mBroadPhase.LargeCount();
 }
 
 void PhysicsSystem::ResolveCollision(

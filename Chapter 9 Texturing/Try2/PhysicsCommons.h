@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 #include <glm/glm.hpp>
 
@@ -82,7 +83,7 @@ struct CollisionManifold
 {
     bool colliding = false;
     glm::vec3 normal = glm::vec3(0.0f);
-    float penetrationDepth = 0.1f;
+    float penetrationDepth = 0.0f;
 };
 
 inline AABB MakeAABB(const glm::vec3& position, const ColliderComponent& collider)
@@ -166,8 +167,102 @@ inline bool IntersectsSphere(
     return glm::dot(delta, delta) <= radiusSum * radiusSum;
 }
 
+// Contact normals follow the solver convention: from A toward B.
+// Exact tangency is not penetration, matching GetAABBCollision.
+inline CollisionManifold GetSphereCollision(
+    const glm::vec3& aCenter, float aRadius,
+    const glm::vec3& bCenter, float bRadius)
+{
+    CollisionManifold result;
+    const glm::vec3 delta = bCenter - aCenter;
+    const float radiusSum = aRadius + bRadius;
+    const float distanceSquared = glm::dot(delta, delta);
+    if (radiusSum <= 0.0f || distanceSquared >= radiusSum * radiusSum)
+        return result;
+
+    const float distance = std::sqrt(distanceSquared);
+    result.colliding = true;
+    // Coincident centers have no unique direction; use a stable fallback.
+    result.normal = distance > 0.0f ? delta / distance : glm::vec3(1, 0, 0);
+    result.penetrationDepth = radiusSum - distance;
+    return result;
+}
+
+inline CollisionManifold GetSphereAABBCollision(
+    const glm::vec3& sphereCenter, float radius, const AABB& box)
+{
+    CollisionManifold result;
+    const glm::vec3 closest = glm::clamp(sphereCenter, box.Min(), box.Max());
+    const glm::vec3 towardBox = closest - sphereCenter;
+    const float distanceSquared = glm::dot(towardBox, towardBox);
+
+    if (distanceSquared > 0.0f)
+    {
+        if (radius <= 0.0f || distanceSquared >= radius * radius)
+            return result;
+
+        const float distance = std::sqrt(distanceSquared);
+        result.colliding = true;
+        result.normal = towardBox / distance;
+        result.penetrationDepth = radius - distance;
+        return result;
+    }
+
+    // The center is inside/on the box. Push the sphere out through the nearest
+    // face, including its radius. Negate outward because the solver moves A - N.
+    const glm::vec3 localCenter = sphereCenter - box.center;
+    const glm::vec3 faceDistance = box.halfExtents - glm::abs(localCenter);
+    int axis = 0;
+    if (faceDistance.y < faceDistance[axis]) axis = 1;
+    if (faceDistance.z < faceDistance[axis]) axis = 2;
+    result.penetrationDepth = radius + faceDistance[axis];
+    if (result.penetrationDepth <= 0.0f)
+        return result;
+
+    result.colliding = true;
+    result.normal = glm::vec3(0);
+    result.normal[axis] = localCenter[axis] < 0.0f ? 1.0f : -1.0f;
+    return result;
+}
+
+// Bounds come from MakeScaledAABB. A sphere's bounds have equal half-extents,
+// equal to its world radius (largest absolute scale component).
+inline CollisionManifold GetColliderCollision(
+    const AABB& aBounds, ColliderType aType,
+    const AABB& bBounds, ColliderType bType)
+{
+    if (aType == ColliderType::Sphere && bType == ColliderType::Sphere)
+        return GetSphereCollision(aBounds.center, aBounds.halfExtents.x,
+                                  bBounds.center, bBounds.halfExtents.x);
+    if (aType == ColliderType::Sphere)
+        return GetSphereAABBCollision(aBounds.center, aBounds.halfExtents.x, bBounds);
+    if (bType == ColliderType::Sphere)
+    {
+        CollisionManifold result = GetSphereAABBCollision(bBounds.center, bBounds.halfExtents.x, aBounds);
+        result.normal = -result.normal;
+        return result;
+    }
+    return GetAABBCollision(aBounds, bBounds);
+}
+
+
 namespace PhysicsStats
 {
+    // All counters describe the last completed physics step, not a render frame.
+    struct BroadPhaseStats
+    {
+        size_t possiblePairs = 0;
+        size_t aabbTests = 0;
+        size_t narrowPhaseTests = 0;
+        size_t gridCells = 0;
+        size_t largeColliders = 0;
+    };
+
+    inline BroadPhaseStats& BroadPhase()
+    {
+        static BroadPhaseStats stats;
+        return stats;
+    }
     inline int& FrameCollisionCount()
     {
         static int count = 0;
