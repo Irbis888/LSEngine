@@ -15,7 +15,7 @@ struct Vertex
         const glm::vec2& uv) :
         Position(p),
         Normal(n),
-        TangentU(t),
+        TangentU(t, 1.0f),
         TexC(uv) {
     }
     Vertex(
@@ -25,13 +25,14 @@ struct Vertex
         float u, float v) :
         Position(px, py, pz),
         Normal(nx, ny, nz),
-        TangentU(tx, ty, tz),
+        TangentU(tx, ty, tz, 1.0f),
         TexC(u, v) {
     }
 
     glm::vec3 Position;
     glm::vec3 Normal;
-    glm::vec3 TangentU;
+    // xyz: tangent, w: sign of dot(cross(normal, tangent), bitangent).
+    glm::vec4 TangentU;
     glm::vec2 TexC;
 };
 

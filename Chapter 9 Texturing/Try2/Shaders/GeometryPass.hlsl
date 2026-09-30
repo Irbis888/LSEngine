@@ -45,22 +45,25 @@ SamplerState gsamAnisotropicWrap : register(s4);
 
 
 
-float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)
+float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float4 tangentW)
 {
 	// Uncompress each component from [0,1] to [-1,1].
     float3 normalT = 2.0f * normalMapSample - 1.0f;
 
 	// Build orthonormal basis.
     float3 N = unitNormalW;
-    float3 T = normalize(tangentW - dot(tangentW, N) * N);
-    float3 B = cross(N, T);
+    float3 T = tangentW.xyz - dot(tangentW.xyz, N) * N;
+    // Without a valid tangent, use the surface normal.
+    float tangentLengthSq = dot(T, T);
+    T *= rsqrt(max(tangentLengthSq, 1e-8f));
+    float3 B = tangentW.w * cross(N, T);
 
     float3x3 TBN = float3x3(T, B, N);
 
 	// Transform from tangent space to world space.
     float3 bumpedNormalW = mul(normalT, TBN);
 
-    return bumpedNormalW;
+    return tangentLengthSq < 1e-8f ? N : bumpedNormalW;
 }
 
 struct VertexIn
@@ -68,7 +71,7 @@ struct VertexIn
     float3 PosL : POSITION;
     float3 NormalL : NORMAL;
     float2 TexC : TEXCOORD;
-    float3 TangentL : TANGENT;
+    float4 TangentL : TANGENT;
 };
 
 struct VertexOut
@@ -77,7 +80,7 @@ struct VertexOut
     float3 PosW : POSITION;
     float3 NormalW : NORMAL;
     float2 TexC : TEXCOORD;
-    float3 TangentW : TANGENT;
+    float4 TangentW : TANGENT;
 };
 
 VertexOut VS(VertexIn vin)
@@ -89,11 +92,12 @@ VertexOut VS(VertexIn vin)
     vout.TexC = mul(texC, gMatTransform).xy;
     
     float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
-    vout.PosW = posW;
+    vout.PosW = posW.xyz;
     vout.PosH = mul(posW, gViewProj);   
-    vout.NormalW = mul(vin.NormalL, (float3x3) gWorld);
+    vout.NormalW = mul(vin.NormalL, transpose((float3x3)gInvWorld));
     
-    vout.TangentW = mul(vin.TangentL, (float3x3) gWorld);
+    float worldSign = determinant((float3x3)gWorld) < 0.0f ? -1.0f : 1.0f;
+    vout.TangentW = float4(mul(vin.TangentL.xyz, (float3x3)gWorld), vin.TangentL.w * worldSign);
 
     
     return vout;
@@ -112,15 +116,16 @@ VertexOut VSTerrain(VertexIn vin)
     float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
     float height = gHeightMap.SampleLevel(gsamAnisotropicWrap, vout.TexC, 0).r;
     posW.y += height * 300 - 150;
-    vout.PosW = posW;
+    vout.PosW = posW.xyz;
 
     vout.PosH = mul(posW, gViewProj);
    
     
 
-    vout.NormalW = mul(vin.NormalL, (float3x3) gWorld);
+    vout.NormalW = mul(vin.NormalL, transpose((float3x3)gInvWorld));
     //vout.NormalW = float3(0., 1., 0.);
-    vout.TangentW = mul(vin.TangentL, (float3x3) gWorld);
+    float worldSign = determinant((float3x3)gWorld) < 0.0f ? -1.0f : 1.0f;
+    vout.TangentW = float4(mul(vin.TangentL.xyz, (float3x3)gWorld), vin.TangentL.w * worldSign);
 
     
     return vout;

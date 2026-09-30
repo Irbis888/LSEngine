@@ -51,7 +51,6 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
     const aiScene* scene = importer.ReadFile(path,
         aiProcess_Triangulate |
         aiProcess_ConvertToLeftHanded |
-        aiProcess_FlipUVs |
         aiProcess_GenNormals |
         aiProcess_CalcTangentSpace);
 
@@ -151,6 +150,13 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
             }
 
             mesh.vertices.emplace_back(pos, normal, tangent, uv);
+            if (aMesh->HasTangentsAndBitangents())
+            {
+                const aiVector3D& b = aMesh->mBitangents[i];
+                const glm::vec3 bitangent(b.x, b.y, b.z);
+                mesh.vertices.back().TangentU.w =
+                    glm::dot(glm::cross(normal, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+            }
         }
 
         // =========================

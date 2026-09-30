@@ -36,7 +36,7 @@
                     "color": [1.0, 1.0, 1.0],
                     "roughness": 0.45,
                     "albedo": "textures/texture.dds",
-                    "normal": "textures/texture_nm.dds"
+                    "normal": "textures/african_head_nm_tangent.dds"
                 }
             }
         },
@@ -55,7 +55,7 @@
                     "color": [1.0, 1.0, 1.0],
                     "roughness": 0.45,
                     "albedo": "textures/texture.dds",
-                    "normal": "textures/texture_nm.dds"
+                    "normal": "textures/african_head_nm_tangent.dds"
                 }
             }
         },
@@ -74,7 +74,7 @@
                     "color": [1.0, 1.0, 1.0],
                     "roughness": 0.45,
                     "albedo": "textures/texture.dds",
-                    "normal": "textures/texture_nm.dds"
+                    "normal": "textures/african_head_nm_tangent.dds"
                 }
             }
         },
