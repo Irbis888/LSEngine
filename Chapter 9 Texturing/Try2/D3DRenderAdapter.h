@@ -3,6 +3,7 @@
 #include "d3dUtils.h"
 #include "MathHelper.h"
 #include "FrameRes.h"
+#include "TextureUploader.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -21,6 +22,8 @@ struct Dx12ImGuiBindings
 class D3DRenderAdapter : public IRenderAdapter
 {
 public:
+    ~D3DRenderAdapter() override;
+    const TextureUploadStats& TextureStats() const { return mTextureUploader.Stats(); }
     void Init(void* windowHandle, uint32_t width, uint32_t height) override;
     void BeginFrame() override;
     void EndFrame() override;
@@ -106,6 +109,7 @@ private:
 
     // Next free descriptor index in the CBV/SRV/UAV heap
     UINT mNextCbvSrvIndex = 0;
+    TextureUploader mTextureUploader;
 
     // Current material/transform state (set by SetMaterial/SetTransform)
     MaterialID mCurrentMaterial = 0;
@@ -142,7 +146,6 @@ public:
 
     std::unordered_map<MeshID, std::unique_ptr<MeshGPU>> mGeometries;
     std::unordered_map<std::string, std::unique_ptr<MaterialGPU>> mMaterials;
-    std::unordered_map<std::string, std::unique_ptr<TextureGPU>> mTextures;
     std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
     std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
     std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> mRootSignatures;
@@ -159,7 +162,6 @@ public:
 
 
     // Texture loading (lazy loading similar to meshes)
-    int LoadTexture(const std::wstring& filename);
     MaterialGPU* GetOrLoadMaterial(MaterialID materialId);
 
     // Build root signatures and PSOs

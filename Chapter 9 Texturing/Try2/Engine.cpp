@@ -34,6 +34,7 @@ namespace
 }
 
 void Engine::Init(const GameTimer& gt) {
+    JobSystem::Get().Init();
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	updateSystems.push_back(std::make_unique<CameraControllerSystem>());
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>());
@@ -59,6 +60,7 @@ void Engine::Init(const GameTimer& gt) {
 		DemoScene::Build(world, mResourceManager);
 	}
 
+    SyncActiveTextures();
 }
 void Engine::Update(const FrameContext& context)
 {
@@ -112,13 +114,23 @@ bool Engine::LoadScene(const std::string& path, std::string& outError)
 	{
 		world.registry.clear();
 		SceneSerializer::Load(world, mResourceManager, path);
+        SyncActiveTextures();
 		outError.clear();
 		return true;
 	}
 	catch (const std::exception& e)
 	{
 		outError = e.what();
+		SyncActiveTextures();
 		return false;
 	}
 }
 
+
+void Engine::SyncActiveTextures()
+{
+    std::vector<MeshID> meshes;
+    for (auto entity : world.registry.view<MeshComponent>())
+        meshes.push_back(world.registry.get<MeshComponent>(entity).meshID);
+    mResourceManager.SetActiveMeshes(meshes);
+}

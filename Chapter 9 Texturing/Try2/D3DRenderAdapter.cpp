@@ -14,48 +14,6 @@ static const int SwapChainBufferCount = 2;
 
 namespace
 {
-    std::string WideToUtf8(const std::wstring& value)
-    {
-        if (value.empty())
-        {
-            return {};
-        }
-
-        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        if (size <= 0)
-        {
-            return {};
-        }
-
-        std::string result(size - 1, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
-        return result;
-    }
-
-    std::wstring ResolveTexturePath(const std::wstring& filename)
-    {
-        namespace fs = std::filesystem;
-
-        if (filename.empty())
-        {
-            return filename;
-        }
-
-        fs::path path(filename);
-        if (path.is_absolute() || fs::exists(path))
-        {
-            return path.wstring();
-        }
-
-        auto firstPart = path.begin();
-        if (firstPart != path.end() && firstPart->wstring() == L"..")
-        {
-            return path.wstring();
-        }
-
-        return (fs::path(L"../../Textures") / path).wstring();
-    }
-
     void SyncSubmeshMaterials(MeshGPU& gpuMesh, const Mesh& cpuMesh)
     {
         if (gpuMesh.materialVersion == cpuMesh.materialVersion &&
@@ -125,11 +83,13 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
 
     // Create CBV/SRV/UAV descriptor heap (shader visible). We'll allocate descriptors as needed.
     D3D12_DESCRIPTOR_HEAP_DESC cbvSrvDesc = {};
-    cbvSrvDesc.NumDescriptors = 1024; // allow many descriptors for textures and CBVs
+    cbvSrvDesc.NumDescriptors = 8192; // allow many descriptors for textures and CBVs
     cbvSrvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvSrvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvDesc, IID_PPV_ARGS(&mCbvSrvUavHeap)));
     mCbvSrvUavDescriptorCount = cbvSrvDesc.NumDescriptors;
+    // 0..899: engine views; 900..963: ImGui; 1024..8191: streamed textures.
+    mTextureUploader.Init(md3dDevice.Get(), mCbvSrvUavHeap.Get(), 1024, 8192 - 1024);
     mNextCbvSrvIndex = 0;
 
     CreateCommandObjects();
@@ -313,6 +273,7 @@ void D3DRenderAdapter::BeginFrame()
     // Reset command allocator for this frame
     ThrowIfFailed(mCurrFrameResource->CmdListAlloc->Reset());
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
+    if (mResourceManager) mTextureUploader.Pump(mResourceManager->Textures(), mCommandList.Get(), mFence->GetCompletedValue());
 
     // Update pass constants for this frame
     //UpdateMainPassCB();
@@ -384,6 +345,7 @@ void D3DRenderAdapter::EndFrame()
     mCurrentFence++;
     ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mCurrentFence));
     mCurrFrameResource->Fence = mCurrentFence;
+    mTextureUploader.OnSubmitted(mCurrentFence);
 
     // Clean up completed mesh uploads
     CleanupMeshUploadBuffers();
@@ -564,7 +526,7 @@ ID3D12Resource* D3DRenderAdapter::CurrentBackBuffer() const
 int D3DRenderAdapter::CreateSRV(ID3D12Resource* resource)
 {
     if (!resource) return -1;
-    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount) return -1;
+    if (mNextCbvSrvIndex >= 900) return -1;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -585,7 +547,7 @@ int D3DRenderAdapter::CreateSRV(ID3D12Resource* resource)
 
 int D3DRenderAdapter::CreateCBV(const void* data, UINT64 byteSize, ID3D12Resource** outUploadResource)
 {
-    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount) return -1;
+    if (mNextCbvSrvIndex >= 900) return -1;
 
     UINT64 uploadSize = byteSize;
     // Create upload buffer
@@ -1226,155 +1188,23 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     );
 }
 
-int D3DRenderAdapter::LoadTexture(const std::wstring& filename)
-{
-	std::wstring fn = ResolveTexturePath(filename);
-    // Check if texture already loaded
-    std::string filenameStr = WideToUtf8(fn);
-	//filenameStr = "../Textures/" + filenameStr; // Assuming textures are in this relative path
-
-    auto it = mTextures.find(filenameStr);
-    if (it != mTextures.end())
-    {
-        // Already loaded, return stored SRV index
-        return it->second->SrvHeapIndex;
-    }
-
-    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount)
-    {
-        return -1; // Descriptor heap full
-    }
-
-    auto textureGPU = std::make_unique<TextureGPU>();
-    textureGPU->Filename = fn;
-    textureGPU->Name = filenameStr;
-
-    // Load DDS texture using DirectX helper
-    ComPtr<ID3D12Resource> texture;
-    ComPtr<ID3D12Resource> uploadHeap;
-
-    HRESULT hr = DirectX::CreateDDSTextureFromFile12(
-        md3dDevice.Get(),
-        mCommandList.Get(),
-        fn.c_str(),
-        texture,
-        uploadHeap);
-
-    if (FAILED(hr))
-    {
-        return -1; // Failed to load texture
-    }
-
-    textureGPU->Resource = texture;
-    textureGPU->UploadHeap = uploadHeap;
-
-    // Create SRV for the texture
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Format = texture->GetDesc().Format;
-    srvDesc.Texture2D.MipLevels = (UINT)texture->GetDesc().MipLevels;
-
-    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(
-        mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
-        mNextCbvSrvIndex,
-        mCbvSrvUavDescriptorSize);
-
-    md3dDevice->CreateShaderResourceView(texture.Get(), &srvDesc, handle);
-
-    int srvHeapIndex = mNextCbvSrvIndex;
-    mNextCbvSrvIndex++;
-
-    // Store SRV index in TextureGPU
-    textureGPU->SrvHeapIndex = srvHeapIndex;
-
-    // Store texture
-    mTextures[filenameStr] = std::move(textureGPU);
-
-    // Keep upload heap alive in owned resources
-    mOwnedResources.push_back(uploadHeap);
-
-    return srvHeapIndex;
-}
-
 MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
 {
-    if (!mResourceManager)
-        return nullptr;
-
-    std::string matKey = std::to_string((uint32_t)materialId);
-    auto it = mMaterials.find(matKey);
-    if (it != mMaterials.end())
-    {
-        return it->second.get();
-    }
-
-    Material& cpuMaterial = mResourceManager->GetMaterial(materialId);
-
-    auto materialGPU = std::make_unique<MaterialGPU>();
-    materialGPU->Name = cpuMaterial.name;
-    materialGPU->DiffuseAlbedo = DirectX::XMFLOAT4(
-        cpuMaterial.color.x,
-        cpuMaterial.color.y,
-        cpuMaterial.color.z,
-        1.0f);
-    materialGPU->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-    materialGPU->Roughness = cpuMaterial.roughness;
-
-    MaterialGPU* matGPU = materialGPU.get();
-
-    if (cpuMaterial.albedo != 0)
-    {
-        try
-        {
-            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.albedo);
-            if (!cpuTexture.filename.empty())
-            {
-                int srvIndex = LoadTexture(cpuTexture.filename);
-                if (srvIndex >= 0)
-                {
-                    matGPU->DiffuseSrvHeapIndex = srvIndex;
-                }
-            }
-        }
-        catch (...)
-        {
-            // Texture not found or loading failed - leave as -1
-        }
-    }
-
-    if (cpuMaterial.normal != 0)
-    {
-        try
-        {
-            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.normal);
-            if (!cpuTexture.filename.empty())
-            {
-                int srvIndex = LoadTexture(cpuTexture.filename);
-                if (srvIndex >= 0)
-                {
-                    matGPU->NormalSrvHeapIndex = srvIndex;
-                }
-            }
-        }
-        catch (...)
-        {
-            // Texture not found or loading failed - leave as -1
-        }
-    }
-
-    if (matGPU->DiffuseSrvHeapIndex < 0)
-    {
-        matGPU->DiffuseSrvHeapIndex = LoadTexture(L"white1x1.dds");
-    }
-
-    if (matGPU->NormalSrvHeapIndex < 0)
-    {
-        matGPU->NormalSrvHeapIndex = LoadTexture(L"default_nmap.dds");
-    }
-
-    mMaterials[matKey] = std::move(materialGPU);
-    return matGPU;
+    if (!mResourceManager) return nullptr;
+    const auto& cpu = mResourceManager->GetMaterial(materialId);
+    auto& material = mMaterials[std::to_string(materialId)];
+    if (!material) material = std::make_unique<MaterialGPU>();
+    material->Name = cpu.name;
+    material->DiffuseAlbedo = DirectX::XMFLOAT4(cpu.color.x, cpu.color.y, cpu.color.z, 1.0f);
+    material->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+    material->Roughness = cpu.roughness;
+    // Resolve every frame: handles stay stable as placeholders become ready textures.
+    auto& textures = mResourceManager->Textures();
+    textures.Activate(cpu.albedo);
+    textures.Activate(cpu.normal);
+    material->DiffuseSrvHeapIndex = mTextureUploader.Resolve(textures, cpu.albedo, false);
+    material->NormalSrvHeapIndex = mTextureUploader.Resolve(textures, cpu.normal, true);
+    return material.get();
 }
 
 void D3DRenderAdapter::CleanupMeshUploadBuffers()
@@ -1503,3 +1333,10 @@ std::vector<D3D12_STATIC_SAMPLER_DESC> D3DRenderAdapter::GetStaticSamplers()
 }
 
 // End of file
+
+D3DRenderAdapter::~D3DRenderAdapter()
+{
+    if (mCommandQueue && mFence) {
+        try { FlushCommandQueue(); } catch (...) { /* Device loss: resources can be released. */ }
+    }
+}

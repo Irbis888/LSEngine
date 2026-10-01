@@ -170,3 +170,12 @@ namespace DirectX
                                         _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr
                                     );
 }
+// CPU-only preparation. Subresource pointers refer to the caller-owned DDS bytes.
+#include <vector>
+namespace DirectX {
+    struct PreparedDDS12 {
+        D3D12_RESOURCE_DESC desc = {};
+        std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+    };
+    HRESULT PrepareDDS12(const uint8_t* data, size_t size, bool forceSRGB, PreparedDDS12& result);
+}

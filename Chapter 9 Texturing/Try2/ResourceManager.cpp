@@ -10,7 +10,7 @@
 
 static MeshID gNextMeshID = 1;
 static MaterialID gNextMaterialID = 1;
-static TextureID gNextTextureID = 1;
+
 
 namespace
 {
@@ -27,8 +27,9 @@ namespace
             return {};
         }
 
-        std::string result(size - 1, '\0');
+        std::string result(size, '\0');
         WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
+        result.pop_back();
         return result;
     }
 }
@@ -86,7 +87,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
             aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
         {
             std::wstring wpath(texPath.C_Str(), texPath.C_Str() + strlen(texPath.C_Str()));
-            mat.normal = LoadTexture(wpath);
+            mat.normal = LoadTexture(wpath, TextureColorSpace::Linear);
         }
 
         MaterialID matID = CreateMaterial(mat);
@@ -351,7 +352,7 @@ MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
 
     if (!desc.normalTexture.empty())
     {
-        mat.normal = LoadTexture(desc.normalTexture);
+        mat.normal = LoadTexture(desc.normalTexture, TextureColorSpace::Linear);
     }
 
     return CreateMaterial(mat);
@@ -412,36 +413,24 @@ Material& ResourceManager::GetMaterial(MaterialID id)
 // Texture
 //--------------------------------------------------------------
 
-TextureID ResourceManager::LoadTexture(const std::wstring& filename)
+TextureID ResourceManager::LoadTexture(const std::wstring& filename, TextureColorSpace color)
 {
-    auto cached = mTextureIDsByFilename.find(filename);
-    if (cached != mTextureIDsByFilename.end())
-    {
-        return cached->second;
-    }
-
-    Texture tex;
-
-    tex.filename = filename;
-
-    // имя можно вытащить из пути (пока просто копия)
-    tex.name = WideToUtf8(filename);
-
-    TextureID id = gNextTextureID++;
-    mTextures[id] = std::move(tex);
-    mTextureIDsByFilename[filename] = id;
-
-    return id;
+    return mTextureLoader.Request(filename, color);
 }
-
 Texture& ResourceManager::GetTexture(TextureID id)
 {
-    auto it = mTextures.find(id);
-    assert(it != mTextures.end() && "Texture not found!");
-    return it->second;
+    return mTextureLoader.Get(id);
 }
-
-
+void ResourceManager::SetActiveMeshes(const std::vector<MeshID>& meshes)
+{
+    std::unordered_set<TextureHandle> used;
+    for (auto id : meshes) for (const auto& sub : GetMesh(id).submeshes) {
+        const auto& mat = GetMaterial(sub.material);
+        if (mat.albedo) used.insert(mat.albedo);
+        if (mat.normal) used.insert(mat.normal);
+    }
+    mTextureLoader.SetActive(used);
+}
 
 void ResourceManager::PrintAllMeshes() const
 {
@@ -495,7 +484,7 @@ void ResourceManager::PrintAllTextures() const
 {
     std::cout << "==== TEXTURES ====\n";
 
-    for (const auto& [id, tex] : mTextures)
+    for (const auto& [id, tex] : mTextureLoader.Records())
     {
         std::wcout << L"TextureID: " << id << L"\n";
         std::wcout << L"Name: " << tex.name.c_str() << L"\n";

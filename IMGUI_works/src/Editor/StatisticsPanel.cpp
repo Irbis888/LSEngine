@@ -3,6 +3,8 @@
 #include <imgui.h>
 #include <Commons.h>
 #include <PhysicsCommons.h>
+#include <Engine.h>
+#include <D3DRenderAdapter.h>
 #include <vector>
 #include <unordered_set>
 
@@ -93,7 +95,26 @@ static void DrawStatisticsPanel(EditorContext& ctx, const FrameContext& frame)
     ImGui::Text("Grid cells: %zu | Large colliders: %zu", broadPhase.gridCells, broadPhase.largeColliders);
     ImGui::SetItemTooltip("Colliders spanning more than 64 cells use a separate list (for example, large floors).");
     ImGui::Text("Collisions (last physics step): %d", PhysicsStats::GetFrameCollisionCount());
-    ImGui::TextDisabled("GPU memory: [PLACEHOLDER]");
+    if (ctx.resources) {
+        const auto stats = ctx.resources->Textures().Stats();
+        ImGui::Separator();
+        ImGui::Text("Textures: %zu ready | %zu queued | %zu failed", stats.ready, stats.queued, stats.failed);
+        ImGui::Text("Loading: %zu CPU | %zu prepared | %zu GPU", stats.loading, stats.readyCPU, stats.uploading);
+        ImGui::Text("CPU loading reservation: %.1f MiB", double(stats.reservedCPUBytes) / (1024 * 1024));
+        if (ctx.engine) if (auto* renderer = dynamic_cast<D3DRenderAdapter*>(ctx.engine->GetRenderer())) {
+            const auto& gpu = renderer->TextureStats();
+            ImGui::Text("Textures GPU: %.1f MiB | Upload buffers: %.1f MiB", double(gpu.residentBytes) / (1024 * 1024), double(gpu.stagingBytes) / (1024 * 1024));
+            ImGui::Text("Upload: %.2f MiB/frame | %.3f ms | %zu descriptors", double(gpu.frameBytes) / (1024 * 1024), gpu.pumpMilliseconds, gpu.descriptors);
+        }
+        if (stats.failed && ImGui::TreeNode("Texture errors")) {
+            for (const auto& [id, texture] : ctx.resources->Textures().Records()) {
+                if (texture.state == TextureState::Failed) {
+                    ImGui::TextWrapped("%s: %s", texture.name.c_str(), texture.error.c_str());
+                }
+            }
+            ImGui::TreePop();
+        }
+    }
 
     ImGui::End();
 }

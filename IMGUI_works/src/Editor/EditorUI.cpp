@@ -242,6 +242,10 @@ static void DrawMainMenu(EditorContext& ctx)
         }
         ImGui::SetItemTooltip("Load 256 orange cubes and 256 blue spheres, mixed above a large floor.");
 
+        if (ImGui::MenuItem("Texture Streaming (1000 Textures)", nullptr, false, canSwitchScene))
+            EditorSceneIO::LoadScene(ctx, "Scenes/TextureStreaming1000.json");
+        ImGui::SetItemTooltip("Generate assets first with tests/GenerateTextureStressScene.py. Load 1000 cubes with distinct textures.");
+
         if (!canSwitchScene)
         {
             ImGui::Separator();

@@ -56,7 +56,7 @@ namespace
 
         if (value.contains("normal"))
         {
-            material.normal = resources.LoadTexture(StringToWide(value.at("normal").get<std::string>()));
+            material.normal = resources.LoadTexture(StringToWide(value.at("normal").get<std::string>()), TextureColorSpace::Linear);
         }
 
         return resources.CreateMaterial(material);

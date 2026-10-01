@@ -33,7 +33,10 @@ Application::Application(HINSTANCE hInstance)
 
 Application::~Application()
 {
-   
+    if (mEngine) mEngine->GetResources().Textures().Shutdown();
+    JobSystem::Get().Shutdown();
+    mEngine.reset();
+    mRenderAdapter.reset();
 }
 HINSTANCE Application::AppInst() const
 {
@@ -152,6 +155,8 @@ int Application::Run()
 		
 	}
 
+    if (mEngine) mEngine->GetResources().Textures().Shutdown();
+    static_cast<D3DRenderAdapter*>(mRenderAdapter.get())->FlushCommandQueue();
 	ImGuiBridge::OnApplicationShutdown();
 	return (int)msg.wParam;
 }

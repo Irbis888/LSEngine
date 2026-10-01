@@ -21,6 +21,8 @@ public:
         : mRenderAdapter(renderer) {
     };
 
+    void SyncActiveTextures();
+    IRenderAdapter* GetRenderer() { return mRenderAdapter; }
 	void Init(const GameTimer& gt);
 	void Update(const FrameContext& context);
 	void PhysicsUpdate(const FrameContext& context);

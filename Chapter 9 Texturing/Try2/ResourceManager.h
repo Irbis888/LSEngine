@@ -1,5 +1,6 @@
 #pragma once
 #include "Commons.h"
+#include "TextureLoading.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -73,17 +74,6 @@ struct Material
     float roughness = 0.5f;
 };
 
-struct Texture
-{
-    std::string name;
-    std::wstring filename;
-    
-    // позже:
-    // TextureID albedo;
-    // ShaderID shader;
-};
-
-
 class ResourceManager
 {
 public:
@@ -111,7 +101,9 @@ public:
     Mesh& GetMesh(MeshID id);
     Material& GetMaterial(MaterialID id);
 
-    TextureID LoadTexture(const std::wstring& filename);
+    TextureID LoadTexture(const std::wstring& filename, TextureColorSpace color = TextureColorSpace::File);
+    TextureLoader& Textures() { return mTextureLoader; }
+    void SetActiveMeshes(const std::vector<MeshID>& meshes);
     Texture& GetTexture(TextureID id);
 
     void PrintAllMeshes() const;
@@ -121,6 +113,5 @@ public:
 private:
     std::unordered_map<MeshID, Mesh> mMeshes;
     std::unordered_map<MaterialID, Material> mMaterials;
-    std::unordered_map<TextureID, Texture> mTextures;
-    std::unordered_map<std::wstring, TextureID> mTextureIDsByFilename;
+    TextureLoader mTextureLoader;
 };
