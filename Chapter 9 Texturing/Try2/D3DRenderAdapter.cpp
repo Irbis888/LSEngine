@@ -1,4 +1,5 @@
 #include "D3DRenderAdapter.h"
+#include "TextureBenchmark.h"
 
 #include <filesystem>
 #include <stdexcept>
@@ -125,12 +126,12 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
 
     // Create CBV/SRV/UAV descriptor heap (shader visible). We'll allocate descriptors as needed.
     D3D12_DESCRIPTOR_HEAP_DESC cbvSrvDesc = {};
-    cbvSrvDesc.NumDescriptors = 1024; // allow many descriptors for textures and CBVs
+    cbvSrvDesc.NumDescriptors = 8192; // allow many descriptors for textures and CBVs
     cbvSrvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvSrvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvSrvDesc, IID_PPV_ARGS(&mCbvSrvUavHeap)));
     mCbvSrvUavDescriptorCount = cbvSrvDesc.NumDescriptors;
-    mNextCbvSrvIndex = 0;
+    mNextCbvSrvIndex = 1024;
 
     CreateCommandObjects();
     CreateSwapChain();
@@ -299,10 +300,11 @@ void D3DRenderAdapter::BeginFrame()
     mCurrentObjectCBIndex = 0;
     mNextMaterialCBIndex = 0;
     
-    ZoneScopedN("WaitForFence");
+    ZoneScopedN("BeginFrame");
     // If GPU has not finished processing commands up to this fence, wait
     if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
     {
+        ZoneScopedN("WaitForFence");
 		
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
         ThrowIfFailed(mFence->SetEventOnCompletion(mCurrFrameResource->Fence, eventHandle));
@@ -384,6 +386,18 @@ void D3DRenderAdapter::EndFrame()
     mCurrentFence++;
     ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mCurrentFence));
     mCurrFrameResource->Fence = mCurrentFence;
+    if (TextureBenchmark::active) {
+        if (!TextureBenchmark::uploadFence) {
+            size_t loaded = 0;
+            for (const auto& [name, texture] : mTextures)
+                if (texture->Filename.find(L"StreamingStress") != std::wstring::npos) ++loaded;
+            TracyPlot("Benchmark textures ready", int64_t(loaded));
+            if (loaded == 1000) TextureBenchmark::uploadFence = mCurrentFence;
+        }
+        if (TextureBenchmark::uploadFence && mFence->GetCompletedValue() >= TextureBenchmark::uploadFence)
+            TextureBenchmark::Ready();
+    }
+
 
     // Clean up completed mesh uploads
     CleanupMeshUploadBuffers();
@@ -1249,6 +1263,7 @@ int D3DRenderAdapter::LoadTexture(const std::wstring& filename)
     textureGPU->Filename = fn;
     textureGPU->Name = filenameStr;
 
+    ZoneScopedN("Texture sync read prepare upload");
     // Load DDS texture using DirectX helper
     ComPtr<ID3D12Resource> texture;
     ComPtr<ID3D12Resource> uploadHeap;

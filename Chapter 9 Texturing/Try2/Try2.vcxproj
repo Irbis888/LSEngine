@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -73,8 +73,8 @@
   <PropertyGroup>
     <IMGUI_WORKS>$(SolutionDir)..\..\IMGUI_works</IMGUI_WORKS>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LibraryPath>$(ProjectDir)Libs;$(LibraryPath)</LibraryPath>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <LibraryPath>$(ProjectDir)..\..\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -125,9 +125,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\external\tracy\public;$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
@@ -182,6 +182,7 @@
     <ClInclude Include="..\..\Common\GameTimer.h" />
     <ClInclude Include="..\..\Common\MathHelper.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="TextureBenchmark.h" />
     <ClInclude Include="CameraControllerSystem.h" />
     <ClInclude Include="Commons.h" />
     <ClInclude Include="D3DRenderAdapter.h" />

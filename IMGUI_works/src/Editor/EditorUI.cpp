@@ -242,6 +242,10 @@ static void DrawMainMenu(EditorContext& ctx)
         }
         ImGui::SetItemTooltip("Load 256 orange cubes and 256 blue spheres, mixed above a large floor.");
 
+        if (ImGui::MenuItem("Texture Streaming (1000 Textures)", nullptr, false, canSwitchScene))
+            EditorSceneIO::LoadScene(ctx, "Scenes/TextureStreaming1000.json");
+        ImGui::SetItemTooltip("1000 unique textures; synchronous baseline loader.");
+
         if (!canSwitchScene)
         {
             ImGui::Separator();
