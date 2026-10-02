@@ -218,6 +218,9 @@
     <None Include="Scenes\PhysicsStress256.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="EnableEditor" AfterTargets="Build">
+    <Touch Files="$(TargetDir).imgui_on" AlwaysCreate="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
