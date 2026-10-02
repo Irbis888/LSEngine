@@ -1,4 +1,5 @@
 #include "D3DRenderAdapter.h"
+#include "TextureBenchmark.h"
 
 #include <filesystem>
 #include <stdexcept>
@@ -259,10 +260,11 @@ void D3DRenderAdapter::BeginFrame()
     mCurrentObjectCBIndex = 0;
     mNextMaterialCBIndex = 0;
     
-    ZoneScopedN("WaitForFence");
+    ZoneScopedN("BeginFrame");
     // If GPU has not finished processing commands up to this fence, wait
     if (mFence->GetCompletedValue() < mCurrFrameResource->Fence)
     {
+        ZoneScopedN("WaitForFence");
 		
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
         ThrowIfFailed(mFence->SetEventOnCompletion(mCurrFrameResource->Fence, eventHandle));
@@ -346,6 +348,14 @@ void D3DRenderAdapter::EndFrame()
     ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mCurrentFence));
     mCurrFrameResource->Fence = mCurrentFence;
     mTextureUploader.OnSubmitted(mCurrentFence);
+    if (TextureBenchmark::active && mResourceManager) {
+        const auto stats = mResourceManager->Textures().Stats();
+        TracyPlot("Benchmark textures ready", int64_t(stats.ready));
+        TracyPlot("Benchmark textures queued", int64_t(stats.queued));
+        if (stats.ready == 1000 && stats.failed == 0 && stats.loading == 0 && stats.uploading == 0)
+            TextureBenchmark::Ready();
+    }
+
 
     // Clean up completed mesh uploads
     CleanupMeshUploadBuffers();

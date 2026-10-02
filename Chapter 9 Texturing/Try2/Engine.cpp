@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "TextureBenchmark.h"
 #include "RenderSystem.h"
 #include "CameraControllerSystem.h"
 #include "DemoScene.h"
@@ -110,6 +111,8 @@ bool Engine::SaveScene(const std::string& path, std::string& outError)
 
 bool Engine::LoadScene(const std::string& path, std::string& outError)
 {
+    TextureBenchmark::Begin(path);
+    ZoneScopedN("Scene switch and texture requests");
 	try
 	{
 		world.registry.clear();

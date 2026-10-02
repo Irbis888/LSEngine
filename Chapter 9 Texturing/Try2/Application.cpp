@@ -1,4 +1,5 @@
 #include "Application.h"
+#include "TextureBenchmark.h"
 #include "ImGuiBridge.h"
 #include <WindowsX.h>
 #include <wrl.h>
@@ -89,6 +90,7 @@ const float fixed_dt = 1.0f / 60.0f;
 int Application::Run()
 {
 	MSG msg = { 0 };
+    std::chrono::steady_clock::time_point previousFrame;
 
 	mTimer.Reset();
 	float accumulator = 0.0f; // physics timer
@@ -104,7 +106,12 @@ int Application::Run()
 		// Otherwise, do animation/game stuff.
 		else
 		{
+			ZoneScopedN("Engine frame CPU");
 			mTimer.Tick();
+            const auto frameNow = std::chrono::steady_clock::now();
+            if (previousFrame.time_since_epoch().count())
+                TracyPlot("Frame interval ms", (std::chrono::duration<double, std::milli>(frameNow - previousFrame).count()));
+            previousFrame = frameNow;
 			float dt = mTimer.DeltaTime();
 			dt = min(dt, 0.1f);
 			accumulator += dt;
