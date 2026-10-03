@@ -24,13 +24,13 @@
             "mesh": {
                 "source": "model",
                 "path": "../../Common/negr.obj",
-                "material": {
-                    "name": "PortraitMaterial",
-                    "color": [1.0, 1.0, 1.0],
-                    "roughness": 0.45,
-                    "albedo": "textures/texture.dds",
-                    "normal": "textures/texture_nm.dds"
-                }
+              "material": {
+                "name": "PortraitMaterial",
+                "color": [ 1.0, 1.0, 1.0 ],
+                "roughness": 0.45,
+                "albedo": "textures/texture.dds",
+                "normal": "textures/african_head_nm_tangent.dds"
+              }
             }
         },
         {
@@ -48,7 +48,7 @@
                     "color": [1.0, 1.0, 1.0],
                     "roughness": 0.4,
                     "albedo": "textures/diablo3_pose_diffuse.dds",
-                    "normal": "textures/diablo3_pose_nm.dds"
+                    "normal": "textures/diablo3_pose_nm_tangent.dds"
                 }
             }
         },

@@ -13,7 +13,7 @@ void DemoScene::Build(World& world, ResourceManager& resources)
     MaterialID portraitMaterial = resources.CreateTexturedMaterial(
         "PortraitMaterial",
         L"textures/texture.dds",
-        L"textures/texture_nm.dds",
+        L"textures/african_head_nm_tangent.dds",
         glm::vec3(1.0f),
         0.45f);
     resources.SetMeshMaterial(portraitMesh, portraitMaterial);
@@ -21,7 +21,7 @@ void DemoScene::Build(World& world, ResourceManager& resources)
     MaterialID diabloMaterial = resources.CreateTexturedMaterial(
         "DiabloMaterial",
         L"textures/diablo3_pose_diffuse.dds",
-        L"textures/diablo3_pose_nm.dds",
+        L"textures/diablo3_pose_nm_tangent.dds",
         glm::vec3(1.0f),
         0.4f);
     resources.SetMeshMaterial(diabloMesh, diabloMaterial);

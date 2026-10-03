@@ -132,7 +132,8 @@ float4 PS(VertexOut pin) : SV_Target0
     float4 diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
     float3 normalSample = gNormalMap.Sample(gsamAnisotropicWrap, pin.TexC).rgb;
     pin.NormalW = normalize(pin.NormalW);
-    float3 bumpedNormalW = NormalSampleToWorldSpace(normalSample.rgb, pin.NormalW, pin.Tan);
+    float3 bumpedNormalW = normalize(
+    NormalSampleToWorldSpace(normalSample, pin.NormalW, pin.Tan));
 
     
     // Interpolating normal can unnormalize it, so renormalize it.
@@ -147,7 +148,7 @@ float4 PS(VertexOut pin) : SV_Target0
     Material mat = { diffuseAlbedo, gFresnelR0, shininess };
     float3 shadowFactor = 1.0f;
     float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
-        bumpedNormalW, toEyeW, shadowFactor);
+       bumpedNormalW, toEyeW, shadowFactor);
 
     float4 litColor = ambient + directLight;
     // Common convention to take alpha from diffuse albedo.

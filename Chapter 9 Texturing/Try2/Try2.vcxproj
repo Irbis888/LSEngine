@@ -142,6 +142,7 @@
     <ClCompile Include="..\..\Common\GameTimer.cpp" />
     <ClCompile Include="..\..\Common\MathHelper.cpp" />
     <ClCompile Include="..\..\external\tracy\public\TracyClient.cpp" />
+    <ClCompile Include="..\TexColumns\CustomBuffer.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="CameraControllerSystem.cpp" />
     <ClCompile Include="Commons.cpp" />
