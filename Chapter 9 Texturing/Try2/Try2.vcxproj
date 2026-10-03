@@ -217,6 +217,27 @@
     <None Include="Scenes\PhysicsMixed512.json" />
     <None Include="Scenes\PhysicsStress256.json" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\TexColumns\CustomBuffer.h" />
+    <ClInclude Include="..\..\Common\d3dx12.h" />
+    <ClInclude Include="CameraGLM.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\imconfig.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Shaders\Debug.hlsl" />
+    <Text Include="Shaders\GeometryPass.hlsl" />
+    <Text Include="Shaders\LightingPass.hlsl" />
+    <Text Include="Shaders\ResolvePass.hlsl" />
+    <Text Include="Shaders\TransparentUnlit.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="RESOURCE_MANAGER.md" />
+    <None Include="PHYSICS_SYSTEM.md" />
+    <None Include="Scenes\EditorSave.json" />
+    <None Include="Scenes\EditorPlaySnapshot.json" />
+    <None Include="Scenes\TextureStreaming1000.json" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="EnableEditor" AfterTargets="Build">
     <Touch Files="$(TargetDir).imgui_on" AlwaysCreate="true" />

@@ -1,223 +1,289 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Исходные файлы">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{8DBB2F73-23DA-44F7-9187-92BE9CFF6211}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Файлы заголовков">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Graphics">
+      <UniqueIdentifier>{74DFBA39-62F2-4D41-84A8-7C61D425060C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Файлы ресурсов">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Serializer">
+      <UniqueIdentifier>{71F78417-4C5B-47B2-9515-7CFE5F2CC683}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Scenes">
-      <UniqueIdentifier>{F47EC7A5-F9AC-4E9B-83EE-FEE0C53F10C6}</UniqueIdentifier>
+    <Filter Include="Physics">
+      <UniqueIdentifier>{BD42367A-FD4B-4B08-891A-482116CD3FB0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{2D65185B-B2FB-45A4-9703-6EF3149874F2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{1B019D14-1236-405A-BB2B-71A5700CE25D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Profiling">
+      <UniqueIdentifier>{B57D4186-786D-4BCD-85C4-238D33943F2B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Serializer\Scenes">
+      <UniqueIdentifier>{5D23B21D-DD24-4266-A314-7CEE65F85CDD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\ThirdParty">
+      <UniqueIdentifier>{E15541EC-8A8C-4A8C-89C7-FF747CAE1E38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\ThirdParty\ImGui">
+      <UniqueIdentifier>{1BD13C92-A01D-478C-86EE-3E6325483DC5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\ThirdParty\ImGuizmo">
+      <UniqueIdentifier>{164088A5-09C3-4E70-BAD0-38560AD16AE5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Try2.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Common\GameTimer.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Application.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Commons.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="World.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Engine.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="ResourceManager.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="D3DRenderAdapter.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="d3dUtils.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="FrameRes.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderSystem.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Common\MathHelper.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Common\DDSTextureLoader.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="CameraControllerSystem.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="DemoScene.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="SceneFactory.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="SceneSerializer.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="PhysicsSystem.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiBridge.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiPlatform.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorContext.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor</Filter>
     </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorContext.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor</Filter>
     </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\LegendPanel.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorUI.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\HierarchyPanel.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\InspectorPanel.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\ViewportPanel.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\StatisticsPanel.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\GizmoController.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\HierarchyPanel.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\imconfig.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiBridge.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiBridge.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\ImGuiPlatform.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiPlatform.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\InspectorPanel.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\LegendPanel.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\StatisticsPanel.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\ViewportPanel.cpp">
+      <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_draw.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_tables.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_widgets.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor\ThirdParty\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_demo.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor\ThirdParty\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_win32.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_draw.cpp">
+      <Filter>Editor\ThirdParty\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_dx12.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor\ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Editor\ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_tables.cpp">
+      <Filter>Editor\ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\imgui\imgui_widgets.cpp">
+      <Filter>Editor\ThirdParty\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src\ImGuizmo.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Editor\ThirdParty\ImGuizmo</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\external\tracy\public\TracyClient.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="Application.cpp">
+      <Filter>Engine</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\Common\GameTimer.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="Application.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Engine</Filter>
     </ClInclude>
+    <ClCompile Include="CameraControllerSystem.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="CameraControllerSystem.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraGLM.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClCompile Include="Commons.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClInclude Include="Commons.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="World.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
+    <ClCompile Include="Engine.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClInclude Include="Engine.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Engine</Filter>
     </ClInclude>
+    <ClCompile Include="..\..\Common\GameTimer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Common\GameTimer.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Common\MathHelper.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Common\MathHelper.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <None Include="RESOURCE_MANAGER.md">
+      <Filter>Engine</Filter>
+    </None>
+    <ClCompile Include="ResourceManager.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClInclude Include="ResourceManager.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Engine</Filter>
     </ClInclude>
+    <ClCompile Include="Try2.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="World.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureBenchmark.h">
+      <Filter>Engine\Profiling</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\external\tracy\public\TracyClient.cpp">
+      <Filter>Engine\Profiling</Filter>
+    </ClCompile>
+    <ClInclude Include="..\TexColumns\CustomBuffer.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClCompile Include="D3DRenderAdapter.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClInclude Include="D3DRenderAdapter.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Graphics</Filter>
     </ClInclude>
+    <ClCompile Include="d3dUtils.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClInclude Include="d3dUtils.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Common\d3dx12.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Common\DDSTextureLoader.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Common\DDSTextureLoader.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClCompile Include="FrameRes.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClInclude Include="FrameRes.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Graphics</Filter>
     </ClInclude>
+    <None Include="MESH_UPLOAD_GUIDE.md">
+      <Filter>Graphics</Filter>
+    </None>
+    <ClCompile Include="RenderSystem.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClInclude Include="RenderSystem.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <None Include="PHYSICS_SYSTEM.md">
+      <Filter>Physics</Filter>
+    </None>
     <ClInclude Include="PhysicsBroadPhase.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Physics</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsCommons.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Physics</Filter>
     </ClInclude>
-    <ClInclude Include="RenderSystem.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Common\MathHelper.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Common\DDSTextureLoader.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="CameraControllerSystem.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="DemoScene.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneFactory.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneSerializer.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
+    <ClCompile Include="PhysicsSystem.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
     <ClInclude Include="PhysicsSystem.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Physics</Filter>
     </ClInclude>
-    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiBridge.h">
-      <Filter>Файлы заголовков</Filter>
+    <ClCompile Include="DemoScene.cpp">
+      <Filter>Serializer</Filter>
+    </ClCompile>
+    <ClInclude Include="DemoScene.h">
+      <Filter>Serializer</Filter>
     </ClInclude>
-    <ClInclude Include="$(IMGUI_WORKS)\src\ImGuiPlatform.h">
-      <Filter>Файлы заголовков</Filter>
+    <ClCompile Include="SceneFactory.cpp">
+      <Filter>Serializer</Filter>
+    </ClCompile>
+    <ClInclude Include="SceneFactory.h">
+      <Filter>Serializer</Filter>
     </ClInclude>
-    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorContext.h">
-      <Filter>Файлы заголовков</Filter>
+    <ClCompile Include="SceneSerializer.cpp">
+      <Filter>Serializer</Filter>
+    </ClCompile>
+    <ClInclude Include="SceneSerializer.h">
+      <Filter>Serializer</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Shaders\Default.hlsl" />
-    <Text Include="Shaders\LightingUtil.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="MESH_UPLOAD_GUIDE.md" />
     <None Include="Scenes\CharacterShowcase.json">
-      <Filter>Scenes</Filter>
+      <Filter>Serializer\Scenes</Filter>
     </None>
     <None Include="Scenes\DemoScene.json">
-      <Filter>Scenes</Filter>
+      <Filter>Serializer\Scenes</Filter>
+    </None>
+    <None Include="Scenes\EditorPlaySnapshot.json">
+      <Filter>Serializer\Scenes</Filter>
+    </None>
+    <None Include="Scenes\EditorSave.json">
+      <Filter>Serializer\Scenes</Filter>
     </None>
     <None Include="Scenes\PhysicsMixed512.json">
-      <Filter>Scenes</Filter>
+      <Filter>Serializer\Scenes</Filter>
     </None>
     <None Include="Scenes\PhysicsStress256.json">
-      <Filter>Scenes</Filter>
+      <Filter>Serializer\Scenes</Filter>
     </None>
+    <None Include="Scenes\TextureStreaming1000.json">
+      <Filter>Serializer\Scenes</Filter>
+    </None>
+    <Text Include="Shaders\Debug.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\Default.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\GeometryPass.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\LightingPass.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\LightingUtil.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\ResolvePass.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="Shaders\TransparentUnlit.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
   </ItemGroup>
 </Project>
