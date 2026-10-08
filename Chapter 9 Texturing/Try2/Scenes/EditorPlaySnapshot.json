@@ -10,13 +10,13 @@
             "tag": "MainCamera",
             "transform": {
                 "position": [
-                    -1.0,
-                    10.0,
-                    -25.0
+                    3.6180872917175293,
+                    25.29600715637207,
+                    22.104694366455078
                 ],
                 "rotation": [
-                    0.0,
-                    0.0,
+                    0.19600063562393188,
+                    3.4229984283447266,
                     0.0
                 ],
                 "scale": [
@@ -133,23 +133,23 @@
                     0.8799999952316284
                 ],
                 "direction": [
-                    -0.5486301183700562,
-                    -0.7980074286460876,
-                    0.2493773102760315
+                    0.0,
+                    -1.0,
+                    -0.5
                 ],
                 "enabled": true,
-                "intensity": 1.149999976158142
+                "intensity": 0.8500000238418579
             },
             "tag": "SunLight",
             "transform": {
                 "position": [
-                    0.0,
-                    0.0,
+                    0.7480030059814453,
+                    4.4572248458862305,
                     0.0
                 ],
                 "rotation": [
                     0.0,
-                    0.0,
+                    -0.0,
                     0.0
                 ],
                 "scale": [
@@ -178,7 +178,7 @@
                 "type": "sphere"
             },
             "mesh": {
-                "id": 16
+                "id": 8
             },
             "rigidbody": {
                 "acceleration": [
@@ -233,7 +233,7 @@
                 "type": "sphere"
             },
             "mesh": {
-                "id": 15
+                "id": 7
             },
             "rigidbody": {
                 "acceleration": [
@@ -288,7 +288,7 @@
                 "type": "aabb"
             },
             "mesh": {
-                "id": 14
+                "id": 6
             },
             "rigidbody": {
                 "acceleration": [
@@ -343,7 +343,7 @@
                 "type": "aabb"
             },
             "mesh": {
-                "id": 13
+                "id": 5
             },
             "rigidbody": {
                 "acceleration": [
@@ -398,7 +398,7 @@
                 "type": "aabb"
             },
             "mesh": {
-                "id": 12
+                "id": 4
             },
             "rigidbody": {
                 "acceleration": [
@@ -436,7 +436,7 @@
         },
         {
             "mesh": {
-                "id": 11
+                "id": 3
             },
             "tag": "TexturedDiablo",
             "transform": {
@@ -458,8 +458,40 @@
             }
         },
         {
+            "collider": {
+                "friction": 0.800000011920929,
+                "halfExtents": [
+                    0.5,
+                    0.10000000149011612,
+                    0.5
+                ],
+                "isTrigger": false,
+                "offset": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.5,
+                "restitution": 0.0,
+                "type": "aabb"
+            },
             "mesh": {
-                "id": 10
+                "id": 2
+            },
+            "rigidbody": {
+                "acceleration": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "mass": 1.0,
+                "type": "static",
+                "useGravity": true,
+                "velocity": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
             },
             "tag": "TexturedPortrait",
             "transform": {
@@ -482,7 +514,7 @@
         },
         {
             "mesh": {
-                "id": 9
+                "id": 1
             },
             "tag": "Sponza",
             "transform": {

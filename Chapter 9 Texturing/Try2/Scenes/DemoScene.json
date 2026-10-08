@@ -3,36 +3,53 @@
     "name": "DemoScene",
     "entities": [
         {
-            "tag": "Sponza",
-            "transform": {
-                "position": [0.0, 0.0, 0.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [0.3, 0.3, 0.3]
-            },
-            "mesh": {
-                "source": "model",
-                "path": "../../Common/sponza.obj"
-            }
+          "tag": "Sponza",
+          "transform": {
+            "position": [ 0.0, 0.0, 0.0 ],
+            "rotation": [ 0.0, 0.0, 0.0 ],
+            "scale": [ 0.3, 0.3, 0.3 ]
+          },
+          "mesh": {
+            "source": "model",
+            "path": "../../Common/sponza.obj"
+          }
+          
         },
-        {
-            "tag": "TexturedPortrait",
-            "transform": {
-                "position": [0.0, 4.0, -2.0],
-                "rotation": [0.0, 0.0, 0.0],
-                "scale": [4.0, 4.0, 4.0]
-            },
-            "mesh": {
-                "source": "model",
-                "path": "../../Common/negr.obj",
-              "material": {
-                "name": "PortraitMaterial",
-                "color": [ 1.0, 1.0, 1.0 ],
-                "roughness": 0.45,
-                "albedo": "textures/texture.dds",
-                "normal": "textures/african_head_nm_tangent.dds"
-              }
-            }
+      {
+        "tag": "TexturedPortrait",
+        "transform": {
+          "position": [ 0.0, 4.0, -2.0 ],
+          "rotation": [ 0.0, 0.0, 0.0 ],
+          "scale": [ 4.0, 4.0, 4.0 ]
         },
+        "mesh": {
+          "source": "model",
+          "path": "../../Common/negr.obj",
+          "material": {
+            "name": "PortraitMaterial",
+            "color": [ 1.0, 1.0, 1.0 ],
+            "roughness": 0.45,
+            "albedo": "textures/texture.dds",
+            "normal": "textures/african_head_nm_tangent.dds"
+          }
+        },
+        "rigidbody": {
+          "type": "static",
+          "velocity": [ 0.0, 0.0, 0.0 ],
+          "acceleration": [ 0.0, 0.0, 0.0 ],
+          "mass": 1.0,
+          "useGravity": true
+        },
+        "collider": {
+          "type": "aabb",
+          "offset": [ 0.0, 0.0, 0.0 ],
+          "halfExtents": [ 0.5, 0.1, 0.5 ],
+          "radius": 0.5,
+          "isTrigger": false,
+          "restitution": 0.0,
+          "friction": 0.8
+        }
+      },
         {
             "tag": "TexturedDiablo",
             "transform": {

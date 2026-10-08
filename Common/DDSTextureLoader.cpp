@@ -866,7 +866,7 @@ static HRESULT FillInitData( _In_ size_t width,
                 ++skipMip;
             }
 
-            if (pSrcBits + (NumBytes*d) > pEndBits)
+            if (d == 0 || NumBytes > static_cast<size_t>(pEndBits - pSrcBits) / d)
             {
                 return HRESULT_FROM_WIN32( ERROR_HANDLE_EOF );
             }
@@ -963,7 +963,7 @@ static HRESULT FillInitData12(_In_ size_t width,
 				++skipMip;
 			}
 
-			if (pSrcBits + (NumBytes*d) > pEndBits)
+			if (d == 0 || NumBytes > static_cast<size_t>(pEndBits - pSrcBits) / d)
 			{
 				return HRESULT_FROM_WIN32(ERROR_HANDLE_EOF);
 			}
@@ -1669,20 +1669,14 @@ static HRESULT CreateTextureFromDDS( _In_ ID3D11Device* d3dDevice,
     return hr;
 }
 
-static HRESULT CreateTextureFromDDS12(
-	_In_ ID3D12Device* device,
-	_In_opt_ ID3D12GraphicsCommandList* cmdList,
-	_In_ const DDS_HEADER* header,
-	_In_reads_bytes_(bitSize) const uint8_t* bitData,
-	_In_ size_t bitSize,
-	_In_ size_t maxsize,
-	_In_ bool forceSRGB,
-	ComPtr<ID3D12Resource>& texture,
-	ComPtr<ID3D12Resource>& textureUploadHeap)
+static HRESULT LoadImageDataFromDDS(
+    const DDS_HEADER* header, const uint8_t* bitData, size_t bitSize,
+    size_t maxsize, bool forceSRGB, ImageData& image)
 {
 	HRESULT hr = S_OK;
 
 	UINT width = header->width;
+	if (!width || !header->height) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
 	UINT height = header->height;
 	UINT depth = header->depth;
 
@@ -1728,6 +1722,8 @@ static HRESULT CreateTextureFromDDS12(
 		case D3D11_RESOURCE_DIMENSION_TEXTURE2D:
 			if (d3d10ext->miscFlag & D3D11_RESOURCE_MISC_TEXTURECUBE)
 			{
+				if (arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION / 6)
+					return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
 				arraySize *= 6;
 				isCubeMap = true;
 			}
@@ -1735,7 +1731,7 @@ static HRESULT CreateTextureFromDDS12(
 			break;
 
 		case D3D11_RESOURCE_DIMENSION_TEXTURE3D:
-			if (!(header->flags & DDS_HEADER_FLAGS_VOLUME))
+			if (!(header->flags & DDS_HEADER_FLAGS_VOLUME) || depth == 0)
 				return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
 			if (arraySize > 1)
 				return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
@@ -1767,6 +1763,7 @@ static HRESULT CreateTextureFromDDS12(
 
 		if (header->flags & DDS_HEADER_FLAGS_VOLUME)
 		{
+			if (!depth) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
 			resDim = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
 		}
 		else
@@ -1855,22 +1852,71 @@ static HRESULT CreateTextureFromDDS12(
 		twidth, theight, tdepth, skipMip, initData.get()
 		);
 
-	if (SUCCEEDED(hr))
-	{
-		hr = CreateD3DResources12(
-			device, cmdList,
-			resDim, twidth, theight, tdepth,
-			mipCount - skipMip,
-			arraySize,
-			format,
-			false, // forceSRGB
-			isCubeMap,
-			initData.get(),
-			texture, 
-			textureUploadHeap);
-	}
+	if (FAILED(hr)) return hr;
 
-	return hr;
+    ImageData result;
+    result.width = static_cast<uint32_t>(twidth);
+    result.height = static_cast<uint32_t>(theight);
+    result.depth = static_cast<uint32_t>(tdepth);
+    result.arraySize = arraySize;
+    result.mipLevels = static_cast<uint32_t>(mipCount - skipMip);
+    result.format = forceSRGB ? MakeSRGB(format) : format;
+    result.isCubeMap = isCubeMap;
+    result.dimension = resDim == D3D12_RESOURCE_DIMENSION_TEXTURE1D ? ImageDimension::Texture1D
+        : resDim == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? ImageDimension::Texture3D
+        : ImageDimension::Texture2D;
+    result.pixels.assign(bitData, bitData + bitSize);
+    result.subresources.reserve(result.mipLevels * arraySize);
+    for (size_t i = 0; i < result.mipLevels * arraySize; ++i)
+    {
+        const auto& source = initData[i];
+        result.subresources.push_back({
+            static_cast<size_t>(static_cast<const uint8_t*>(source.pData) - bitData),
+            static_cast<size_t>(source.RowPitch), static_cast<size_t>(source.SlicePitch) });
+    }
+    image = std::move(result);
+    return S_OK;
+}
+
+HRESULT DirectX::LoadDDSImageFromFile(const wchar_t* filename, ImageData& image)
+{
+    if (!filename) return E_INVALIDARG;
+    std::unique_ptr<uint8_t[]> fileData;
+    DDS_HEADER* header = nullptr;
+    uint8_t* bitData = nullptr;
+    size_t bitSize = 0;
+    HRESULT hr = LoadTextureDataFromFile(filename, fileData, &header, &bitData, &bitSize);
+    if (FAILED(hr)) return hr;
+    return LoadImageDataFromDDS(header, bitData, bitSize, 0, false, image);
+}
+
+static HRESULT CreateTextureFromDDS12(
+	_In_ ID3D12Device* device,
+	_In_opt_ ID3D12GraphicsCommandList* cmdList,
+	_In_ const DDS_HEADER* header,
+	_In_reads_bytes_(bitSize) const uint8_t* bitData,
+	_In_ size_t bitSize,
+	_In_ size_t maxsize,
+	_In_ bool forceSRGB,
+	ComPtr<ID3D12Resource>& texture,
+	ComPtr<ID3D12Resource>& textureUploadHeap)
+{
+    ImageData image;
+    HRESULT hr = LoadImageDataFromDDS(header, bitData, bitSize, maxsize, forceSRGB, image);
+    if (FAILED(hr)) return hr;
+    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+    subresources.reserve(image.subresources.size());
+    for (const auto& source : image.subresources)
+    {
+        subresources.push_back({ image.pixels.data() + source.offset,
+            static_cast<LONG_PTR>(source.rowPitch), static_cast<LONG_PTR>(source.slicePitch) });
+    }
+    const auto dimension = image.dimension == ImageDimension::Texture1D ? D3D12_RESOURCE_DIMENSION_TEXTURE1D
+        : image.dimension == ImageDimension::Texture3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
+        : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    return CreateD3DResources12(device, cmdList, dimension, image.width, image.height,
+        image.depth, image.mipLevels, image.arraySize, image.format, false, image.isCubeMap,
+        subresources.data(), texture, textureUploadHeap);
 }
 
 //--------------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #pragma once
 #include "Commons.h"
+#include "ImageData.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -76,10 +77,7 @@ struct Texture
 {
     std::string name;
     std::wstring filename;
-    
-    // позже:
-    // TextureID albedo;
-    // ShaderID shader;
+    ImageData imageData;
 };
 
 

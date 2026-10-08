@@ -127,9 +127,6 @@ public:
     // Create SRV from an already loaded ID3D12Resource (returns descriptor index)
     int CreateSRV(ID3D12Resource* resource);
 
-    // Load texture from file and create SRV (returns descriptor index)
-    // NOTE: CreateSRVFromFile implementation removed to avoid linking DDSTextureLoader from this module.
-
     // Create a constant buffer view from CPU data (returns descriptor index)
     int CreateCBV(const void* data, UINT64 byteSize, ID3D12Resource** outUploadResource = nullptr);
 
@@ -158,8 +155,8 @@ public:
     void UpdCB();
 
 
-    // Texture loading (lazy loading similar to meshes)
-    int LoadTexture(const std::wstring& filename);
+    // Upload CPU ImageData from ResourceManager and cache its SRV by TextureID.
+    int UploadTexture(TextureID textureId);
     MaterialGPU* GetOrLoadMaterial(MaterialID materialId);
 
     // Build root signatures and PSOs

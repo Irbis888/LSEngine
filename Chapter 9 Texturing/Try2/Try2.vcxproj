@@ -180,6 +180,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Common\DDSTextureLoader.h" />
+    <ClInclude Include="..\..\Common\ImageData.h" />
+    <ClInclude Include="..\..\Common\ThirdParty\stb\stb_image.h" />
     <ClInclude Include="..\..\Common\GameTimer.h" />
     <ClInclude Include="..\..\Common\MathHelper.h" />
     <ClInclude Include="Application.h" />

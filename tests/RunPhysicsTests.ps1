@@ -27,13 +27,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Physics tests did not compile.' }
 if ($LASTEXITCODE -ne 0) { throw 'Physics tests failed.' }
 
 
-$sceneCompilerArgs = @('/nologo', '/std:c++20', '/EHsc', '/O2', '/W3',
+$sceneCompilerArgs = @('/nologo', '/std:c++20', '/permissive', '/EHsc', '/O2', '/W3',
     "/I$project", "/I$(Join-Path $repo 'Common')",
     "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fe$output\SceneLoadingTests.exe",
     (Join-Path $PSScriptRoot 'SceneLoadingTests.cpp'),
     (Join-Path $project 'SceneSerializer.cpp'),
     (Join-Path $project 'ResourceManager.cpp'),
+    (Join-Path $repo 'Common\DDSTextureLoader.cpp'),
+    '/link', 'd3d12.lib', 'dxgi.lib',
     (Join-Path $repo 'Libs\assimp-vc143-mt.lib'))
 & cl.exe @sceneCompilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Scene loader tests did not compile.' }

@@ -1,11 +1,9 @@
 #include "D3DRenderAdapter.h"
 #include "TextureBenchmark.h"
 
-#include <filesystem>
 #include <stdexcept>
 #include <assert.h>
 #include "ResourceManager.h"
-#include "DDSTextureLoader.h"
 
 //#define DEBUG
 
@@ -15,48 +13,6 @@ static const int SwapChainBufferCount = 2;
 
 namespace
 {
-    std::string WideToUtf8(const std::wstring& value)
-    {
-        if (value.empty())
-        {
-            return {};
-        }
-
-        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        if (size <= 0)
-        {
-            return {};
-        }
-
-        std::string result(size - 1, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
-        return result;
-    }
-
-    std::wstring ResolveTexturePath(const std::wstring& filename)
-    {
-        namespace fs = std::filesystem;
-
-        if (filename.empty())
-        {
-            return filename;
-        }
-
-        fs::path path(filename);
-        if (path.is_absolute() || fs::exists(path))
-        {
-            return path.wstring();
-        }
-
-        auto firstPart = path.begin();
-        if (firstPart != path.end() && firstPart->wstring() == L"..")
-        {
-            return path.wstring();
-        }
-
-        return (fs::path(L"../../Textures") / path).wstring();
-    }
-
     void SyncSubmeshMaterials(MeshGPU& gpuMesh, const Mesh& cpuMesh)
     {
         if (gpuMesh.materialVersion == cpuMesh.materialVersion &&
@@ -595,7 +551,7 @@ int D3DRenderAdapter::CreateSRV(ID3D12Resource* resource)
     return static_cast<int>(mNextCbvSrvIndex++);
 }
 
-// CreateSRVFromFile removed - use ResourceManager/DDSTextureLoader in a module that links DirectX helper.
+// Texture files are decoded by ResourceManager; UploadTexture consumes CPU ImageData.
 
 int D3DRenderAdapter::CreateCBV(const void* data, UINT64 byteSize, ID3D12Resource** outUploadResource)
 {
@@ -1240,76 +1196,114 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     );
 }
 
-int D3DRenderAdapter::LoadTexture(const std::wstring& filename)
+int D3DRenderAdapter::UploadTexture(TextureID textureId)
 {
-	std::wstring fn = ResolveTexturePath(filename);
-    // Check if texture already loaded
-    std::string filenameStr = WideToUtf8(fn);
-	//filenameStr = "../Textures/" + filenameStr; // Assuming textures are in this relative path
+    const std::string key = std::to_string(textureId);
+    auto cached = mTextures.find(key);
+    if (cached != mTextures.end()) return cached->second->SrvHeapIndex;
+    if (!mResourceManager || mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount) return -1;
 
-    auto it = mTextures.find(filenameStr);
-    if (it != mTextures.end())
-    {
-        // Already loaded, return stored SRV index
-        return it->second->SrvHeapIndex;
-    }
+    const Texture& cpuTexture = mResourceManager->GetTexture(textureId);
+    const ImageData& image = cpuTexture.imageData;
+    if (image.pixels.empty() || image.subresources.empty()) return -1;
+    ZoneScopedN("Texture GPU upload");
 
-    if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount)
-    {
-        return -1; // Descriptor heap full
-    }
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = image.dimension == ImageDimension::Texture1D ? D3D12_RESOURCE_DIMENSION_TEXTURE1D
+        : image.dimension == ImageDimension::Texture3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
+        : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = image.width;
+    desc.Height = image.height;
+    desc.DepthOrArraySize = static_cast<UINT16>(
+        image.dimension == ImageDimension::Texture3D ? image.depth : image.arraySize);
+    desc.MipLevels = static_cast<UINT16>(image.mipLevels);
+    desc.Format = image.format;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     auto textureGPU = std::make_unique<TextureGPU>();
-    textureGPU->Filename = fn;
-    textureGPU->Name = filenameStr;
+    textureGPU->Filename = cpuTexture.filename;
+    textureGPU->Name = cpuTexture.name;
+    const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+    HRESULT hr = md3dDevice->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE,
+        &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textureGPU->Resource));
+    if (FAILED(hr)) return -1;
 
-    ZoneScopedN("Texture sync read prepare upload");
-    // Load DDS texture using DirectX helper
-    ComPtr<ID3D12Resource> texture;
-    ComPtr<ID3D12Resource> uploadHeap;
+    const UINT subresourceCount = static_cast<UINT>(image.subresources.size());
+    const UINT64 uploadSize = GetRequiredIntermediateSize(textureGPU->Resource.Get(), 0, subresourceCount);
+    const CD3DX12_HEAP_PROPERTIES uploadHeap(D3D12_HEAP_TYPE_UPLOAD);
+    const auto uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadSize);
+    hr = md3dDevice->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE,
+        &uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&textureGPU->UploadHeap));
+    if (FAILED(hr)) return -1;
 
-    HRESULT hr = DirectX::CreateDDSTextureFromFile12(
-        md3dDevice.Get(),
-        mCommandList.Get(),
-        fn.c_str(),
-        texture,
-        uploadHeap);
-
-    if (FAILED(hr))
+    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+    subresources.reserve(subresourceCount);
+    for (const ImageSubresource& source : image.subresources)
     {
-        return -1; // Failed to load texture
+        subresources.push_back({ image.pixels.data() + source.offset,
+            static_cast<LONG_PTR>(source.rowPitch), static_cast<LONG_PTR>(source.slicePitch) });
     }
+    if (!UpdateSubresources(mCommandList.Get(), textureGPU->Resource.Get(),
+        textureGPU->UploadHeap.Get(), 0, 0, subresourceCount, subresources.data())) return -1;
+    const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(textureGPU->Resource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    mCommandList->ResourceBarrier(1, &barrier);
 
-    textureGPU->Resource = texture;
-    textureGPU->UploadHeap = uploadHeap;
-
-    // Create SRV for the texture
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Format = texture->GetDesc().Format;
-    srvDesc.Texture2D.MipLevels = (UINT)texture->GetDesc().MipLevels;
-
-    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(
-        mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
-        mNextCbvSrvIndex,
-        mCbvSrvUavDescriptorSize);
-
-    md3dDevice->CreateShaderResourceView(texture.Get(), &srvDesc, handle);
-
-    int srvHeapIndex = mNextCbvSrvIndex;
-    mNextCbvSrvIndex++;
-
-    // Store SRV index in TextureGPU
-    textureGPU->SrvHeapIndex = srvHeapIndex;
-
-    // Store texture
-    mTextures[filenameStr] = std::move(textureGPU);
-
-    // Keep upload heap alive in owned resources
-    mOwnedResources.push_back(uploadHeap);
-
-    return srvHeapIndex;
+    srvDesc.Format = image.format;
+    if (image.dimension == ImageDimension::Texture3D)
+    {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+        srvDesc.Texture3D.MipLevels = image.mipLevels;
+    }
+    else if (image.dimension == ImageDimension::Texture1D)
+    {
+        if (image.arraySize > 1)
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
+            srvDesc.Texture1DArray.MipLevels = image.mipLevels;
+            srvDesc.Texture1DArray.ArraySize = image.arraySize;
+        }
+        else
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
+            srvDesc.Texture1D.MipLevels = image.mipLevels;
+        }
+    }
+    else if (image.isCubeMap)
+    {
+        if (image.arraySize > 6)
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+            srvDesc.TextureCubeArray.MipLevels = image.mipLevels;
+            srvDesc.TextureCubeArray.NumCubes = image.arraySize / 6;
+        }
+        else
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            srvDesc.TextureCube.MipLevels = image.mipLevels;
+        }
+    }
+    else if (image.arraySize > 1)
+    {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MipLevels = image.mipLevels;
+        srvDesc.Texture2DArray.ArraySize = image.arraySize;
+    }
+    else
+    {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = image.mipLevels;
+    }
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
+        mNextCbvSrvIndex, mCbvSrvUavDescriptorSize);
+    md3dDevice->CreateShaderResourceView(textureGPU->Resource.Get(), &srvDesc, handle);
+    const int srvIndex = static_cast<int>(mNextCbvSrvIndex++);
+    textureGPU->SrvHeapIndex = srvIndex;
+    mTextures[key] = std::move(textureGPU);
+    return srvIndex;
 }
 
 MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
@@ -1342,15 +1336,7 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
     {
         try
         {
-            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.albedo);
-            if (!cpuTexture.filename.empty())
-            {
-                int srvIndex = LoadTexture(cpuTexture.filename);
-                if (srvIndex >= 0)
-                {
-                    matGPU->DiffuseSrvHeapIndex = srvIndex;
-                }
-            }
+            matGPU->DiffuseSrvHeapIndex = UploadTexture(cpuMaterial.albedo);
         }
         catch (...)
         {
@@ -1362,15 +1348,7 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
     {
         try
         {
-            Texture& cpuTexture = mResourceManager->GetTexture(cpuMaterial.normal);
-            if (!cpuTexture.filename.empty())
-            {
-                int srvIndex = LoadTexture(cpuTexture.filename);
-                if (srvIndex >= 0)
-                {
-                    matGPU->NormalSrvHeapIndex = srvIndex;
-                }
-            }
+            matGPU->NormalSrvHeapIndex = UploadTexture(cpuMaterial.normal);
         }
         catch (...)
         {
@@ -1380,12 +1358,12 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
 
     if (matGPU->DiffuseSrvHeapIndex < 0)
     {
-        matGPU->DiffuseSrvHeapIndex = LoadTexture(L"white1x1.dds");
+        matGPU->DiffuseSrvHeapIndex = UploadTexture(mResourceManager->LoadTexture(L"white1x1.dds"));
     }
 
     if (matGPU->NormalSrvHeapIndex < 0)
     {
-        matGPU->NormalSrvHeapIndex = LoadTexture(L"default_nmap.dds");
+        matGPU->NormalSrvHeapIndex = UploadTexture(mResourceManager->LoadTexture(L"default_nmap.dds"));
     }
 
     mMaterials[matKey] = std::move(materialGPU);

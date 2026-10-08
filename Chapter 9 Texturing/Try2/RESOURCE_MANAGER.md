@@ -46,7 +46,7 @@ std::unordered_map<std::wstring, TextureID> mTextureIDsByFilename;
 
 - `Mesh` - вершины, индексы, submesh-информацию.
 - `Material` - цвет, roughness, ссылки на albedo/normal textures.
-- `Texture` - имя и filename текстуры.
+- `Texture` - имя, filename и `ImageData` с данными изображения в CPU-памяти.
 - `mTextureIDsByFilename` - cache, чтобы одна и та же texture filename не создавала новый `TextureID` каждый раз.
 
 Важно: это CPU-side storage. D3D12 buffers, SRV descriptors и GPU textures хранятся не здесь, а в `D3DRenderAdapter`.
@@ -129,14 +129,15 @@ float roughness = 0.5f;
 
 ## Texture
 
-`Texture` сейчас хранит только CPU-метаданные:
+`Texture` хранит CPU-метаданные и данные изображения:
 
 ```cpp
 std::string name;
 std::wstring filename;
+ImageData imageData;
 ```
 
-Сам DDS-файл не читается в `ResourceManager`. Он только регистрируется и получает `TextureID`. Реальная загрузка DDS в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::LoadTexture`.
+`ResourceManager::LoadTexture` читает файл и получает `ImageData` без GPU-ресурсов. Для `.dds` (без учёта регистра) используется CPU-часть `DDSTextureLoader`; остальные форматы декодируются через `stb_image` в RGBA8. `ImageData` владеет пикселями или сжатыми DDS-блоками, хранит формат, размеры, mip-уровни, массивы и offsets/rowPitch/slicePitch каждого subresource. Offsets остаются корректными при копировании и перемещении данных. Загрузка в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::UploadTexture`.
 
 ## Создание mesh
 
@@ -169,7 +170,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
 1. Assimp читает файл.
 2. Сначала создаются материалы из `scene->mMaterials`.
 3. Для каждого Assimp material читаются diffuse и normal texture пути.
-4. Эти texture пути регистрируются через `LoadTexture`.
+4. Текстуры читаются через `LoadTexture`; относительные пути сначала проверяются рядом с файлом модели.
 5. Каждый Assimp mesh конвертируется в общий `Mesh`.
 6. Для каждого Assimp mesh создаётся `Submesh` с `indexOffset`, `indexCount` и `MaterialID`.
 7. Готовый `Mesh` сохраняется через `CreateMesh`.
@@ -262,7 +263,7 @@ MaterialID CreateTexturedMaterial(
     float roughness = 0.5f);
 ```
 
-Она создаёт `Material`, а texture filenames регистрирует через `LoadTexture`.
+Она создаёт `Material`, а изображения читает в CPU-память через `LoadTexture`.
 
 Пример:
 
@@ -281,17 +282,13 @@ MaterialID cubeMaterial = resources.CreateTexturedMaterial(
 TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 ```
 
-Важный момент: это не GPU-загрузка. Метод только регистрирует texture filename и возвращает `TextureID`.
+Метод резолвит путь, читает изображение в `Texture::imageData` и возвращает `TextureID`. GPU-ресурсы здесь не создаются.
 
-Если такой filename уже был загружен, метод возвращает старый ID:
+Кеш использует абсолютный нормализованный путь, поэтому повторная загрузка возвращает прежний ID без повторного чтения. Путь ищется напрямую, затем в `../../Textures`, как раньше в renderer. Исходный filename сохраняется в `Texture`.
 
-```cpp
-auto cached = mTextureIDsByFilename.find(filename);
-if (cached != mTextureIDsByFilename.end())
-    return cached->second;
-```
+Для DDS `DirectX::LoadDDSImageFromFile` проверяет заголовок и объём данных, сохраняя сжатие и mip-цепочку. Остальные изображения читает `stb_image`; результат — RGBA8 с одним mip-уровнем. Unicode filenames поддерживаются через открытие файла по wide-пути.
 
-Это защищает от дубликатов texture IDs, если несколько материалов используют один и тот же DDS.
+Ошибка чтения/декодирования выбрасывает `std::runtime_error` с путём. Неуспешная загрузка не попадает в кеш, поэтому после исправления файла можно повторить вызов.
 
 ## Смена материалов у mesh
 
@@ -363,23 +360,26 @@ MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
 2. Создаётся `MaterialGPU`.
 3. `color` превращается в `DiffuseAlbedo`.
 4. `roughness` копируется в `Roughness`.
-5. Если есть `albedo TextureID`, renderer получает filename из `ResourceManager` и грузит DDS.
-6. Если есть `normal TextureID`, renderer грузит normal DDS.
+5. Если есть `albedo TextureID`, renderer получает готовый `ImageData` из `ResourceManager` и загружает его на GPU.
+6. Если есть `normal TextureID`, renderer загружает его `ImageData` на GPU.
 7. Если textures нет или загрузка не удалась, используются fallback textures.
 
 GPU texture loading делает:
 
 ```cpp
-D3DRenderAdapter::LoadTexture(const std::wstring& filename)
+D3DRenderAdapter::UploadTexture(TextureID textureId)
 ```
 
 Он:
 
-- резолвит путь через `ResolveTexturePath`;
-- проверяет GPU texture cache `mTextures`;
-- вызывает `DirectX::CreateDDSTextureFromFile12`;
-- создаёт SRV descriptor;
-- сохраняет `TextureGPU`.
+- проверяет GPU-кеш по `TextureID`;
+- получает `Texture::imageData` из ResourceManager;
+- создаёт GPU texture и upload buffer;
+- копирует subresources через `UpdateSubresources` и переводит ресурс в `PIXEL_SHADER_RESOURCE`;
+- создаёт SRV согласно размерности, mip-уровням и массиву изображения;
+- сохраняет `TextureGPU`, удерживая upload buffer в живых.
+
+Адаптер не читает файл и не декодирует изображение. Fallback `white1x1.dds` и `default_nmap.dds` также проходят через ResourceManager.
 
 ## JSON-сцены и ресурсы
 
@@ -485,13 +485,13 @@ PrintAllTextures();
 1. `SceneSerializer::Load` читает entity.
 2. `JsonToMesh` видит `"source": "primitive"`.
 3. `JsonToMaterial` создаёт material.
-4. `ResourceManager::LoadTexture(L"bricks2.dds")` регистрирует texture filename и возвращает `TextureID`.
+4. `ResourceManager::LoadTexture(L"bricks2.dds")` читает DDS в `ImageData` и возвращает `TextureID`.
 5. `ResourceManager::CreateMaterial` возвращает `MaterialID`.
 6. `ResourceManager::CreateCube(material)` создаёт CPU mesh.
 7. Entity получает `MeshComponent{ meshId }`.
 8. На первом draw `D3DRenderAdapter::UploadMesh` создаёт GPU buffers.
 9. На первом draw submesh `GetOrLoadMaterial` создаёт `MaterialGPU`.
-10. `D3DRenderAdapter::LoadTexture` реально грузит DDS и создаёт SRV.
+10. `D3DRenderAdapter::UploadTexture` загружает готовый `ImageData` на GPU и создаёт SRV.
 11. Renderer bind-ит SRV + material constant buffer и рисует.
 
 ## Текущие ограничения
@@ -500,9 +500,9 @@ PrintAllTextures();
 - ID-генераторы static, а не поля `ResourceManager`; несколько ResourceManager в одном процессе будут делить счётчики.
 - Нет cache для `LoadMesh(path)`: одна и та же модель, загруженная дважды, создаст два разных `MeshID`.
 - CPU material можно создать, но изменение параметров уже загруженного `MaterialGPU` сейчас не имеет полноценного versioning/update path.
-- Texture cache есть на CPU-side по filename и GPU-side по resolved path, но пути надо держать аккуратно.
-- `LoadTexture` в ResourceManager не проверяет существование файла; ошибка выясняется позже в renderer при `CreateDDSTextureFromFile12`.
-- Поддерживается в основном DDS path, потому что renderer использует `DDSTextureLoader`.
+- Texture cache есть на CPU-side по нормализованному абсолютному пути и на GPU-side по `TextureID`.
+- Чтение и декодирование в `ResourceManager::LoadTexture` пока синхронные; CPU-данные остаются в памяти после GPU upload.
+- Для non-DDS используется набор форматов `stb_image`; mip-уровни автоматически не генерируются.
 - `GetMesh/GetMaterial/GetTexture` используют `assert`, поэтому в Release неправильный ID может приводить к плохим последствиям без красивого exception.
 - Нет asset database, GUID, hot reload текстур/материалов и dependency tracking.
 
@@ -513,6 +513,6 @@ PrintAllTextures();
 3. Добавить material versioning, чтобы менять color/roughness/texture во время работы.
 4. Добавить явный asset descriptor формат: material assets, mesh assets, texture assets.
 5. Добавить проверку существования texture/model files на этапе загрузки сцены.
-6. Добавить поддержку non-DDS image formats через WIC или отдельный image loader.
+6. Добавить генерацию mip-уровней для non-DDS изображений.
 7. Добавить unload/reference counting для ресурсов.
 8. Добавить editor UI для просмотра meshes/materials/textures и переназначения материалов.

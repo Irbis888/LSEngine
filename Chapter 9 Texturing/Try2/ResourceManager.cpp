@@ -2,7 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cwctype>
+#include <filesystem>
 #include <stdexcept>
+#include "DDSTextureLoader.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "ThirdParty/stb/stb_image.h"
 
 //--------------------------------------------------------------
 // ID генераторы
@@ -21,15 +28,67 @@ namespace
             return {};
         }
 
-        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        const int size = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
         if (size <= 0)
         {
             return {};
         }
 
-        std::string result(size - 1, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
+        std::string result(size, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(), size, nullptr, nullptr);
         return result;
+    }
+
+    std::wstring ResolveTexturePath(const std::wstring& filename)
+    {
+        namespace fs = std::filesystem;
+        fs::path path(filename);
+        if (!path.is_absolute() && !fs::exists(path))
+        {
+            auto firstPart = path.begin();
+            if (firstPart != path.end() && firstPart->wstring() != L"..")
+                path = fs::path(L"../../Textures") / path;
+        }
+        return fs::absolute(path).lexically_normal().wstring();
+    }
+
+    ImageData LoadImage(const std::wstring& filename)
+    {
+        ZoneScopedN("Texture CPU read and decode");
+        ImageData image;
+        std::wstring extension = std::filesystem::path(filename).extension().wstring();
+        std::transform(extension.begin(), extension.end(), extension.begin(),
+            [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+        if (extension == L".dds")
+        {
+            const HRESULT hr = DirectX::LoadDDSImageFromFile(filename.c_str(), image);
+            if (FAILED(hr))
+                throw std::runtime_error("Failed to load DDS texture: " + WideToUtf8(filename) +
+                    " (HRESULT " + std::to_string(static_cast<uint32_t>(hr)) + ")");
+            return image;
+        }
+
+        FILE* handle = nullptr;
+        if (_wfopen_s(&handle, filename.c_str(), L"rb") != 0)
+            throw std::runtime_error("Failed to open texture: " + WideToUtf8(filename));
+        std::unique_ptr<FILE, decltype(&std::fclose)> file(handle, &std::fclose);
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        std::unique_ptr<stbi_uc, decltype(&stbi_image_free)> pixels(
+            stbi_load_from_file(file.get(), &width, &height, &channels, STBI_rgb_alpha),
+            &stbi_image_free);
+        if (!pixels)
+            throw std::runtime_error("Failed to decode texture: " + WideToUtf8(filename) +
+                " (" + stbi_failure_reason() + ")");
+        image.width = static_cast<uint32_t>(width);
+        image.height = static_cast<uint32_t>(height);
+        image.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        const size_t rowPitch = static_cast<size_t>(width) * 4;
+        const size_t slicePitch = rowPitch * static_cast<size_t>(height);
+        image.pixels.assign(pixels.get(), pixels.get() + slicePitch);
+        image.subresources.push_back({ 0, rowPitch, slicePitch });
+        return image;
     }
 }
 
@@ -64,6 +123,14 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
 
     // 1. Сначала загрузим все материалы сцены
     std::vector<MaterialID> materialIDs(scene->mNumMaterials);
+    const auto modelDirectory = std::filesystem::path(path).parent_path();
+    const auto loadMaterialTexture = [&](const aiString& texturePath)
+    {
+        const auto relativePath = std::filesystem::path(std::u8string(
+            reinterpret_cast<const char8_t*>(texturePath.C_Str()), texturePath.length));
+        const auto modelPath = modelDirectory / relativePath;
+        return LoadTexture((std::filesystem::exists(modelPath) ? modelPath : relativePath).wstring());
+    };
 
     for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
     {
@@ -77,8 +144,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         // --- DIFFUSE ---
         if (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS)
         {
-            std::wstring wpath(texPath.C_Str(), texPath.C_Str() + strlen(texPath.C_Str()));
-            mat.albedo = LoadTexture(wpath);
+            mat.albedo = loadMaterialTexture(texPath);
         }
 
         // --- NORMAL ---
@@ -86,8 +152,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
             aiMat->GetTexture(aiTextureType_HEIGHT, 0, &texPath) == AI_SUCCESS ||
             aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
         {
-            std::wstring wpath(texPath.C_Str(), texPath.C_Str() + strlen(texPath.C_Str()));
-            mat.normal = LoadTexture(wpath);
+            mat.normal = loadMaterialTexture(texPath);
         }
 
         MaterialID matID = CreateMaterial(mat);
@@ -408,7 +473,10 @@ Material& ResourceManager::GetMaterial(MaterialID id)
 
 TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 {
-    auto cached = mTextureIDsByFilename.find(filename);
+    if (filename.empty())
+        throw std::invalid_argument("Texture filename is empty");
+    const std::wstring resolvedFilename = ResolveTexturePath(filename);
+    auto cached = mTextureIDsByFilename.find(resolvedFilename);
     if (cached != mTextureIDsByFilename.end())
     {
         return cached->second;
@@ -417,13 +485,14 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
     Texture tex;
 
     tex.filename = filename;
+    tex.imageData = LoadImage(resolvedFilename);
 
     // имя можно вытащить из пути (пока просто копия)
     tex.name = WideToUtf8(filename);
 
     TextureID id = gNextTextureID++;
     mTextures[id] = std::move(tex);
-    mTextureIDsByFilename[filename] = id;
+    mTextureIDsByFilename[resolvedFilename] = id;
 
     return id;
 }

@@ -25,6 +25,7 @@
 #include <wrl.h>
 #include <d3d11_1.h>
 #include "d3dx12.h"
+#include "ImageData.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4005)
@@ -46,6 +47,9 @@
 
 namespace DirectX
 {
+    // Reads and parses DDS into owned CPU data without creating GPU resources.
+    HRESULT LoadDDSImageFromFile(const wchar_t* filename, ImageData& image);
+
     enum DDS_ALPHA_MODE
     {
         DDS_ALPHA_MODE_UNKNOWN       = 0,
