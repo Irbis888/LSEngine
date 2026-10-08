@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files" />
+    <Filter Include="Header Files" />
+    <Filter Include="Documentation" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\TaskScheduler.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="src\TaskScheduler.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\LockLessMultiReadPipe.h"><Filter>Header Files</Filter></ClInclude>
+    <None Include="README.md"><Filter>Documentation</Filter></None>
+    <None Include="VERSION.md"><Filter>Documentation</Filter></None>
+    <None Include="License.txt"><Filter>Documentation</Filter></None>
+  </ItemGroup>
+</Project>

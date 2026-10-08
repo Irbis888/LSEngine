@@ -137,6 +137,15 @@
       <AdditionalDependencies>assimp-vc143-mt.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="..\..\external\enkiTS\enkiTS.props" />
+  </ImportGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\external\enkiTS\enkiTS.vcxproj">
+      <Project>{25E63670-6AF2-43E5-8EC1-46B478472BE1}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Common\DDSTextureLoader.cpp" />
     <ClCompile Include="..\..\Common\GameTimer.cpp" />
@@ -151,6 +160,7 @@
     <ClCompile Include="d3dUtils.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="FrameRes.cpp" />
+    <ClCompile Include="JobSystem.cpp" />
     <ClCompile Include="PhysicsSystem.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
@@ -185,6 +195,7 @@
     <ClInclude Include="..\..\Common\GameTimer.h" />
     <ClInclude Include="..\..\Common\MathHelper.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="JobSystem.h" />
     <ClInclude Include="TextureBenchmark.h" />
     <ClInclude Include="CameraControllerSystem.h" />
     <ClInclude Include="Commons.h" />
