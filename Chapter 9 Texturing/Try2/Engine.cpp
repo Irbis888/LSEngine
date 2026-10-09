@@ -53,7 +53,7 @@ Engine::Engine(IRenderAdapter* renderer) : mRenderAdapter(renderer) {}
 
 void Engine::Init(const GameTimer& gt) {
 	const uint32_t hardwareThreads = std::thread::hardware_concurrency();
-	mJobs.Init(std::min<uint32_t>(4, hardwareThreads > 1 ? hardwareThreads - 1 : 1));
+	mJobs.Init(std::min<uint32_t>(15, hardwareThreads > 1 ? hardwareThreads - 1 : 1));
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	updateSystems.push_back(std::make_unique<CameraControllerSystem>());

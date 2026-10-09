@@ -91,17 +91,30 @@ bool PhysicsSystem::RunRanges(size_t count, JobSystem::RangeJob work)
         throw std::length_error("Physics work exceeds Dispatch capacity");
     if (mScheduling.parallel && count >= mScheduling.parallelThreshold && mJobs.IsInitialized())
     {
-        auto task = mJobs.Dispatch(static_cast<uint32_t>(count), std::move(work),
-            mScheduling.rangeSize, JobSystem::Priority::High);
-        mJobs.WaitHighPriority(task);
+        JobSystem::TaskHandle task;
+        {
+            ZoneScopedN("PhysicsDispatch");
+            ZoneValue(count);
+            task = mJobs.Dispatch(static_cast<uint32_t>(count), std::move(work),
+                mScheduling.rangeSize, JobSystem::Priority::High);
+        }
+        {
+            // Range zones on this thread can nest here while Wait helps workers.
+            ZoneScopedN("PhysicsWaitHighPriority");
+            mJobs.WaitHighPriority(task);
+        }
         return true;
     }
+    ZoneScopedN("PhysicsSerialRange");
+    ZoneValue(count);
     work(0, static_cast<uint32_t>(count));
     return false;
 }
 
 void PhysicsSystem::IntegrateRange(uint32_t begin, uint32_t end, float dt)
 {
+    ZoneScopedN("PhysicsIntegrateRange");
+    ZoneValue(end - begin);
     for (uint32_t i = begin; i < end; ++i)
     {
         auto& transform = *mBodies[i].transform;
@@ -121,6 +134,8 @@ void PhysicsSystem::IntegrateRange(uint32_t begin, uint32_t end, float dt)
 
 void PhysicsSystem::BoundsRange(uint32_t begin, uint32_t end)
 {
+    ZoneScopedN("PhysicsBoundsRange");
+    ZoneValue(end - begin);
     for (uint32_t i = begin; i < end; ++i)
     {
         const auto& transform = *mColliders[i].transform;

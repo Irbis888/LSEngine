@@ -271,6 +271,14 @@ Build сетки, solver (с обновлениями сетки и повтор
 пока физика выключена, отображаются показатели последнего завершённого шага.
 Те же этапы размечены зонами и графиками Tracy.
 
+Зоны Tracy: `PhysicsStep`, `PhysicsPrepare`, `PhysicsIntegration`, `PhysicsInitialAABB`,
+`PhysicsBroadPhaseBuild`, `PhysicsCollisions`. Внутри CPU-этапов `PhysicsDispatch`
+показывает отправку, `PhysicsWaitHighPriority` — ожидание с помощью главным потоком,
+`PhysicsSerialRange` — последовательный путь. `PhysicsIntegrateRange` и
+`PhysicsBoundsRange` показывают сами вычисления на выполняющем потоке, включая workers.
+В Value диапазона записано число элементов. Вложенный диапазон внутри Wait означает,
+что главный поток помогает выполнять физическую задачу, а не просто простаивает.
+
 Измерения последовательного/параллельного режимов: [PHYSICS_PARALLEL_BENCHMARK.md](PHYSICS_PARALLEL_BENCHMARK.md).
 
 ## Как добавить физический объект в C++
