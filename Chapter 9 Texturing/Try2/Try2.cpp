@@ -7,6 +7,40 @@
 #include "ImGuiBridge.h"
 
 #include <string>
+#include <filesystem>
+#include <stdexcept>
+
+namespace
+{
+    void ConfigureRuntimeDirectory()
+    {
+        namespace fs = std::filesystem;
+        const auto hasAssets = [](const fs::path& directory)
+        {
+            return fs::is_regular_file(directory / "Shaders/Default.hlsl") &&
+                fs::is_directory(directory / "Scenes");
+        };
+        if (hasAssets(fs::current_path())) return;
+
+        std::wstring executable(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+        if (!length || length >= executable.size())
+            throw std::runtime_error("Could not determine the executable directory");
+        executable.resize(length);
+        for (fs::path directory = fs::path(executable).parent_path(); !directory.empty();)
+        {
+            if (hasAssets(directory))
+            {
+                fs::current_path(directory);
+                return;
+            }
+            const auto parent = directory.parent_path();
+            if (parent == directory) break;
+            directory = parent;
+        }
+        throw std::runtime_error("Could not find runtime assets: Shaders/Default.hlsl and Scenes near the executable");
+    }
+}
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
@@ -60,6 +94,7 @@ int main()
 
     try
     {
+        ConfigureRuntimeDirectory();
         HINSTANCE hInstance = GetModuleHandle(nullptr);
         TestApp theApp(hInstance);
         if (!theApp.Initialize())
@@ -72,7 +107,12 @@ int main()
     catch (DxException& e)
     {
         MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
-        return 0;
+        return EXIT_FAILURE;
+    }
+    catch (const std::exception& e)
+    {
+        MessageBoxA(nullptr, e.what(), "Startup failed", MB_OK | MB_ICONERROR);
+        return EXIT_FAILURE;
     }
 }
 

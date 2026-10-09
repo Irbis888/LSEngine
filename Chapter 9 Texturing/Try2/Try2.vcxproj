@@ -256,6 +256,9 @@
   <Target Name="EnableEditor" AfterTargets="Build">
     <Touch Files="$(TargetDir).imgui_on" AlwaysCreate="true" />
   </Target>
+  <Target Name="CopyRuntimeDependencies" AfterTargets="Build" Condition="'$(Platform)'=='x64'">
+    <Copy SourceFiles="$(ProjectDir)dlls\assimp-vc143-mt.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
