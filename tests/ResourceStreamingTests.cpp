@@ -102,6 +102,19 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
     const MeshID cube = resources.CreateCube(material);
     const MeshID plane = resources.CreatePlane(material);
     const MeshID sphere = resources.CreateSphere(material, 8, 4);
+    const MeshID cubeCopy = resources.CreateCube(brokenMaterial);
+    const MeshID planeCopy = resources.CreatePlane(brokenMaterial);
+    const MeshID sphereCopy = resources.CreateSphere(brokenMaterial, 8, 4);
+    const MeshID differentSphere = resources.CreateSphere(material, 8, 5);
+    const MeshID minimumSphere = resources.CreateSphere(material, 3, 2);
+    const MeshID clampedSphere = resources.CreateSphere(material, 0, 0);
+    Check(cube != cubeCopy && resources.GetMesh(cube).sharedGeometry == resources.GetMesh(cubeCopy).sharedGeometry &&
+        resources.GetMesh(plane).sharedGeometry == resources.GetMesh(planeCopy).sharedGeometry &&
+        resources.GetMesh(sphere).sharedGeometry == resources.GetMesh(sphereCopy).sharedGeometry,
+        "Identical primitives did not share CPU geometry independently of material");
+    Check(resources.GetMesh(sphere).sharedGeometry != resources.GetMesh(differentSphere).sharedGeometry &&
+        resources.GetMesh(minimumSphere).sharedGeometry == resources.GetMesh(clampedSphere).sharedGeometry,
+        "Sphere cache ignored tessellation or did not normalize minimum tessellation");
     const MeshID model = resources.LoadMesh((fixtures / "async.obj").string());
     resources.SetMeshMaterial(model, material);
     const MaterialID overrideMaterial = resources.CreateSolidMaterial("Deferred override", glm::vec3(0.5f));
@@ -124,7 +137,7 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         renderer.SetResourceManager(&resources);
         renderer.Init(window, 64, 64);
         D3DRenderAdapter::UploadBudget budget;
-        budget.maxTextures = 1; budget.maxMeshes = 1;
+        budget.maxBytes = 4; // One tiny texture, or one oversized resource, per frame.
         budget.maxMilliseconds = 1000.0; // Count limit is deterministic in this test.
         renderer.SetUploadBudget(budget);
         Check(renderer.mGeometries.empty(), "Primitive creation eagerly uploaded GPU buffers");
@@ -147,6 +160,11 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
             renderer.DrawMesh(plane);
             renderer.SetTransform(object);
             renderer.DrawMesh(sphere);
+            for (const MeshID copy : { cubeCopy, planeCopy, sphereCopy })
+            {
+                renderer.SetTransform(object);
+                renderer.DrawMesh(copy);
+            }
             renderer.SetTransform(object);
             renderer.DrawMesh(model);
         };
@@ -155,7 +173,7 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         for (int frame = 0; frame < 3; ++frame)
         {
             renderer.BeginFrame();
-            Check(resources.GetActiveLoadCount() == 2 && resources.GetQueuedLoadCount() > 0,
+            Check(resources.GetActiveLoadCount() <= 2 && resources.GetQueuedLoadCount() > 0,
                 "Resource job admission was not bounded");
             cachedMaterial = renderer.GetOrLoadMaterial(material);
             placeholder = renderer.mTextures.at(std::to_string(resources.GetPlaceholderTexture()))->SrvHeapIndex;
@@ -174,9 +192,26 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
                     "Primitive did not reuse its cached GPU buffers");
             }
             Check(!renderer.mGeometries.contains(model), "Loading model was uploaded before CPU import finished");
+            for (const auto& pair : { std::pair{cube, cubeCopy}, std::pair{plane, planeCopy}, std::pair{sphere, sphereCopy} })
+            {
+                auto* first = renderer.GetMeshGPU(pair.first);
+                auto* second = renderer.GetMeshGPU(pair.second);
+                Check(first != second && first->vertexBuffer == second->vertexBuffer && first->indexBuffer == second->indexBuffer,
+                    "Identical primitives allocated separate GPU geometry buffers");
+                Check(first->submeshes[0].material == material && second->submeshes[0].material == brokenMaterial,
+                    "Shared primitive geometry coupled per-mesh materials");
+            }
+            Check(!renderer.mGeometries.contains(differentSphere), "Unused primitive eagerly uploaded buffers");
             renderer.EndFrame();
         }
         release.store(true, std::memory_order_release);
+        const auto continuousDeadline = std::chrono::steady_clock::now() + 5s;
+        while (resources.GetLoadingStats().completedResults < ids.size() + 3 && std::chrono::steady_clock::now() < continuousDeadline)
+            std::this_thread::sleep_for(1ms);
+        Check(resources.GetLoadingStats().completedResults >= ids.size() + 3 && resources.GetQueuedLoadCount() == 0,
+            "CPU consumers waited for a frame to start the next request");
+        Check(resources.GetTexture(ids[0]).state == ResourceState::Loading,
+            "Worker published directly into resource maps");
         const auto deadline = std::chrono::steady_clock::now() + 15s;
         size_t frames = 0;
         while (std::chrono::steady_clock::now() < deadline)
@@ -194,6 +229,7 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
             std::this_thread::sleep_for(1ms);
         }
         Check(!resources.HasPendingLoads() && resources.PeekTextureUpload() == 0, "Streaming did not finish");
+        Check(resources.GetLoadingStats().readyBytes == 0, "Completed GPU resources retained their pending-memory charge");
         Check(frames >= ids.size(), "Texture budget did not distribute uploads across frames");
         Check(cachedMaterial->DiffuseSrvHeapIndex != placeholder &&
             cachedMaterial->DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(ids[0]))->SrvHeapIndex &&
@@ -212,8 +248,99 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         renderer.EndFrame();
         renderer.FlushCommandQueue();
         renderer.CleanupMeshUploadBuffers();
+        resources.SetMeshMaterial(cubeCopy, overrideMaterial);
+        renderer.BeginFrame();
+        Check(renderer.GetMeshGPU(cubeCopy)->submeshes[0].material == overrideMaterial &&
+            renderer.GetMeshGPU(cube)->submeshes[0].material == material,
+            "Editing a material affected another primitive sharing geometry");
+        renderer.EndFrame();
+        renderer.FlushCommandQueue();
+        renderer.CleanupMeshUploadBuffers();
         for (const auto& [key, texture] : renderer.mTextures)
             Check(!texture->UploadHeap && texture->uploadCompleteFence == 0, "Completed texture upload heap was retained");
+        CheckDiagnostics(diagnostics.Get());
+
+        // Pause frame pumping: consumers must fill the byte budget, then stop producing.
+        ResourceManager limited;
+        limited.InitLoading(jobs, 2);
+        limited.SetLoadingMemoryBudget(1024);
+        std::vector<TextureID> limitedTextures;
+        for (int i = 0; i < 128; ++i)
+        {
+            const auto path = fixtures / ("memory-" + std::to_string(i) + ".tga");
+            Write(path, tga);
+            limitedTextures.push_back(limited.LoadTexture(path.wstring()));
+        }
+        const auto memoryDeadline = std::chrono::steady_clock::now() + 5s;
+        while (limited.GetLoadingStats().readyBytes < 1024 && std::chrono::steady_clock::now() < memoryDeadline)
+            std::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(20ms);
+        const auto full = limited.GetLoadingStats();
+        Check(full.readyBytes >= 1024 && full.readyBytes <= 1024 + 2 * (4 + sizeof(ImageSubresource)) &&
+            full.completedResults > 4 && limited.GetQueuedLoadCount() > 0,
+            "Worker results were unaccounted, production was count-limited, or byte backpressure failed");
+        const auto queuedWhenFull = limited.GetQueuedLoadCount();
+        std::this_thread::sleep_for(20ms);
+        Check(limited.GetQueuedLoadCount() == queuedWhenFull, "Full ready-data budget did not pause CPU production");
+        renderer.SetResourceManager(&limited);
+        budget.maxBytes = 1024 * 1024;
+        renderer.SetUploadBudget(budget);
+        bool uploadedMoreThanFour = false;
+        while (std::chrono::steady_clock::now() < memoryDeadline)
+        {
+            const size_t before = renderer.mTextures.size();
+            renderer.BeginFrame();
+            uploadedMoreThanFour |= renderer.mTextures.size() > before + 4;
+            renderer.EndFrame();
+            if (!limited.HasPendingLoads() && limited.PeekTextureUpload() == 0) break;
+        }
+        Check(uploadedMoreThanFour && limited.GetTextureProgress().ready == limitedTextures.size() &&
+            limited.GetLoadingStats().readyBytes == 0,
+            "GPU pump kept an operation-count limit or did not resume memory-blocked consumers");
+        std::vector<MeshID> limitedModels;
+        for (int i = 0; i < 6; ++i) limitedModels.push_back(limited.LoadMesh((fixtures / "async.obj").string()));
+        const auto modelDeadline = std::chrono::steady_clock::now() + 5s;
+        while (std::chrono::steady_clock::now() < modelDeadline)
+        {
+            limited.PumpLoading();
+            size_t modelBytes = 0;
+            for (auto id : limitedModels)
+                if (limited.GetMesh(id).state == ResourceState::CpuReady) modelBytes += limited.GetMesh(id).GeometryBytes();
+            Check(limited.GetLoadingStats().readyBytes >= modelBytes, "Pending model geometry escaped memory accounting");
+            renderer.BeginFrame();
+            for (auto id : limitedModels) renderer.GetMeshGPU(id);
+            renderer.EndFrame();
+            bool ready = true;
+            for (auto id : limitedModels) ready &= limited.GetMesh(id).state == ResourceState::Ready;
+            if (ready && !limited.HasPendingLoads() && limited.PeekTextureUpload() == 0) break;
+        }
+        for (auto id : limitedModels) Check(limited.GetMesh(id).state == ResourceState::Ready, "Memory-blocked model did not finish");
+        Check(limited.GetLoadingStats().readyBytes == 0, "Model GPU upload did not release pending memory");
+        renderer.FlushCommandQueue();
+        limited.SetLoadingMemoryBudget(1);
+        std::vector<TextureID> cancelAtCapacity;
+        for (int i = 0; i < 8; ++i)
+        {
+            const auto path = fixtures / ("full-cancel-" + std::to_string(i) + ".tga");
+            Write(path, tga);
+            cancelAtCapacity.push_back(limited.LoadTexture(path.wstring()));
+        }
+        const auto capacityDeadline = std::chrono::steady_clock::now() + 5s;
+        while (limited.GetLoadingStats().readyBytes < 1 && std::chrono::steady_clock::now() < capacityDeadline)
+            std::this_thread::sleep_for(1ms);
+        Check(limited.GetLoadingStats().readyBytes >= 1 && limited.GetQueuedLoadCount() > 0,
+            "Shutdown-at-capacity fixture did not fill pending memory");
+        const auto otherWorkFinished = std::make_shared<std::atomic<bool>>(false);
+        const auto otherWork = jobs.Submit([otherWorkFinished] { otherWorkFinished->store(true, std::memory_order_release); });
+        while (!otherWork.IsComplete() && std::chrono::steady_clock::now() < capacityDeadline)
+            std::this_thread::sleep_for(1ms);
+        Check(otherWork.IsComplete() && otherWorkFinished->load(std::memory_order_acquire),
+            "Memory-blocked resource consumers monopolized scheduler workers");
+        jobs.Wait(otherWork);
+        limited.ShutdownLoading();
+        for (auto id : cancelAtCapacity)
+            Check(limited.GetTexture(id).state == ResourceState::Failed, "Shutdown did not cancel a memory-blocked request");
+        renderer.SetResourceManager(&resources);
         CheckDiagnostics(diagnostics.Get());
     }
     DestroyWindow(window);
@@ -235,5 +362,5 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         Check(rejected, "Shutdown admitted a new resource request");
     }
     jobs.Shutdown();
-    std::cout << "PASS: async CPU textures/models; frames with occupied workers; checkerboard switch; bounded GPU pump; errors; deferred overrides; fence cleanup; shutdown\n";
+    std::cout << "PASS: continuous CPU consumers; byte backpressure including models; shared CPU/GPU primitives and independent materials; frames with occupied workers; checkerboard switch; byte/time GPU pump; errors; deferred overrides; fence cleanup; shutdown at capacity\n";
 }

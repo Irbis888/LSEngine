@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 using Microsoft::WRL::ComPtr;
+struct MeshGeometry;
 
 struct Dx12ImGuiBindings
 {
@@ -52,10 +53,8 @@ public:
     void CleanupMeshUploadBuffers();
     struct UploadBudget
     {
-        uint32_t maxTextures = 4;
-        uint32_t maxMeshes = 4;
-        size_t maxBytes = 16 * 1024 * 1024;
-        double maxMilliseconds = 2.0;
+        size_t maxBytes = 64 * 1024 * 1024;
+        double maxMilliseconds = 12.0;
     };
     void SetUploadBudget(const UploadBudget& budget);
     const UploadBudget& GetUploadBudget() const { return mUploadBudget; }
@@ -82,6 +81,7 @@ private:
     bool mTextureUploadTurn = true;
     std::deque<MeshID> mMeshUploads;
     std::unordered_set<MeshID> mQueuedMeshes;
+    std::unordered_map<const MeshGeometry*, MeshID> mSharedGeometryUploads;
     HWND      mhMainWnd = nullptr;
     int mClientWidth;
     int mClientHeight;

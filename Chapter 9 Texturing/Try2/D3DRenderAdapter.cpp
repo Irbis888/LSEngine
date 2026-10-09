@@ -50,7 +50,7 @@ D3DRenderAdapter::~D3DRenderAdapter()
 
 void D3DRenderAdapter::SetUploadBudget(const UploadBudget& budget)
 {
-    if (!budget.maxTextures || !budget.maxMeshes || !budget.maxBytes ||
+    if (!budget.maxBytes ||
         !std::isfinite(budget.maxMilliseconds) || budget.maxMilliseconds <= 0)
         throw std::invalid_argument("Upload budget limits must be positive");
     mUploadBudget = budget;
@@ -71,23 +71,22 @@ void D3DRenderAdapter::PumpResourceUploads()
     // This is called only after resetting the frame command list. Uploads and
     // draws use one queue, so copy + transition precede sampling in this frame.
     EnsureDefaultTextures();
-    mResourceManager->PumpLoading();
     ZoneScopedN("Bounded GPU resource finalization");
     const auto start = std::chrono::steady_clock::now();
+    mResourceManager->PumpLoading(mUploadBudget.maxMilliseconds * 0.5);
     size_t uploadedBytes = 0;
     uint32_t textures = 0, meshes = 0;
     bool textureTurn = mTextureUploadTurn;
     mTextureUploadTurn = !mTextureUploadTurn;
     for (;;)
     {
-        const TextureID texture = textures < mUploadBudget.maxTextures ? mResourceManager->PeekTextureUpload() : 0;
-        const bool meshAvailable = meshes < mUploadBudget.maxMeshes && !mMeshUploads.empty();
+        const TextureID texture = mResourceManager->PeekTextureUpload();
+        const bool meshAvailable = !mMeshUploads.empty();
         if (!texture && !meshAvailable) break;
         const bool uploadTexture = texture && (textureTurn || !meshAvailable);
         const MeshID mesh = meshAvailable ? mMeshUploads.front() : 0;
         const size_t bytes = uploadTexture ? mResourceManager->GetTexture(texture).imageData.pixels.size()
-            : mResourceManager->GetMesh(mesh).vertices.size() * sizeof(Vertex) +
-              mResourceManager->GetMesh(mesh).indices.size() * sizeof(uint32_t);
+            : mResourceManager->GetMesh(mesh).GeometryBytes();
         // At least one resource progresses even if it exceeds the soft budget.
         if (textures + meshes > 0 && (bytes > mUploadBudget.maxBytes - std::min(uploadedBytes, mUploadBudget.maxBytes) ||
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= mUploadBudget.maxMilliseconds))
@@ -1047,6 +1046,7 @@ void D3DRenderAdapter::SetResourceManager(ResourceManager* resourceManager)
     mResourceManager = resourceManager;
     mMeshUploads.clear();
     mQueuedMeshes.clear();
+    mSharedGeometryUploads.clear();
 }
 
 MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
@@ -1067,47 +1067,42 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
     Mesh& cpuMesh = mResourceManager->GetMesh(meshId);
 
     if (cpuMesh.state == ResourceState::Loading || cpuMesh.state == ResourceState::Failed) return nullptr;
-    if (cpuMesh.vertices.empty() || cpuMesh.indices.empty())
+    const auto& vertices = cpuMesh.GetVertices();
+    const auto& indices = cpuMesh.GetIndices();
+    if (vertices.empty() || indices.empty())
     {
         throw std::runtime_error("Mesh has no vertices or indices");
     }
 
     auto meshGPU = std::make_unique<MeshGPU>();
 
-    // Upload vertex buffer
-    UINT64 vbByteSize = (UINT64)cpuMesh.vertices.size() * sizeof(Vertex);
-    ComPtr<ID3D12Resource> vbUploadBuffer;
-
-    meshGPU->vertexBuffer = d3dUtils::CreateDefaultBuffer(
-        md3dDevice.Get(),
-        mCommandList.Get(),
-        cpuMesh.vertices.data(),
-        vbByteSize,
-        vbUploadBuffer);
-
-    // Upload index buffer
-    UINT64 ibByteSize = (UINT64)cpuMesh.indices.size() * sizeof(uint32_t);
-    ComPtr<ID3D12Resource> ibUploadBuffer;
-
-    meshGPU->indexBuffer = d3dUtils::CreateDefaultBuffer(
-        md3dDevice.Get(),
-        mCommandList.Get(),
-        cpuMesh.indices.data(),
-        ibByteSize,
-        ibUploadBuffer);
-
-    // Create vertex buffer view
-    meshGPU->vbView.BufferLocation = meshGPU->vertexBuffer->GetGPUVirtualAddress();
-    meshGPU->vbView.StrideInBytes = sizeof(Vertex);
-    meshGPU->vbView.SizeInBytes = (UINT)vbByteSize;
-
-    // Create index buffer view
-    meshGPU->ibView.BufferLocation = meshGPU->indexBuffer->GetGPUVirtualAddress();
-    meshGPU->ibView.Format = DXGI_FORMAT_R32_UINT;
-    meshGPU->ibView.SizeInBytes = (UINT)ibByteSize;
-
-    // Store index count
-    meshGPU->indexCount = (UINT)cpuMesh.indices.size();
+    // Materials belong to each MeshID; immutable primitive buffers belong to the geometry.
+    MeshGPU* shared = nullptr;
+    if (cpuMesh.sharedGeometry)
+        if (auto cached = mSharedGeometryUploads.find(cpuMesh.sharedGeometry.get()); cached != mSharedGeometryUploads.end())
+            shared = mGeometries.at(cached->second).get();
+    if (shared)
+    {
+        meshGPU->vertexBuffer = shared->vertexBuffer;
+        meshGPU->indexBuffer = shared->indexBuffer;
+        meshGPU->vbView = shared->vbView;
+        meshGPU->ibView = shared->ibView;
+        meshGPU->indexCount = shared->indexCount;
+    }
+    else
+    {
+        const UINT64 vbByteSize = UINT64(vertices.size()) * sizeof(Vertex);
+        const UINT64 ibByteSize = UINT64(indices.size()) * sizeof(uint32_t);
+        meshGPU->vertexBuffer = d3dUtils::CreateDefaultBuffer(md3dDevice.Get(), mCommandList.Get(),
+            vertices.data(), vbByteSize, meshGPU->vertexUploadBuffer);
+        meshGPU->indexBuffer = d3dUtils::CreateDefaultBuffer(md3dDevice.Get(), mCommandList.Get(),
+            indices.data(), ibByteSize, meshGPU->indexUploadBuffer);
+        meshGPU->vbView = { meshGPU->vertexBuffer->GetGPUVirtualAddress(), UINT(vbByteSize), sizeof(Vertex) };
+        meshGPU->ibView = { meshGPU->indexBuffer->GetGPUVirtualAddress(), UINT(ibByteSize), DXGI_FORMAT_R32_UINT };
+        meshGPU->indexCount = UINT(indices.size());
+        // Only the first mesh owns staging buffers, retained until this fence completes.
+        meshGPU->uploadCompleteFence = mCurrentFence + 1;
+    }
 
     // Copy submesh metadata from CPU to GPU
     meshGPU->submeshes.reserve(cpuMesh.submeshes.size());
@@ -1121,15 +1116,11 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
     }
     meshGPU->materialVersion = cpuMesh.materialVersion;
 
-    // Store upload buffers in the mesh (will be disposed after GPU finishes)
-    meshGPU->vertexUploadBuffer = vbUploadBuffer;
-    meshGPU->indexUploadBuffer = ibUploadBuffer;
-    meshGPU->uploadCompleteFence = mCurrentFence + 1;  // Will be signaled after next flush
-
-    // Store in geometry map
     MeshGPU* result = meshGPU.get();
     mGeometries[meshId] = std::move(meshGPU);
-    cpuMesh.state = ResourceState::Ready;
+    if (cpuMesh.sharedGeometry && !shared)
+        mSharedGeometryUploads.emplace(cpuMesh.sharedGeometry.get(), meshId);
+    mResourceManager->FinishMeshUpload(meshId);
 
     return result;
 }

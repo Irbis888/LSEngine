@@ -36,6 +36,13 @@ public:
     };
     const SceneLoadProgress& GetSceneLoadProgress() const { return mSceneProgress; }
     bool IsSceneLoading() const { return mSceneProgress.active; }
+    struct SceneLoadingBudget
+    {
+        double initialMilliseconds = 8.0;
+        double streamingMilliseconds = 4.0;
+    };
+    void SetSceneLoadingBudget(const SceneLoadingBudget& budget);
+    const SceneLoadingBudget& GetSceneLoadingBudget() const { return mSceneLoadingBudget; }
 
 	void Init(const GameTimer& gt);
 	void Update(const FrameContext& context);
@@ -50,4 +57,5 @@ public:
 	bool LoadScene(const std::string& path, std::string& outError);
 private:
     SceneLoadProgress mSceneProgress;
+    SceneLoadingBudget mSceneLoadingBudget;
 };

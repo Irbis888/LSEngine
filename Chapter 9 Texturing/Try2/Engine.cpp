@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <iostream>
 #include <chrono>
+#include <cmath>
 
 namespace
 {
@@ -155,15 +156,24 @@ bool Engine::LoadScene(const std::string& path, std::string& outError)
     catch (const std::exception& error) { outError = error.what(); return false; }
 }
 
+void Engine::SetSceneLoadingBudget(const SceneLoadingBudget& budget)
+{
+    if (!std::isfinite(budget.initialMilliseconds) || budget.initialMilliseconds <= 0 ||
+        !std::isfinite(budget.streamingMilliseconds) || budget.streamingMilliseconds <= 0)
+        throw std::invalid_argument("Scene loading budgets must be positive");
+    mSceneLoadingBudget = budget;
+}
+
 void Engine::PumpSceneLoading()
 {
     ZoneScopedN("Bounded scene entity publication");
     const auto start = std::chrono::steady_clock::now();
+    const double budgetMs = mStartupScene ? mSceneLoadingBudget.initialMilliseconds : mSceneLoadingBudget.streamingMilliseconds;
     const auto overBudget = [&]
-    { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= 2.0; };
+    { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= budgetMs; };
     // Retire the previous registry gradually instead of destroying every
     // component inside the scene-switch button callback.
-    for (size_t removed = 0; mRetiredWorld && removed < 32 && !overBudget(); ++removed)
+    while (mRetiredWorld && !overBudget())
     {
         const auto entities = mRetiredWorld->registry.storage<entt::entity>().each();
         if (entities.begin() == entities.end()) { mRetiredWorld.reset(); break; }
@@ -196,7 +206,7 @@ void Engine::PumpSceneLoading()
     try
     {
         size_t batch = 0;
-        while (mSceneProgress.created < mSceneProgress.total && batch < 32 &&
+        while (mSceneProgress.created < mSceneProgress.total &&
             (batch == 0 || !overBudget()))
         {
             SceneSerializer::CreateEntity(world, mResourceManager,

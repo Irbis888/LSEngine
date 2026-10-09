@@ -10,7 +10,7 @@ static void Verify(World& world, ResourceManager& resources)
     {
         ++meshes;
         auto& mesh = resources.GetMesh(world.registry.get<MeshComponent>(entity).meshID);
-        if (mesh.vertices.empty() || mesh.indices.empty())
+        if (mesh.GetVertices().empty() || mesh.GetIndices().empty())
             throw std::runtime_error("Empty scene mesh");
         const auto& collider = world.registry.get<ColliderComponent>(entity);
         const auto& body = world.registry.get<RigidbodyComponent>(entity);
@@ -18,14 +18,14 @@ static void Verify(World& world, ResourceManager& resources)
         if (collider.type == ColliderType::Sphere)
         {
             ++spheres;
-            for (const auto& vertex : mesh.vertices)
+            for (const auto& vertex : mesh.GetVertices())
                 if (std::abs(glm::length(vertex.Position) - collider.radius) > 1e-4f)
                     throw std::runtime_error("Sphere mesh and collider sizes differ");
         }
         else
         {
             ++cubes;
-            for (const auto& vertex : mesh.vertices)
+            for (const auto& vertex : mesh.GetVertices())
                 if (glm::any(glm::greaterThan(glm::abs(vertex.Position), collider.halfExtents + glm::vec3(1e-4f))))
                     throw std::runtime_error("Cube mesh exceeds collider");
         }

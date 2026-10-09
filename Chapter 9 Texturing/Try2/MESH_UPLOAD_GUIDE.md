@@ -4,6 +4,11 @@
 
 Imported mesh requests use the bounded resource upload pump in `BeginFrame`. Generated planes, cubes, and spheres upload lazily on their first draw, with copies and barriers recorded before that draw in the same command list. See `RESOURCE_MANAGER.md` for CPU jobs, placeholders, upload budgets, and shutdown. `GetMeshGPU` returns `nullptr` while an imported mesh is pending.
 
+Primitive CPU geometry is immutable and cached by shape (spheres also by normalized slice/stack count).
+Distinct MeshIDs keep independent materials while sharing the same GPU vertex/index buffers.
+Use `Mesh::GetVertices()` / `GetIndices()` to read either shared or owned CPU arrays.
+The upload pump limits time and bytes, with no fixed number of meshes or textures per frame.
+
 ## Architecture
 
 ### Key Components
@@ -130,7 +135,8 @@ if (mesh) {
 
 3. **Resource Ownership**: 
    - MeshGPU stored in `mGeometries` map
-   - Upload buffers kept alive in MeshGPU until its fence completes
+   - Primitive MeshGPU entries reference shared vertex/index resources and own separate material metadata
+   - The first upload owns staging buffers until its fence completes; other entries do not allocate staging buffers
 
 4. **Error Handling**:
    - Throws if ResourceManager not set

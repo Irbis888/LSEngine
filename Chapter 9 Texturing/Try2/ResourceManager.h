@@ -37,11 +37,18 @@ struct Vertex
     glm::vec2 TexC;
 };
 
+struct MeshGeometry
+{
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+};
+
 struct Mesh
 {
     ResourceState state = ResourceState::CpuReady;
     // Generated primitives upload lazily on their first draw, without the model queue.
     bool isPrimitive = false;
+    std::shared_ptr<const MeshGeometry> sharedGeometry;
     std::string error;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -55,6 +62,9 @@ struct Mesh
 
     std::vector<Submesh> submeshes;
     uint32_t materialVersion = 1;
+    const std::vector<Vertex>& GetVertices() const { return sharedGeometry ? sharedGeometry->vertices : vertices; }
+    const std::vector<uint32_t>& GetIndices() const { return sharedGeometry ? sharedGeometry->indices : indices; }
+    size_t GeometryBytes() const { return GetVertices().size() * sizeof(Vertex) + GetIndices().size() * sizeof(uint32_t); }
 };
 
 struct MaterialDesc
@@ -97,14 +107,22 @@ public:
     ResourceManager& operator=(const ResourceManager&) = delete;
 
     // Main-thread API. Workers produce isolated results; PumpLoading publishes
-    // completed results without waiting and admits a bounded number of jobs.
+    // completed results without waiting. Consumers drain requests independently of frames.
     // The JobSystem must outlive this manager, or call ShutdownLoading first.
     void InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads = 4);
-    void PumpLoading();
+    void PumpLoading(double maxMilliseconds = 4.0);
     void ShutdownLoading();
     bool HasPendingLoads() const;
     size_t GetActiveLoadCount() const;
     size_t GetQueuedLoadCount() const;
+    struct LoadingStats
+    {
+        size_t readyBytes = 0, peakReadyBytes = 0, maxReadyBytes = 0;
+        size_t completedResults = 0, activeLoads = 0;
+    };
+    LoadingStats GetLoadingStats() const;
+    void SetLoadingMemoryBudget(size_t maxReadyBytes);
+    void FinishMeshUpload(MeshID id);
     struct TextureProgress { size_t total = 0, ready = 0, failed = 0; };
     TextureProgress GetTextureProgress() const;
     TextureID GetPlaceholderTexture() const { return mPlaceholderTexture; }
@@ -147,6 +165,11 @@ public:
 private:
     struct LoadingState;
     std::unique_ptr<LoadingState> mLoading;
+    std::unordered_map<TextureID, size_t> mPendingTextureBytes;
+    std::unordered_map<MeshID, size_t> mPendingMeshBytes;
+    MeshID CreatePrimitive(std::shared_ptr<const MeshGeometry> geometry, MaterialID material);
+    std::shared_ptr<const MeshGeometry> mPlaneGeometry, mCubeGeometry;
+    std::unordered_map<uint64_t, std::shared_ptr<const MeshGeometry>> mSphereGeometries;
     TextureID CreateBuiltinTexture(const std::string& name, uint32_t width,
         uint32_t height, std::vector<uint8_t> pixels);
     TextureID mPlaceholderTexture = 0;

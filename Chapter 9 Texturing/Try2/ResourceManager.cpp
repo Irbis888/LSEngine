@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <cwctype>
 #include <filesystem>
+#include <mutex>
+#include <chrono>
 #include <stdexcept>
 #include "DDSTextureLoader.h"
 
@@ -256,21 +258,136 @@ struct ResourceManager::LoadingState
     };
     struct Result
     {
+        Request request;
         ImageData image;
         DecodedModel model;
         std::string error;
-    };
-    struct Active
-    {
-        Request request;
-        std::shared_ptr<Result> result;
-        JobSystem::TaskHandle task;
+        size_t bytes = 0;
     };
     JobSystem* jobs = nullptr;
-    uint32_t concurrency = 1;
-    bool stopped = false;
+    bool stopped = false; // Main-thread lifecycle flag.
+    bool stopping = false; // Protected by mutex, observed by consumers.
+    mutable std::mutex mutex;
     std::deque<Request> queued;
-    std::vector<Active> active;
+    std::deque<Result> completed;
+    struct Consumer
+    {
+        JobSystem::TaskHandle task;
+        bool scheduled = false; // Protected by mutex; includes tasks still in the scheduler pipe.
+    };
+    std::vector<Consumer> consumers;
+    std::vector<JobSystem::TaskHandle> retiringConsumers; // Owner-thread task lifetime bookkeeping.
+    size_t scheduledConsumers = 0;
+    size_t active = 0;
+    size_t readyBytes = 0, peakReadyBytes = 0;
+    size_t maxReadyBytes = 64 * 1024 * 1024;
+
+    void Consume(size_t slot)
+    {
+        for (;;)
+        {
+            Request request;
+            {
+                std::lock_guard lock(mutex);
+                // Yield scheduler workers to other CPU jobs while ready-data memory is full.
+                if (stopping || queued.empty() || readyBytes >= maxReadyBytes)
+                {
+                    // Enqueue uses the same mutex: it either sees a live consumer
+                    // that will take its request, or reserves a new consumer here.
+                    consumers[slot].scheduled = false;
+                    --scheduledConsumers;
+                    return;
+                }
+                request = std::move(queued.front());
+                queued.pop_front();
+                ++active;
+            }
+            Result result;
+            result.request = std::move(request);
+            try
+            {
+                if (result.request.texture) result.image = LoadImage(result.request.texturePath);
+                else result.model = DecodeModel(result.request.modelPath);
+            }
+            catch (const std::exception& error) { result.error = error.what(); }
+            catch (...) { result.error = "Unknown CPU resource loading error"; }
+            result.bytes = result.image.pixels.capacity() +
+                result.image.subresources.capacity() * sizeof(ImageSubresource);
+            result.bytes += result.model.mesh.vertices.capacity() * sizeof(Vertex) +
+                result.model.mesh.indices.capacity() * sizeof(uint32_t) +
+                result.model.mesh.submeshes.capacity() * sizeof(Mesh::Submesh) +
+                result.model.materials.capacity() * sizeof(MaterialDesc);
+            for (const auto& material : result.model.materials)
+                result.bytes += material.name.capacity() +
+                    (material.albedoTexture.capacity() + material.normalTexture.capacity()) * sizeof(wchar_t);
+            {
+                std::lock_guard lock(mutex);
+                --active;
+                readyBytes += result.bytes;
+                peakReadyBytes = std::max(peakReadyBytes, readyBytes);
+                completed.push_back(std::move(result));
+            }
+            // Take the next request here, without returning to the frame pump.
+        }
+    }
+
+    void StartConsumers() // Owner thread only; at most consumers.size() decoding tasks.
+    {
+        for (size_t i = 0; i < retiringConsumers.size();)
+        {
+            if (!retiringConsumers[i].IsComplete()) { ++i; continue; }
+            jobs->Wait(retiringConsumers[i]);
+            retiringConsumers.erase(retiringConsumers.begin() + i);
+        }
+        for (size_t slot = 0; slot < consumers.size(); ++slot)
+        {
+            auto& consumer = consumers[slot];
+            {
+                std::lock_guard lock(mutex);
+                if (stopping || queued.empty() || readyBytes >= maxReadyBytes) break;
+                // Do not wake four callbacks for a single request not yet taken by a worker.
+                const size_t needed = std::min(consumers.size(), queued.size() + active);
+                if (scheduledConsumers >= needed) break;
+                if (consumer.scheduled) continue;
+                consumer.scheduled = true;
+                ++scheduledConsumers;
+            }
+            // A consumer can release its slot before enkiTS marks its callback complete.
+            // Preserve that handle for shutdown, but do not make the new request wait for it.
+            if (consumer.task)
+            {
+                if (consumer.task.IsComplete()) jobs->Wait(consumer.task);
+                else retiringConsumers.push_back(consumer.task);
+                consumer.task = {};
+            }
+            try { consumer.task = jobs->Submit([this, slot] { Consume(slot); }); }
+            catch (...)
+            {
+                std::lock_guard lock(mutex);
+                consumer.scheduled = false;
+                --scheduledConsumers;
+                throw;
+            }
+        }
+    }
+    void Enqueue(Request request)
+    {
+        {
+            std::lock_guard lock(mutex);
+            queued.push_back(std::move(request));
+        }
+        StartConsumers();
+    }
+    void ReleaseBytes(size_t bytes)
+    {
+        {
+            std::lock_guard lock(mutex);
+            readyBytes -= bytes;
+        }
+        // Publication/GPU completion calls this on the owner thread. Resume now,
+        // rather than postponing admission to the next frame.
+        StartConsumers();
+    }
 };
 
 ResourceManager::ResourceManager()
@@ -310,27 +427,29 @@ void ResourceManager::InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads)
     if (!jobs.IsInitialized()) throw std::logic_error("JobSystem must be initialized first");
     mLoading = std::make_unique<LoadingState>();
     mLoading->jobs = &jobs;
-    // Keep admission well below enkiTS pipe capacity, avoiding inline decoder
-    // execution on Submit. The engine reserves a core for the rendering thread.
-    mLoading->concurrency = std::clamp<uint32_t>(maxConcurrentLoads, 1,
-        std::min<uint32_t>(jobs.GetWorkerThreadCount(), 8));
+    mLoading->consumers.resize(std::clamp<uint32_t>(maxConcurrentLoads, 1,
+        std::min<uint32_t>(jobs.GetWorkerThreadCount(), 8)));
 }
 
-void ResourceManager::PumpLoading()
+void ResourceManager::PumpLoading(double maxMilliseconds)
 {
+    if (!std::isfinite(maxMilliseconds) || maxMilliseconds <= 0)
+        throw std::invalid_argument("CPU publication budget must be positive");
     if (!mLoading || mLoading->stopped) return;
-    ZoneScopedN("Publish CPU resources and schedule jobs");
+    ZoneScopedN("Publish CPU resources");
     auto& loading = *mLoading;
-    for (size_t i = 0; i < loading.active.size();)
+    const auto start = std::chrono::steady_clock::now();
+    for (;;)
     {
-        auto& active = loading.active[i];
-        if (!active.task.IsComplete()) { ++i; continue; }
-        // IsComplete synchronizes with worker writes. Wait cannot execute an
-        // unfinished task here, and workers never access the resource maps.
-        loading.jobs->Wait(active.task);
-        const uint32_t id = active.request.id;
-        auto& result = *active.result;
-        if (active.request.texture)
+        LoadingState::Result result;
+        {
+            std::lock_guard lock(loading.mutex);
+            if (loading.completed.empty()) break;
+            result = std::move(loading.completed.front());
+            loading.completed.pop_front();
+        }
+        const uint32_t id = result.request.id;
+        if (result.request.texture)
         {
             auto& texture = GetTexture(id);
             texture.error = std::move(result.error);
@@ -339,8 +458,9 @@ void ResourceManager::PumpLoading()
             {
                 texture.imageData = std::move(result.image);
                 mTextureUploads.push_back(id);
+                mPendingTextureBytes.emplace(id, result.bytes);
             }
-            else std::cerr << texture.error << '\n';
+            else { loading.ReleaseBytes(result.bytes); std::cerr << texture.error << '\n'; }
         }
         else
         {
@@ -349,6 +469,7 @@ void ResourceManager::PumpLoading()
             {
                 mesh.state = ResourceState::Failed;
                 mesh.error = std::move(result.error);
+                loading.ReleaseBytes(result.bytes);
                 std::cerr << mesh.error << '\n';
             }
             else
@@ -367,42 +488,25 @@ void ResourceManager::PumpLoading()
                             submesh.material = override->second;
                 }
                 mesh = std::move(result.model.mesh);
+                // Material descriptions are released here; only pending mesh data stays charged.
+                const size_t meshBytes = mesh.vertices.capacity() * sizeof(Vertex) +
+                    mesh.indices.capacity() * sizeof(uint32_t) + mesh.submeshes.capacity() * sizeof(Mesh::Submesh);
+                mPendingMeshBytes.emplace(id, meshBytes);
+                loading.ReleaseBytes(result.bytes - meshBytes);
             }
             mMeshMaterialOverrides.erase(id);
             mSubmeshMaterialOverrides.erase(id);
         }
-        loading.active.erase(loading.active.begin() + i);
+        if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= maxMilliseconds)
+            break;
     }
-
-    // Backpressure bounds decoded data awaiting GPU finalization. A single
-    // image may exceed the soft byte limit; in-flight results add at most
-    // concurrency images. CPU copies already uploaded are retained as before.
-    size_t readyBytes = 0;
-    size_t readyCount = 0;
-    for (const auto& [id, texture] : mTextures)
-        if (texture.state == ResourceState::CpuReady && !texture.filename.empty())
-        { readyBytes += texture.imageData.pixels.size(); ++readyCount; }
-    while (!loading.queued.empty() && loading.active.size() < loading.concurrency &&
-        readyCount + loading.active.size() < 32 && readyBytes < 64 * 1024 * 1024)
-    {
-        auto request = std::move(loading.queued.front());
-        loading.queued.pop_front();
-        auto result = std::make_shared<LoadingState::Result>();
-        auto task = loading.jobs->Submit([request, result]
-        {
-            try
-            {
-                if (request.texture) result->image = LoadImage(request.texturePath);
-                else result->model = DecodeModel(request.modelPath);
-            }
-            catch (const std::exception& error) { result->error = error.what(); }
-            catch (...) { result->error = "Unknown CPU resource loading error"; }
-        });
-        loading.active.push_back({ std::move(request), std::move(result), std::move(task) });
-    }
-    TracyPlot("Resource jobs active", int64_t(loading.active.size()));
-    TracyPlot("Resource requests queued", int64_t(loading.queued.size()));
-    TracyPlot("Textures awaiting GPU", int64_t(readyCount));
+    // Restart consumers that yielded because the request queue was empty or memory was full.
+    // A busy consumer chains requests itself, including while frames are stalled.
+    loading.StartConsumers();
+    const auto stats = GetLoadingStats();
+    TracyPlot("Resource jobs active", int64_t(stats.activeLoads));
+    TracyPlot("Resource requests queued", int64_t(GetQueuedLoadCount()));
+    TracyPlot("CPU data awaiting GPU bytes", int64_t(stats.readyBytes));
 }
 
 void ResourceManager::ShutdownLoading()
@@ -410,9 +514,16 @@ void ResourceManager::ShutdownLoading()
     if (!mLoading || mLoading->stopped) return;
     auto& loading = *mLoading;
     loading.stopped = true;
-    // Cancel work not submitted. Submitted callbacks capture only their own
-    // request/result, so never retain a ResourceManager or renderer pointer.
-    for (const auto& request : loading.queued)
+    std::deque<LoadingState::Request> cancelled;
+    {
+        std::lock_guard lock(loading.mutex);
+        loading.stopping = true;
+        cancelled.swap(loading.queued);
+    }
+    for (const auto& consumer : loading.consumers) loading.jobs->Wait(consumer.task);
+    for (const auto& task : loading.retiringConsumers) loading.jobs->Wait(task);
+    for (const auto& result : loading.completed) cancelled.push_back(result.request);
+    for (const auto& request : cancelled)
     {
         if (request.texture)
         {
@@ -427,32 +538,53 @@ void ResourceManager::ShutdownLoading()
             mesh.error = "Loading cancelled during shutdown";
         }
     }
-    loading.queued.clear();
-    for (const auto& active : loading.active)
-    {
-        loading.jobs->Wait(active.task);
-        if (active.request.texture)
-        {
-            auto& texture = GetTexture(active.request.id);
-            texture.state = ResourceState::Failed;
-            texture.error = "Loading cancelled during shutdown";
-        }
-        else
-        {
-            auto& mesh = GetMesh(active.request.id);
-            mesh.state = ResourceState::Failed;
-            mesh.error = "Loading cancelled during shutdown";
-        }
-    }
-    loading.active.clear();
+    loading.completed.clear();
+    loading.consumers.clear();
+    loading.retiringConsumers.clear();
+    loading.readyBytes = 0;
+    mPendingTextureBytes.clear();
+    mPendingMeshBytes.clear();
 }
 
 bool ResourceManager::HasPendingLoads() const
 {
-    return mLoading && (!mLoading->queued.empty() || !mLoading->active.empty());
+    if (!mLoading) return false;
+    std::lock_guard lock(mLoading->mutex);
+    return !mLoading->queued.empty() || mLoading->active || !mLoading->completed.empty();
 }
-size_t ResourceManager::GetActiveLoadCount() const { return mLoading ? mLoading->active.size() : 0; }
-size_t ResourceManager::GetQueuedLoadCount() const { return mLoading ? mLoading->queued.size() : 0; }
+size_t ResourceManager::GetActiveLoadCount() const { return GetLoadingStats().activeLoads; }
+size_t ResourceManager::GetQueuedLoadCount() const
+{
+    if (!mLoading) return 0;
+    std::lock_guard lock(mLoading->mutex);
+    return mLoading->queued.size();
+}
+ResourceManager::LoadingStats ResourceManager::GetLoadingStats() const
+{
+    if (!mLoading) return {};
+    std::lock_guard lock(mLoading->mutex);
+    return { mLoading->readyBytes, mLoading->peakReadyBytes, mLoading->maxReadyBytes,
+        mLoading->completed.size(), mLoading->active };
+}
+void ResourceManager::SetLoadingMemoryBudget(size_t maxReadyBytes)
+{
+    if (!maxReadyBytes) throw std::invalid_argument("Loading memory budget must be positive");
+    if (!mLoading || mLoading->stopped) throw std::logic_error("Resource loading is not running");
+    {
+        std::lock_guard lock(mLoading->mutex);
+        mLoading->maxReadyBytes = maxReadyBytes;
+    }
+    mLoading->StartConsumers();
+}
+void ResourceManager::FinishMeshUpload(MeshID id)
+{
+    GetMesh(id).state = ResourceState::Ready;
+    if (auto it = mPendingMeshBytes.find(id); it != mPendingMeshBytes.end())
+    {
+        mLoading->ReleaseBytes(it->second);
+        mPendingMeshBytes.erase(it);
+    }
+}
 ResourceManager::TextureProgress ResourceManager::GetTextureProgress() const
 {
     TextureProgress progress;
@@ -478,6 +610,11 @@ void ResourceManager::FinishTextureUpload(TextureID id, const std::string& error
     auto& texture = GetTexture(id);
     texture.state = error.empty() ? ResourceState::Ready : ResourceState::Failed;
     texture.error = error;
+    if (auto it = mPendingTextureBytes.find(id); it != mPendingTextureBytes.end())
+    {
+        mLoading->ReleaseBytes(it->second);
+        mPendingTextureBytes.erase(it);
+    }
     if (!error.empty()) std::cerr << texture.name << ": " << error << '\n';
 }
 
@@ -500,7 +637,7 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         Mesh mesh;
         mesh.state = ResourceState::Loading;
         const MeshID id = CreateMesh(std::move(mesh));
-        mLoading->queued.push_back({ false, id, std::filesystem::absolute(path).string(), {} });
+        mLoading->Enqueue({ false, id, std::filesystem::absolute(path).string(), {} });
         return id;
     }
     auto decoded = DecodeModel(path);
@@ -510,10 +647,19 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
     return CreateMesh(std::move(decoded.mesh));
 }
 
-MeshID ResourceManager::CreatePlane(MaterialID material)
+MeshID ResourceManager::CreatePrimitive(std::shared_ptr<const MeshGeometry> geometry, MaterialID material)
 {
     Mesh mesh;
     mesh.isPrimitive = true;
+    mesh.sharedGeometry = std::move(geometry);
+    mesh.submeshes.push_back({ 0, static_cast<uint32_t>(mesh.GetIndices().size()), material });
+    return CreateMesh(std::move(mesh));
+}
+
+MeshID ResourceManager::CreatePlane(MaterialID material)
+{
+    if (mPlaneGeometry) return CreatePrimitive(mPlaneGeometry, material);
+    MeshGeometry mesh;
 
     mesh.vertices =
     {
@@ -524,15 +670,14 @@ MeshID ResourceManager::CreatePlane(MaterialID material)
     };
 
     mesh.indices = { 0, 1, 2, 0, 2, 3 };
-    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
-
-    return CreateMesh(std::move(mesh));
+    mPlaneGeometry = std::make_shared<MeshGeometry>(std::move(mesh));
+    return CreatePrimitive(mPlaneGeometry, material);
 }
 
 MeshID ResourceManager::CreateCube(MaterialID material)
 {
-    Mesh mesh;
-    mesh.isPrimitive = true;
+    if (mCubeGeometry) return CreatePrimitive(mCubeGeometry, material);
+    MeshGeometry mesh;
 
     const glm::vec3 positions[8] =
     {
@@ -576,19 +721,20 @@ MeshID ResourceManager::CreateCube(MaterialID material)
         mesh.indices.insert(mesh.indices.end(), { base, base + 2, base + 1, base, base + 3, base + 2 });
     }
 
-    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
-
-    return CreateMesh(std::move(mesh));
+    mCubeGeometry = std::make_shared<MeshGeometry>(std::move(mesh));
+    return CreatePrimitive(mCubeGeometry, material);
 }
 
 MeshID ResourceManager::CreateSphere(MaterialID material, uint32_t slices, uint32_t stacks)
 {
-    Mesh mesh;
-    mesh.isPrimitive = true;
-
-    constexpr float pi = 3.14159265358979323846f;
     slices = std::max<uint32_t>(slices, 3);
     stacks = std::max<uint32_t>(stacks, 2);
+    const uint64_t key = (uint64_t(slices) << 32) | stacks;
+    if (auto it = mSphereGeometries.find(key); it != mSphereGeometries.end())
+        return CreatePrimitive(it->second, material);
+    MeshGeometry mesh;
+
+    constexpr float pi = 3.14159265358979323846f;
 
     for (uint32_t stack = 0; stack <= stacks; ++stack)
     {
@@ -629,9 +775,8 @@ MeshID ResourceManager::CreateSphere(MaterialID material, uint32_t slices, uint3
         }
     }
 
-    mesh.submeshes.push_back(Mesh::Submesh{ 0, static_cast<uint32_t>(mesh.indices.size()), material });
-
-    return CreateMesh(std::move(mesh));
+    mSphereGeometries[key] = std::make_shared<MeshGeometry>(std::move(mesh));
+    return CreatePrimitive(mSphereGeometries[key], material);
 }
 
 
@@ -778,7 +923,7 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
     TextureID id = gNextTextureID++;
     mTextures[id] = std::move(tex);
     mTextureIDsByFilename[resolvedFilename] = id;
-    if (mLoading) mLoading->queued.push_back({ true, id, {}, resolvedFilename });
+    if (mLoading) mLoading->Enqueue({ true, id, {}, resolvedFilename });
     else mTextureUploads.push_back(id);
 
     return id;
@@ -800,8 +945,8 @@ void ResourceManager::PrintAllMeshes() const
     for (const auto& [id, mesh] : mMeshes)
     {
         std::cout << "MeshID: " << id << "\n";
-        std::cout << "Vertices: " << mesh.vertices.size() << "\n";
-        std::cout << "Indices: " << mesh.indices.size() << "\n";
+        std::cout << "Vertices: " << mesh.GetVertices().size() << "\n";
+        std::cout << "Indices: " << mesh.GetIndices().size() << "\n";
         std::cout << "Submeshes: " << mesh.submeshes.size() << "\n";
 
         for (size_t i = 0; i < mesh.submeshes.size(); ++i)
