@@ -82,7 +82,10 @@ void TestNarrowPhase()
     };
     auto a = addSphere({0, 0, 0}, {0, 0, 0});
     auto b = addSphere({0.8f, 0.8f, 0}, {0, 0, 0});
-    PhysicsSystem system;
+    JobSystem jobs;
+    jobs.Init(4);
+    PhysicsSystem system(jobs);
+    system.SetSchedulingSettings({ true, 1, 1 });
     GameTimer timer;
     FrameContext context{timer, {}, 1.0f / 60};
     system.Update(reg, context);

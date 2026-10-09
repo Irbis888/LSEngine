@@ -177,6 +177,40 @@ static void TestExceptions()
     other.Wait(foreign);
 }
 
+static void TestPriorityWait()
+{
+    JobSystem jobs;
+    jobs.Init(2);
+    std::atomic<bool> release{ false }, firstEntered{ false }, secondEntered{ false };
+    struct Join
+    {
+        JobSystem& jobs;
+        std::atomic<bool>& release;
+        ~Join() { release = true; jobs.WaitAll(); }
+    } join{ jobs, release };
+    auto blocker = [&](std::atomic<bool>& entered)
+    {
+        entered = true;
+        while (!release.load()) std::this_thread::yield();
+    };
+    jobs.Submit([&] { blocker(firstEntered); }, JobSystem::Priority::Low);
+    jobs.Submit([&] { blocker(secondEntered); }, JobSystem::Priority::Low);
+    WaitUntil(firstEntered);
+    WaitUntil(secondEntered);
+    std::atomic<bool> lowRan{ false };
+    auto low = jobs.Submit([&] { lowRan = true; }, JobSystem::Priority::Low);
+    auto high = jobs.Dispatch(1024, [](uint32_t, uint32_t) {}, 16, JobSystem::Priority::High);
+    jobs.WaitHighPriority(high);
+    Check(high.IsComplete() && !lowRan.load(), "Physics wait ran a queued background callback");
+    ExpectThrow<std::invalid_argument>([&] { jobs.WaitHighPriority(low); },
+        "Priority wait accepted an excluded target (deadlock risk)");
+    auto failed = jobs.Submit([] { throw std::runtime_error("High failure"); }, JobSystem::Priority::High);
+    ExpectThrow<std::runtime_error>([&] { jobs.WaitHighPriority(failed); }, "Priority wait lost exception");
+    release = true;
+    jobs.Wait(low);
+    Check(lowRan.load(), "Background task was lost after priority wait");
+}
+
 int main()
 {
     try
@@ -184,6 +218,7 @@ int main()
         TestSubmitAndDispatch();
         TestNestedJobsAndShutdown();
         TestExceptions();
+        TestPriorityWait();
         std::cout << "PASS: background Submit, Dispatch coverage, lifetime, nested Wait, graceful Shutdown, reinit, errors\n";
         return 0;
     }

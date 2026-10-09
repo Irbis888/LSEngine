@@ -243,6 +243,11 @@ static void DrawMainMenu(EditorContext& ctx)
         }
         ImGui::SetItemTooltip("Load 256 orange cubes and 256 blue spheres, mixed above a large floor.");
 
+        if (ImGui::MenuItem("Physics Stress (10,000 Bodies)", EditorSceneIO::PhysicsStress10000Path(),
+                false, canSwitchScene))
+            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsStress10000Path());
+        ImGui::SetItemTooltip("10,000 falling cubes above a large floor. Press Play to run physics.");
+
         if (ImGui::MenuItem("Texture Streaming (1000 Textures)", nullptr, false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, "Scenes/TextureStreaming1000.json");
         ImGui::SetItemTooltip("1000 unique textures; synchronous baseline loader.");

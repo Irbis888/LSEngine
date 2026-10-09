@@ -96,19 +96,40 @@ const float dt = context.physDT > 0.0f ? context.physDT : context.timer.DeltaTim
 
 ## Шаг PhysicsSystem
 
-`PhysicsSystem::Update` делает две вещи:
+`PhysicsSystem` получает ссылку на общий `Engine::mJobs`; отдельного scheduler нет.
+`Update` выполняет синхронный шаг и возвращается только после завершения обеих CPU-задач:
 
 ```cpp
 PhysicsStats::ResetFrameCollisionCount();
-Integrate(reg, dt);
-ResolveCollisions(reg);
+Prepare(reg);       // Переиспользуемые массивы указателей, resize массива AABB.
+// IntegrateRange: Dispatch(High) + WaitHighPriority или прямой вызов.
+// BoundsRange: Dispatch(High) + WaitHighPriority или прямой вызов.
+mBroadPhase.Build(mBounds);
+ResolveCollisions(); // Последовательный solver с обновлением сетки и повторным поиском.
 ```
 
-Сначала сбрасывается счётчик столкновений текущего physics frame, потом интегрируется движение, потом разрешаются столкновения.
+Главный поток собирает указатели на компоненты до запуска задач. Рабочие задачи не обращаются
+к registry и пишут только в свой диапазон тел или `bounds[i]`. Между Dispatch и Wait
+нельзя изменять структуру registry; движок выполняет публикацию сцен и редактирование до/после шага.
+Массивы очищаются с сохранением capacity, указатели собираются заново каждый шаг, поэтому
+изменения registry между шагами допустимы.
+
+`SetSchedulingSettings({parallel, parallelThreshold, rangeSize})` управляет режимом обработки.
+Порог проверяется отдельно для интеграции и AABB. Последовательный и параллельный режимы
+используют одинаковые `IntegrateRange` / `BoundsRange`; формулы внутри тела сохранены.
+Начальные 128/64 проверены измерениями; итоговый порог по умолчанию — 8192 элементов,
+минимальный диапазон — 64. Ниже порога отправка задач обходилась дороже сэкономленных вычислений.
+Обе настройки доступны в Statistics и через `Engine::GetPhysics()`.
+
+Физика имеет приоритет High; декодирование ресурсов и разбор сцены — Low. Ожидание
+`WaitHighPriority` помогает только High-задачам и не подхватывает импорт/чтение файла.
+ResourceManager допускает максимум `workers - 1` consumers (минимум один) и между файлами
+вызывает `RunHighPriorityTasks`. Длительный уже начавшийся импорт не прерывается.
+При единственном worker физическая работа может выполняться главным потоком.
 
 ## Интеграция движения
 
-`Integrate` проходит по всем entity с:
+Подготовка массива интеграции проходит по всем entity с:
 
 ```cpp
 TransformComponent + RigidbodyComponent
@@ -136,25 +157,23 @@ glm::vec3(0.0f, -9.81f, 0.0f)
 
 ## Детекция столкновений
 
-`ResolveCollisions` берёт все entity с:
+Подготовка массива коллайдеров берёт все entity с:
 
 ```cpp
 TransformComponent + ColliderComponent
 ```
 
-Дальше она проверяет все пары объектов двойным циклом:
-
-```cpp
-for i in entities:
-    for j in entities after i:
-```
-
-Это простой O(n^2) broad phase. Для демосцены с несколькими объектами нормально, но для большого уровня потом нужен spatial partitioning: grid, BVH, sweep-and-prune или другой broad phase.
+Начальные AABB вычисляются независимо по индексам, затем `PhysicsBroadPhase` последовательно
+строит пространственную сетку. Крупные коллайдеры, например пол, хранятся отдельно.
+Кандидаты отсортированы по прежнему порядку collider-view; solver обрабатывает их последовательно.
+После коррекции позиции границы и сетка обновляются, для сдвинутого первого тела выполняется
+повторный поиск после текущего индекса пары. Так сохраняются контакты, появившиеся вследствие
+предыдущих коррекций. Обновление границ в solver не распараллеливается.
 
 Для каждой пары:
 
 1. Коллайдеры превращаются в scaled AABB через `MakeScaledAABB`.
-2. `GetAABBCollision` проверяет пересечение.
+2. `GetColliderCollision` выбирает AABB/AABB, sphere/sphere или sphere/AABB narrow phase.
 3. Если пересечение есть, создаётся `CollisionManifold`.
 
 `CollisionManifold` содержит:
@@ -243,6 +262,16 @@ PhysicsStats::GetFrameCollisionCount();
 ```
 
 Сейчас он хранит количество столкновений за physics frame. ImGui/statistics panel может использовать это для отладки.
+
+`PhysicsStats::Timings()` и `PhysicsSystem::GetTimings()` возвращают время последнего
+завершённого шага: prepare, integration (с Dispatch/Wait), initial AABB (с Dispatch/Wait),
+Build сетки, solver (с обновлениями сетки и повторным поиском) и полный шаг в миллисекундах.
+Также доступны числа тел/коллайдеров и фактический режим каждого CPU-этапа.
+В Statistics видны все эти значения, переключатель Parallel physics, порог и размер диапазона;
+пока физика выключена, отображаются показатели последнего завершённого шага.
+Те же этапы размечены зонами и графиками Tracy.
+
+Измерения последовательного/параллельного режимов: [PHYSICS_PARALLEL_BENCHMARK.md](PHYSICS_PARALLEL_BENCHMARK.md).
 
 ## Как добавить физический объект в C++
 
@@ -351,14 +380,13 @@ world.registry.emplace<ColliderComponent>(
 }
 ```
 
-Но надо помнить: sphere сейчас всё равно разрешается как AABB по `radius`.
+Для sphere используются мировые центр и радиус из scaled AABB, а narrow phase учитывает форму сферы.
 
 ## Текущие ограничения
 
 - Нет rotation-aware collider. AABB всегда осевой, поворот `TransformComponent::rotation` на коллайдер не влияет.
-- Sphere-коллайдер пока не имеет отдельного sphere-vs-sphere или sphere-vs-box solver.
 - Нет continuous collision detection. Быстрый объект может пролететь через тонкий объект при большом timestep.
-- Broad phase O(n^2), без spatial acceleration.
+- При плотных скоплениях число кандидатов пространственной сетки может приблизиться к O(n^2).
 - Нет angular velocity, torque, inertia tensor и вращательной физики.
 - Нет collision events/callbacks, только общий счётчик `PhysicsStats`.
 - `Kinematic` тип пока зарезервирован и не имеет отдельной логики движения.
@@ -367,9 +395,7 @@ world.registry.emplace<ColliderComponent>(
 ## Что логично добавить дальше
 
 1. Настоящие collision events: `OnCollisionEnter`, `OnCollisionStay`, `OnCollisionExit`.
-2. Отдельные narrow phase solvers для sphere-sphere, sphere-AABB и AABB-AABB.
 3. Debug draw коллайдеров.
 4. Layer mask и collision filtering.
 5. Kinematic bodies с ручным движением и push dynamic bodies.
-6. Broad phase через uniform grid или sweep-and-prune.
 7. Angular physics: rotation, angular velocity, inertia, torque.

@@ -57,7 +57,7 @@ void Engine::Init(const GameTimer& gt) {
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	updateSystems.push_back(std::make_unique<CameraControllerSystem>());
-	physicsSystems.push_back(std::make_unique<PhysicsSystem>());
+	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 
 	if (const std::filesystem::path* scenePath = FindScenePath())
@@ -106,6 +106,12 @@ void Engine::PhysicsUpdate(const FrameContext& context)
 	}
 }
 
+PhysicsSystem& Engine::GetPhysics()
+{
+    if (physicsSystems.empty()) throw std::logic_error("Physics is not initialized");
+    return static_cast<PhysicsSystem&>(*physicsSystems.front());
+}
+
 void Engine::Draw(const FrameContext& context)
 {
 	for (auto& system : renderSystems)
@@ -146,7 +152,7 @@ bool Engine::LoadScene(const std::string& path, std::string& outError)
             try { result->data = SceneSerializer::Read(filename); }
             catch (const std::exception& error) { result->error = error.what(); }
             catch (...) { result->error = "Unknown scene loading error"; }
-        });
+        }, JobSystem::Priority::Low);
         mPendingScene = std::move(pending);
         mSceneProgress = { true, 0, 0, path, {} };
         TextureBenchmark::Begin(path);

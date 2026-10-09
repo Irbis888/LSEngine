@@ -13,14 +13,20 @@ foreach ($line in $environmentLines) {
     if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
 }
 $project = Join-Path $repo 'Chapter 9 Texturing\Try2'
-$compilerArgs = @('/nologo', '/std:c++20', '/EHsc', '/O2', '/W3',
+$msbuild = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
+& $msbuild (Join-Path $repo 'external\enkiTS\enkiTS.vcxproj') /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw 'enkiTS library did not build.' }
+$compilerArgs = @('/nologo', '/MD', '/std:c++20', '/EHsc', '/O2', '/W3',
     "/I$project", "/I$(Join-Path $repo 'Common')",
+    "/I$(Join-Path $repo 'external\enkiTS\src')",
     "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fe$output\PhysicsBroadPhaseTests.exe",
     (Join-Path $PSScriptRoot 'PhysicsBroadPhaseTests.cpp'),
     (Join-Path $PSScriptRoot 'PhysicsNarrowPhaseTests.cpp'),
     (Join-Path $project 'PhysicsSystem.cpp'),
-    (Join-Path $repo 'Common\GameTimer.cpp'))
+    (Join-Path $project 'JobSystem.cpp'),
+    (Join-Path $repo 'Common\GameTimer.cpp'),
+    '/link', (Join-Path $repo 'external\enkiTS\.build\x64\Release\enkiTS.lib'))
 & cl.exe @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Physics tests did not compile.' }
 & (Join-Path $output 'PhysicsBroadPhaseTests.exe') (Join-Path $project 'Scenes\PhysicsStress256.json') (Join-Path $project 'Scenes\PhysicsMixed512.json')

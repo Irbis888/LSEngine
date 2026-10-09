@@ -109,6 +109,7 @@ public:
     // Main-thread API. Workers produce isolated results; PumpLoading publishes
     // completed results without waiting. Consumers drain requests independently of frames.
     // The JobSystem must outlive this manager, or call ShutdownLoading first.
+    // Admission is also capped at workers - 1 (minimum 1), reserving capacity for physics.
     void InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads = 4);
     void PumpLoading(double maxMilliseconds = 4.0);
     void ShutdownLoading();

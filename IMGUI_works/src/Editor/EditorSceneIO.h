@@ -13,6 +13,7 @@ namespace EditorSceneIO
     inline const char* PhysicsStress256Path() { return "Scenes/PhysicsStress256.json"; }
 
     inline const char* PhysicsMixed512Path() { return "Scenes/PhysicsMixed512.json"; }
+    inline const char* PhysicsStress10000Path() { return "Scenes/PhysicsStress10000.json"; }
 
     void SaveScene(EditorContext& ctx);
     void LoadScene(EditorContext& ctx);

@@ -328,6 +328,7 @@ struct ResourceManager::LoadingState
                 completed.push_back(std::move(result));
             }
             // Take the next request here, without returning to the frame pump.
+            jobs->RunHighPriorityTasks();
         }
     }
 
@@ -360,7 +361,7 @@ struct ResourceManager::LoadingState
                 else retiringConsumers.push_back(consumer.task);
                 consumer.task = {};
             }
-            try { consumer.task = jobs->Submit([this, slot] { Consume(slot); }); }
+            try { consumer.task = jobs->Submit([this, slot] { Consume(slot); }, JobSystem::Priority::Low); }
             catch (...)
             {
                 std::lock_guard lock(mutex);
@@ -427,8 +428,12 @@ void ResourceManager::InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads)
     if (!jobs.IsInitialized()) throw std::logic_error("JobSystem must be initialized first");
     mLoading = std::make_unique<LoadingState>();
     mLoading->jobs = &jobs;
+    // Keep a worker available for latency-sensitive CPU work. With a single
+    // worker, the owner can still run physics through its high-priority Wait.
+    const uint32_t workers = jobs.GetWorkerThreadCount();
+    const uint32_t loadWorkers = workers > 1 ? workers - 1 : 1;
     mLoading->consumers.resize(std::clamp<uint32_t>(maxConcurrentLoads, 1,
-        std::min<uint32_t>(jobs.GetWorkerThreadCount(), 8)));
+        std::min<uint32_t>(loadWorkers, 8)));
 }
 
 void ResourceManager::PumpLoading(double maxMilliseconds)

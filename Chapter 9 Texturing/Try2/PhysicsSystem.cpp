@@ -1,28 +1,111 @@
 #include "PhysicsSystem.h"
 
 #include <vector>
+#include <chrono>
+#include <limits>
+#include <stdexcept>
 
 #include <glm/geometric.hpp>
 
-void PhysicsSystem::Update(entt::registry& reg, const FrameContext& context)
+namespace
 {
-    PhysicsStats::ResetFrameCollisionCount();
-
-    const float dt = context.physDT > 0.0f ? context.physDT : context.timer.DeltaTime();
-
-    Integrate(reg, dt);
-    ResolveCollisions(reg);
+    using Clock = std::chrono::steady_clock;
+    double ElapsedMs(Clock::time_point start)
+    {
+        return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+    }
 }
 
-void PhysicsSystem::Integrate(entt::registry& reg, float dt)
+void PhysicsSystem::SetSchedulingSettings(const SchedulingSettings& settings)
 {
-    auto view = reg.view<TransformComponent, RigidbodyComponent>();
+    if (!settings.parallelThreshold || !settings.rangeSize)
+        throw std::invalid_argument("Physics threshold and range size must be positive");
+    mScheduling = settings;
+}
 
-    for (entt::entity entity : view)
+void PhysicsSystem::Update(entt::registry& reg, const FrameContext& context)
+{
+    ZoneScopedN("PhysicsStep");
+    const auto start = Clock::now();
+    mTimings = {};
+    PhysicsStats::ResetFrameCollisionCount();
+    const float dt = context.physDT > 0.0f ? context.physDT : context.timer.DeltaTime();
+    Prepare(reg);
+    mTimings.prepareMs = ElapsedMs(start);
     {
-        auto& transform = view.get<TransformComponent>(entity);
-        auto& body = view.get<RigidbodyComponent>(entity);
+        ZoneScopedN("PhysicsIntegration");
+        const auto phase = Clock::now();
+        mTimings.parallelIntegration = RunRanges(mBodies.size(),
+            [this, dt](uint32_t begin, uint32_t end) { IntegrateRange(begin, end, dt); });
+        mTimings.integrateMs = ElapsedMs(phase);
+    }
+    {
+        ZoneScopedN("PhysicsInitialAABB");
+        const auto phase = Clock::now();
+        mTimings.parallelAabb = RunRanges(mColliders.size(),
+            [this](uint32_t begin, uint32_t end) { BoundsRange(begin, end); });
+        mTimings.aabbMs = ElapsedMs(phase);
+    }
+    {
+        ZoneScopedN("PhysicsBroadPhaseBuild");
+        const auto phase = Clock::now();
+        mBroadPhase.Build(mBounds);
+        mTimings.broadPhaseMs = ElapsedMs(phase);
+    }
+    const auto solver = Clock::now();
+    ResolveCollisions();
+    mTimings.solverMs = ElapsedMs(solver);
+    mTimings.totalMs = ElapsedMs(start);
+    PhysicsStats::Timings() = mTimings;
+    TracyPlot("Physics prepare ms", mTimings.prepareMs);
+    TracyPlot("Physics integration ms", mTimings.integrateMs);
+    TracyPlot("Physics AABB ms", mTimings.aabbMs);
+    TracyPlot("Physics broad phase ms", mTimings.broadPhaseMs);
+    TracyPlot("Physics solver ms", mTimings.solverMs);
+    TracyPlot("Physics total ms", mTimings.totalMs);
+}
 
+void PhysicsSystem::Prepare(entt::registry& reg)
+{
+    ZoneScopedN("PhysicsPrepare");
+    mBodies.clear();
+    mColliders.clear();
+    auto bodies = reg.view<TransformComponent, RigidbodyComponent>();
+    mBodies.reserve(bodies.size_hint());
+    for (auto entity : bodies)
+        mBodies.push_back({ &bodies.get<TransformComponent>(entity), &bodies.get<RigidbodyComponent>(entity) });
+    auto colliders = reg.view<TransformComponent, ColliderComponent>();
+    mColliders.reserve(colliders.size_hint());
+    // Preserve the old collider view order: the sequential solver depends on it.
+    for (auto entity : colliders)
+        mColliders.push_back({ &colliders.get<TransformComponent>(entity),
+            &colliders.get<ColliderComponent>(entity), reg.try_get<RigidbodyComponent>(entity) });
+    mBounds.resize(mColliders.size());
+    mTimings.bodies = mBodies.size();
+    mTimings.colliders = mColliders.size();
+}
+
+bool PhysicsSystem::RunRanges(size_t count, JobSystem::RangeJob work)
+{
+    if (count > (std::numeric_limits<uint32_t>::max)())
+        throw std::length_error("Physics work exceeds Dispatch capacity");
+    if (mScheduling.parallel && count >= mScheduling.parallelThreshold && mJobs.IsInitialized())
+    {
+        auto task = mJobs.Dispatch(static_cast<uint32_t>(count), std::move(work),
+            mScheduling.rangeSize, JobSystem::Priority::High);
+        mJobs.WaitHighPriority(task);
+        return true;
+    }
+    work(0, static_cast<uint32_t>(count));
+    return false;
+}
+
+void PhysicsSystem::IntegrateRange(uint32_t begin, uint32_t end, float dt)
+{
+    for (uint32_t i = begin; i < end; ++i)
+    {
+        auto& transform = *mBodies[i].transform;
+        auto& body = *mBodies[i].body;
         if (!body.IsDynamic())
             continue;
 
@@ -36,40 +119,33 @@ void PhysicsSystem::Integrate(entt::registry& reg, float dt)
     }
 }
 
-void PhysicsSystem::ResolveCollisions(entt::registry& reg)
+void PhysicsSystem::BoundsRange(uint32_t begin, uint32_t end)
+{
+    for (uint32_t i = begin; i < end; ++i)
+    {
+        const auto& transform = *mColliders[i].transform;
+        mBounds[i] = MakeScaledAABB(transform.position, transform.scale, *mColliders[i].collider);
+    }
+}
+
+void PhysicsSystem::ResolveCollisions()
 {
     ZoneScopedN("PhysicsCollisions");
-    auto view = reg.view<TransformComponent, ColliderComponent>();
-    std::vector<entt::entity> entities(view.begin(), view.end());
-    std::vector<AABB> bounds;
-    bounds.reserve(entities.size());
-    for (entt::entity entity : entities)
-    {
-        const auto& transform = view.get<TransformComponent>(entity);
-        bounds.push_back(MakeScaledAABB(transform.position, transform.scale, view.get<ColliderComponent>(entity)));
-    }
-    {
-        ZoneScopedN("PhysicsBroadPhaseBuild");
-        mBroadPhase.Build(bounds);
-    }
-
     auto& stats = PhysicsStats::BroadPhase();
     stats = {};
-    stats.possiblePairs = entities.empty() ? 0 : entities.size() * (entities.size() - 1) / 2;
-    std::vector<size_t> candidates;
-    for (size_t i = 0; i < entities.size(); ++i)
+    stats.possiblePairs = mColliders.empty() ? 0 : mColliders.size() * (mColliders.size() - 1) / 2;
+    auto& candidates = mCandidates;
+    for (size_t i = 0; i < mColliders.size(); ++i)
     {
         mBroadPhase.Query(i, i + 1, candidates);
         size_t cursor = 0;
         while (cursor < candidates.size())
         {
             const size_t j = candidates[cursor++];
-            const entt::entity a = entities[i];
-            const entt::entity b = entities[j];
-            auto& aTransform = view.get<TransformComponent>(a);
-            const auto& aCollider = view.get<ColliderComponent>(a);
-            auto& bTransform = view.get<TransformComponent>(b);
-            const auto& bCollider = view.get<ColliderComponent>(b);
+            auto& aTransform = *mColliders[i].transform;
+            const auto& aCollider = *mColliders[i].collider;
+            auto& bTransform = *mColliders[j].transform;
+            const auto& bCollider = *mColliders[j].collider;
 
             ++stats.narrowPhaseTests;
             const CollisionManifold collision = GetColliderCollision(mBroadPhase.Bounds(i), aCollider.type, mBroadPhase.Bounds(j), bCollider.type);
@@ -80,8 +156,8 @@ void PhysicsSystem::ResolveCollisions(entt::registry& reg)
             const glm::vec3 aPosition = aTransform.position;
             const glm::vec3 bPosition = bTransform.position;
             ResolveCollision(
-                aTransform, reg.try_get<RigidbodyComponent>(a), aCollider,
-                bTransform, reg.try_get<RigidbodyComponent>(b), bCollider, collision);
+                aTransform, mColliders[i].body, aCollider,
+                bTransform, mColliders[j].body, bCollider, collision);
 
             // Keep the grid current as the sequential solver pushes bodies.
             // Sorting candidates and resuming after j preserves the old pair order.

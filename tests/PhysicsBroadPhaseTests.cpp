@@ -85,7 +85,10 @@ static entt::entity Body(entt::registry& reg, glm::vec3 position, bool dynamic, 
 
 static void TestSolver()
 {
-    PhysicsSystem system;
+    JobSystem jobs;
+    jobs.Init(4);
+    PhysicsSystem system(jobs);
+    system.SetSchedulingSettings({ true, 1, 1 });
     GameTimer timer;
     FrameContext context{timer, {}, 1.0f / 60};
     entt::registry reg;
@@ -184,7 +187,9 @@ static void TestStressScene(const char* path)
     Require(grid.LargeCount() == 1, "Stress scene floor should bypass grid");
     Require(grid.AabbTests() < possible / 2, "Stress scene candidate reduction is insufficient");
 
-    PhysicsSystem system;
+    JobSystem jobs;
+    jobs.Init(4);
+    PhysicsSystem system(jobs);
     GameTimer timer;
     FrameContext context{timer, {}, 1.0f / 60};
     for (int step = 0; step < 600; ++step)
