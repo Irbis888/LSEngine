@@ -5,10 +5,86 @@
 ## Где лежит код
 
 - `ResourceManager.h/.cpp` - CPU-side база ресурсов: meshes, materials, textures.
-- `D3DRenderAdapter.cpp` - lazy upload CPU-ресурсов в GPU-ресурсы.
+- `D3DRenderAdapter.cpp` - ограниченная за кадр очередь GPU-загрузки и привязка готовых ресурсов.
+- `JobSystem.h/.cpp` - независимая CPU-обёртка над enkiTS; никаких ресурсов или GPU внутри.
+- `Engine.cpp` - запуск worker threads и остановка загрузки перед уничтожением движка.
 - `SceneFactory.h/.cpp` - удобная фабрика entity/primitive/camera.
 - `SceneSerializer.cpp` - загрузка ресурсов из JSON-сцены.
 - `DemoScene.cpp` и `Scenes/DemoScene.json` - примеры использования.
+
+## Фоновая загрузка в движке
+
+`ResourceManager` сразу в конструкторе создаёт три `ImageData` без обращения к диску:
+шахматный albedo-плейсхолдер 2×2, белую текстуру для solid material и плоскую normal map.
+`Engine::Init` затем создаёт до четырёх enkiTS workers (оставляя один аппаратный поток главному)
+и вызывает `ResourceManager::InitLoading(mJobs)`.
+
+`Engine::LoadScene` теперь принимает запрос и возвращает сразу. `true` означает, что запрос принят;
+окончание и ошибка доступны через `GetSceneLoadProgress()`. Worker вызывает `SceneSerializer::Read`:
+читает JSON, проверяет значения и создаёт обычные C++-описания объектов. Большой JSON уничтожается на worker,
+а не в рендере. Пока чтение не завершилось, старая сцена продолжает рисоваться; ошибка чтения её сохраняет.
+
+`Engine::Update` публикует описания порциями до 32 объектов и примерно 2 ms за кадр.
+Камера и свет идут первыми, даже если записаны в конце JSON. Старый registry меняется через swap,
+его компоненты удаляются также небольшими порциями. ECS, материалы и запросы ресурсов остаются на главном потоке.
+Во время публикации физика приостановлена и сохранение неполной сцены запрещено.
+Редактор показывает состояние чтения, число созданных объектов и готовых текстур; завершение CPU-публикации
+не означает завершения texture uploads. Счётчик текстур относится ко всему кешу ResourceManager.
+`SceneSerializer::Load` для инструментов/снимков остаётся синхронным и использует те же Read/CreateEntity.
+
+В этом режиме `LoadTexture` / `LoadMesh` только регистрируют запрос и сразу возвращают стабильный ID.
+Состояния ресурсов: `Loading` → `CpuReady` → `Ready`, либо `Failed` с текстом ошибки.
+В начале каждого `D3DRenderAdapter::BeginFrame`, после reset command list:
+
+1. Три встроенные текстуры один раз загружаются на GPU до обычной очереди.
+2. `PumpLoading` проверяет `TaskHandle::IsComplete`, публикует законченные результаты и запускает новые задачи.
+3. Worker читает/декодирует текстуру или импортирует модель через собственный `Assimp::Importer`.
+   Он работает только с собственными request/result; resource maps, ECS, материалы и D3D12 не трогает.
+4. Главный поток публикует `ImageData` / mesh, создаёт материалы импортированной модели и ставит её текстуры в очередь.
+5. GPU pump записывает копирования и transitions. Рендер идёт дальше; `Wait` для незавершённых задач в кадре не вызывается.
+
+Число CPU-загрузок ограничено workers и `maxConcurrentLoads` (по умолчанию 4, максимум 8).
+Остальные запросы остаются в очереди ResourceManager, а не в pipe enkiTS: это предотвращает выполнение декодера
+на главном потоке при переполнении pipe в текущей интеграции. Новые задачи также придерживаются при 32 изображениях
+или 64 MiB данных, ожидающих GPU. Уже выполняющиеся задачи могут добавить ещё до `maxConcurrentLoads` изображений.
+Эти пределы относятся к ожидающим данным; CPU-копии загруженных ресурсов по-прежнему сохраняются.
+
+`D3DRenderAdapter::UploadBudget` по умолчанию: до 4 текстур и 4 мешей за кадр,
+16 MiB полезных данных и 2 ms на финализацию очереди. `SetUploadBudget` позволяет изменить настройки.
+Примитивы загружаются при первом draw вне этого бюджета.
+Время и объём — мягкие пределы: хотя бы один ресурс обрабатывается за кадр, даже если сам превышает лимит.
+Разбиения одной большой текстуры/модели на несколько кадров пока нет.
+
+`GetOrLoadMaterial` только выбирает SRV: пока albedo не готов, берёт шахматную текстуру;
+для незагруженной normal map — плоскую normal map; для отсутствующего albedo — белую.
+После загрузки cached material автоматически начинает использовать новый SRV. Общий descriptor плейсхолдера
+не перезаписывается, поэтому ранее отправленные кадры остаются корректными.
+`Ready` означает, что копирование и barrier уже записаны перед draw в той же direct queue.
+Завершение этих команд на GPU проверяется отдельно по fence; только после него освобождаются upload heaps.
+
+Для модели в `Loading` пока пропускается draw. После импорта её первый запрос на draw ставит mesh
+в GPU-очередь; buffers создаются в следующем `BeginFrame`. Примитивы создаются на CPU сразу, а их buffers
+создаются лениво при первом draw, перед ним в том же command list. Они не ждут GPU-очередь моделей;
+последующие draw используют cached buffers. Пока текстуры грузятся, примитив рисуется с плейсхолдером.
+Назначенные до окончания импорта mesh/submesh material overrides сохраняются.
+
+`Engine::Shutdown` запрещает новые запросы, отменяет ещё не отправленные, дожидается только уже отправленной CPU-работы
+и останавливает scheduler. Приложение затем дожидается GPU перед освобождением ImGui; renderer также делает flush
+при уничтожении. Scheduler должен жить дольше ResourceManager либо loading нужно остановить явно.
+
+Для инструментов и существующих CPU-тестов `ResourceManager` без `InitLoading` оставляет синхронную загрузку.
+Ошибки такого чтения выбрасываются сразу; в движке ошибка сохраняется в ресурсе и выводится в журнал,
+а плейсхолдер остаётся доступным. Асинхронный неудачный запрос остаётся в cache; повторный `LoadTexture` возвращает тот же ID.
+
+Tracy показывает зоны `Texture CPU read and decode`, `Model CPU read and decode`,
+`Publish CPU resources and schedule jobs`, `Bounded GPU resource finalization` и счётчики
+активных/ожидающих CPU jobs, ожидающих GPU текстур, uploads/bytes за кадр.
+
+Проверка: `tests/RunTextureTests.ps1` включает скрытое D3D12-окно, кадры с занятыми workers,
+замену плейсхолдера, лимит GPU uploads, асинхронные ошибки, импорт модели и material overrides,
+GPU readback и проверку D3D12 debug diagnostics. `SceneSwitchStreamingTests.cpp` дополнительно проверяет
+настоящий Engine со сценой `TextureStreaming1000.json`: рендер во время чтения, небольшие порции ECS,
+плейсхолдер в draw, постепенную готовность всех 1000 DDS, сохранение предыдущей сцены при ошибке JSON и shutdown.
 
 ## Главная идея
 
@@ -137,7 +213,7 @@ std::wstring filename;
 ImageData imageData;
 ```
 
-`ResourceManager::LoadTexture` читает файл и получает `ImageData` без GPU-ресурсов. Для `.dds` (без учёта регистра) используется CPU-часть `DDSTextureLoader`; остальные форматы декодируются через `stb_image` в RGBA8. `ImageData` владеет пикселями или сжатыми DDS-блоками, хранит формат, размеры, mip-уровни, массивы и offsets/rowPitch/slicePitch каждого subresource. Offsets остаются корректными при копировании и перемещении данных. Загрузка в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::UploadTexture`.
+`ResourceManager::LoadTexture` регистрирует запрос; worker получает `ImageData` без GPU-ресурсов. Без `InitLoading` чтение выполняется сразу. Для `.dds` (без учёта регистра) используется CPU-часть `DDSTextureLoader`; остальные форматы декодируются через `stb_image` в RGBA8. `ImageData` владеет пикселями или сжатыми DDS-блоками, хранит формат, размеры, mip-уровни, массивы и offsets/rowPitch/slicePitch каждого subresource. Offsets остаются корректными при копировании и перемещении данных. Загрузка в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::UploadTexture`.
 
 ## Создание mesh
 
@@ -155,7 +231,7 @@ MeshID ResourceManager::CreateMesh(Mesh mesh)
 MeshID ResourceManager::LoadMesh(const std::string& path)
 ```
 
-Загружает модель через Assimp.
+Регистрирует модель для импорта через Assimp в worker; без `InitLoading` импортирует сразу.
 
 Используемые Assimp flags:
 
@@ -167,13 +243,11 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
 
 Алгоритм:
 
-1. Assimp читает файл.
-2. Сначала создаются материалы из `scene->mMaterials`.
-3. Для каждого Assimp material читаются diffuse и normal texture пути.
-4. Текстуры читаются через `LoadTexture`; относительные пути сначала проверяются рядом с файлом модели.
-5. Каждый Assimp mesh конвертируется в общий `Mesh`.
-6. Для каждого Assimp mesh создаётся `Submesh` с `indexOffset`, `indexCount` и `MaterialID`.
-7. Готовый `Mesh` сохраняется через `CreateMesh`.
+1. Worker читает файл через Assimp и копирует вершины, индексы, submeshes и описания материалов в собственный результат.
+2. Относительные texture paths проверяются рядом с моделью; изображения пока не читаются.
+3. `PumpLoading` на главном потоке создаёт материалы и вызывает `LoadTexture` для их изображений.
+4. Локальные material indices заменяются на `MaterialID`, применяются сохранённые overrides.
+5. Готовый mesh публикуется под уже выданным `MeshID`.
 
 Normal texture ищется в нескольких Assimp texture slots:
 
@@ -239,8 +313,8 @@ MaterialID CreateSolidMaterial(
 
 Создаёт материал без albedo/normal textures. Renderer потом подставит fallback textures:
 
-- diffuse fallback: `white1x1.dds`
-- normal fallback: `default_nmap.dds`
+- diffuse fallback: встроенная белая RGBA-текстура
+- normal fallback: встроенная плоская normal map
 
 Цвет и roughness всё равно попадут в material constant buffer.
 
@@ -263,7 +337,7 @@ MaterialID CreateTexturedMaterial(
     float roughness = 0.5f);
 ```
 
-Она создаёт `Material`, а изображения читает в CPU-память через `LoadTexture`.
+Она создаёт `Material`, а запросы изображений передаёт в `LoadTexture`.
 
 Пример:
 
@@ -282,13 +356,13 @@ MaterialID cubeMaterial = resources.CreateTexturedMaterial(
 TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 ```
 
-Метод резолвит путь, читает изображение в `Texture::imageData` и возвращает `TextureID`. GPU-ресурсы здесь не создаются.
+Метод резолвит путь, возвращает `TextureID` и ставит запрос в CPU-очередь. Изображение появляется в `Texture::imageData` при публикации результата. Без `InitLoading` оно читается сразу. GPU-ресурсы здесь не создаются.
 
 Кеш использует абсолютный нормализованный путь, поэтому повторная загрузка возвращает прежний ID без повторного чтения. Путь ищется напрямую, затем в `../../Textures`, как раньше в renderer. Исходный filename сохраняется в `Texture`.
 
 Для DDS `DirectX::LoadDDSImageFromFile` проверяет заголовок и объём данных, сохраняя сжатие и mip-цепочку. Остальные изображения читает `stb_image`; результат — RGBA8 с одним mip-уровнем. Unicode filenames поддерживаются через открытие файла по wide-пути.
 
-Ошибка чтения/декодирования выбрасывает `std::runtime_error` с путём. Неуспешная загрузка не попадает в кеш, поэтому после исправления файла можно повторить вызов.
+В синхронном режиме ошибка чтения/декодирования выбрасывает `std::runtime_error` и не попадает в cache. В асинхронном режиме устанавливаются `Failed` и `Texture::error`; renderer сохраняет плейсхолдер.
 
 ## Смена материалов у mesh
 
@@ -321,65 +395,22 @@ mRenderAdapter->SetResourceManager(&mResourceManager);
 
 После этого `D3DRenderAdapter` может читать CPU-ресурсы.
 
-## Lazy GPU upload mesh
+## Очередь GPU uploads
 
-Когда `RenderSystem` вызывает:
+`GetMeshGPU` возвращает cached buffers. Для CPU-ready примитива он сразу вызывает `UploadMesh`,
+поэтому `DrawMesh` / `DrawSubmesh` могут нарисовать его в том же кадре. Остальные готовые CPU mesh
+регистрируются в очереди с возвратом `nullptr`; их draw пропускается до финализации в `BeginFrame`.
+`UploadMesh` создаёт vertex/index default buffers, upload buffers, views и submesh metadata.
+Изменение материалов готового mesh синхронизирует metadata без пересоздания geometry.
 
-```cpp
-mAdapter->DrawMesh(mesh.meshID);
-```
+`GetOrLoadMaterial` кэширует параметры и каждый draw обновляет индексы SRV по наличию готовых GPU-текстур.
+Файлы во время draw не читаются, GPU texture uploads во время draw не выполняются.
 
-`D3DRenderAdapter` делает:
-
-```cpp
-MeshGPU* meshGPU = GetMeshGPU(meshId);
-```
-
-Если mesh ещё не загружен на GPU:
-
-1. `UploadMesh(meshId)` берёт CPU mesh из `ResourceManager`.
-2. Создаёт default GPU vertex buffer.
-3. Создаёт default GPU index buffer.
-4. Создаёт vertex/index buffer views.
-5. Копирует submesh metadata.
-6. Сохраняет `MeshGPU` в `mGeometries`.
-
-Это называется lazy upload: CPU mesh может быть создан заранее, но GPU buffers создаются только при первом draw.
-
-## Lazy GPU upload material and textures
-
-Когда renderer рисует submesh, он берёт material:
-
-```cpp
-MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
-```
-
-Если material ещё не был создан на GPU-side:
-
-1. CPU material читается из `ResourceManager`.
-2. Создаётся `MaterialGPU`.
-3. `color` превращается в `DiffuseAlbedo`.
-4. `roughness` копируется в `Roughness`.
-5. Если есть `albedo TextureID`, renderer получает готовый `ImageData` из `ResourceManager` и загружает его на GPU.
-6. Если есть `normal TextureID`, renderer загружает его `ImageData` на GPU.
-7. Если textures нет или загрузка не удалась, используются fallback textures.
-
-GPU texture loading делает:
-
-```cpp
-D3DRenderAdapter::UploadTexture(TextureID textureId)
-```
-
-Он:
-
-- проверяет GPU-кеш по `TextureID`;
-- получает `Texture::imageData` из ResourceManager;
-- создаёт GPU texture и upload buffer;
-- копирует subresources через `UpdateSubresources` и переводит ресурс в `PIXEL_SHADER_RESOURCE`;
-- создаёт SRV согласно размерности, mip-уровням и массиву изображения;
-- сохраняет `TextureGPU`, удерживая upload buffer в живых.
-
-Адаптер не читает файл и не декодирует изображение. Fallback `white1x1.dds` и `default_nmap.dds` также проходят через ResourceManager.
+`UploadTexture(TextureID)` получает `ImageData`, создаёт default texture и upload heap,
+копирует все subresources через `UpdateSubresources`, записывает barrier, создаёт отдельный SRV и сохраняет `TextureGPU`.
+Прямые вызовы `UploadMesh` / `UploadTexture` доступны для инструментов и требуют открытого command list;
+обычный рендер пользуется ограниченной очередью для моделей и текстур, а примитивы загружает при первом draw.
+Upload buffers текстур и мешей удерживаются до `uploadCompleteFence`, затем удаляются.
 
 ## JSON-сцены и ресурсы
 
@@ -480,28 +511,24 @@ PrintAllTextures();
 
 ## Типичный путь ресурса
 
-Для textured cube из JSON путь выглядит так:
-
-1. `SceneSerializer::Load` читает entity.
-2. `JsonToMesh` видит `"source": "primitive"`.
-3. `JsonToMaterial` создаёт material.
-4. `ResourceManager::LoadTexture(L"bricks2.dds")` читает DDS в `ImageData` и возвращает `TextureID`.
-5. `ResourceManager::CreateMaterial` возвращает `MaterialID`.
-6. `ResourceManager::CreateCube(material)` создаёт CPU mesh.
-7. Entity получает `MeshComponent{ meshId }`.
-8. На первом draw `D3DRenderAdapter::UploadMesh` создаёт GPU buffers.
-9. На первом draw submesh `GetOrLoadMaterial` создаёт `MaterialGPU`.
-10. `D3DRenderAdapter::UploadTexture` загружает готовый `ImageData` на GPU и создаёт SRV.
-11. Renderer bind-ит SRV + material constant buffer и рисует.
+1. `Engine::LoadScene` отправляет чтение и разбор JSON в job; `Engine::Update` постепенно создаёт entity, material и CPU primitive.
+2. `LoadTexture` возвращает ID сразу, данные пока имеют состояние `Loading`.
+3. `BeginFrame` отправляет CPU-запрос worker; отрисовка использует плейсхолдер.
+4. Следующий `PumpLoading` публикует готовое `ImageData`.
+5. GPU pump загружает изображение в пределах бюджета.
+6. Следующий draw материала выбирает его новый SRV автоматически.
+7. После fence освобождается временный upload heap.
 
 ## Текущие ограничения
 
 - Нет unload/release API для CPU ресурсов.
 - ID-генераторы static, а не поля `ResourceManager`; несколько ResourceManager в одном процессе будут делить счётчики.
 - Нет cache для `LoadMesh(path)`: одна и та же модель, загруженная дважды, создаст два разных `MeshID`.
-- CPU material можно создать, но изменение параметров уже загруженного `MaterialGPU` сейчас не имеет полноценного versioning/update path.
+- Material параметры и texture IDs перечитываются при draw; явного versioning/change notification пока нет.
 - Texture cache есть на CPU-side по нормализованному абсолютному пути и на GPU-side по `TextureID`.
-- Чтение и декодирование в `ResourceManager::LoadTexture` пока синхронные; CPU-данные остаются в памяти после GPU upload.
+- CPU-данные остаются в памяти после GPU upload; unload/cancellation при смене сцены пока не реализованы.
+- JSON читается и разбирается в job; создание ECS и генерация отдельных примитивов идут на главном потоке порциями. Один очень большой примитив может превысить мягкий бюджет.
+- Direct queue используется и для uploads, и для draw; отдельной copy queue нет.
 - Для non-DDS используется набор форматов `stb_image`; mip-уровни автоматически не генерируются.
 - `GetMesh/GetMaterial/GetTexture` используют `assert`, поэтому в Release неправильный ID может приводить к плохим последствиям без красивого exception.
 - Нет asset database, GUID, hot reload текстур/материалов и dependency tracking.

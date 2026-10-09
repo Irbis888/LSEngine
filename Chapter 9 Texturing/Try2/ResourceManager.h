@@ -1,9 +1,10 @@
 #pragma once
 #include "Commons.h"
 #include "ImageData.h"
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+#include <deque>
+
+class JobSystem;
+enum class ResourceState { Loading, CpuReady, Ready, Failed };
 
 
 struct Vertex
@@ -38,6 +39,10 @@ struct Vertex
 
 struct Mesh
 {
+    ResourceState state = ResourceState::CpuReady;
+    // Generated primitives upload lazily on their first draw, without the model queue.
+    bool isPrimitive = false;
+    std::string error;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
@@ -78,12 +83,36 @@ struct Texture
     std::string name;
     std::wstring filename;
     ImageData imageData;
+    ResourceState state = ResourceState::CpuReady;
+    std::string error;
 };
 
 
 class ResourceManager
 {
 public:
+    ResourceManager();
+    ~ResourceManager();
+    ResourceManager(const ResourceManager&) = delete;
+    ResourceManager& operator=(const ResourceManager&) = delete;
+
+    // Main-thread API. Workers produce isolated results; PumpLoading publishes
+    // completed results without waiting and admits a bounded number of jobs.
+    // The JobSystem must outlive this manager, or call ShutdownLoading first.
+    void InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads = 4);
+    void PumpLoading();
+    void ShutdownLoading();
+    bool HasPendingLoads() const;
+    size_t GetActiveLoadCount() const;
+    size_t GetQueuedLoadCount() const;
+    struct TextureProgress { size_t total = 0, ready = 0, failed = 0; };
+    TextureProgress GetTextureProgress() const;
+    TextureID GetPlaceholderTexture() const { return mPlaceholderTexture; }
+    TextureID GetWhiteTexture() const { return mWhiteTexture; }
+    TextureID GetFlatNormalTexture() const { return mFlatNormalTexture; }
+    TextureID PeekTextureUpload();
+    void FinishTextureUpload(TextureID id, const std::string& error = {});
+
     MeshID LoadMesh(const std::string& path);
     MeshID CreateMesh(Mesh mesh);
     MeshID CreatePlane(MaterialID material);
@@ -116,6 +145,16 @@ public:
     void PrintAllTextures() const;
 
 private:
+    struct LoadingState;
+    std::unique_ptr<LoadingState> mLoading;
+    TextureID CreateBuiltinTexture(const std::string& name, uint32_t width,
+        uint32_t height, std::vector<uint8_t> pixels);
+    TextureID mPlaceholderTexture = 0;
+    TextureID mWhiteTexture = 0;
+    TextureID mFlatNormalTexture = 0;
+    std::deque<TextureID> mTextureUploads;
+    std::unordered_map<MeshID, MaterialID> mMeshMaterialOverrides;
+    std::unordered_map<MeshID, std::unordered_map<uint32_t, MaterialID>> mSubmeshMaterialOverrides;
     std::unordered_map<MeshID, Mesh> mMeshes;
     std::unordered_map<MaterialID, Material> mMaterials;
     std::unordered_map<TextureID, Texture> mTextures;

@@ -8,6 +8,8 @@
 #include <stdexcept>
 
 namespace fs = std::filesystem;
+void RunResourceStreamingTests(const fs::path& repo, const fs::path& fixtures);
+void RunSceneSwitchStreamingTests(const fs::path& repo, const fs::path& fixtures);
 
 static void Check(bool condition, const char* message)
 {
@@ -195,6 +197,8 @@ int main(int argc, char** argv)
         ids.push_back(resources.LoadTexture((repo / "Textures/textures/Head_Texture.png").wstring()));
         ids.push_back(resources.LoadTexture((repo / "Textures/white1x1.dds").wstring()));
         VerifyUploads(resources, ids);
+        RunResourceStreamingTests(repo, fixtures);
+        RunSceneSwitchStreamingTests(repo, fixtures);
         std::cout << "PASS: stb RGBA/PNG/Unicode; DDS mips/arrays/cubes/1D/3D; cache; invalid-file retry; GPU readback without source files\n";
         return 0;
     }

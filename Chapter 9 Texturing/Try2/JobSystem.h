@@ -31,7 +31,8 @@ public:
     };
 
     using Job = std::function<void()>;
-    // Each callback processes [begin, end); ranges may execute concurrently.
+    // Each callback processes [begin, end); ranges may execute concurrently
+
     using RangeJob = std::function<void(uint32_t begin, uint32_t end)>;
 
     JobSystem() = default;

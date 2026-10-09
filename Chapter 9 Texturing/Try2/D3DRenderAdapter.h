@@ -3,6 +3,8 @@
 #include "d3dUtils.h"
 #include "MathHelper.h"
 #include "FrameRes.h"
+#include <deque>
+#include <unordered_set>
 
 using Microsoft::WRL::ComPtr;
 
@@ -21,6 +23,7 @@ struct Dx12ImGuiBindings
 class D3DRenderAdapter : public IRenderAdapter
 {
 public:
+    ~D3DRenderAdapter() override;
     void Init(void* windowHandle, uint32_t width, uint32_t height) override;
     void BeginFrame() override;
     void EndFrame() override;
@@ -45,8 +48,17 @@ public:
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
 
-    // Cleanup completed mesh uploads (dispose upload buffers once GPU finishes)
+    // Dispose completed mesh and texture upload buffers after the GPU fence.
     void CleanupMeshUploadBuffers();
+    struct UploadBudget
+    {
+        uint32_t maxTextures = 4;
+        uint32_t maxMeshes = 4;
+        size_t maxBytes = 16 * 1024 * 1024;
+        double maxMilliseconds = 2.0;
+    };
+    void SetUploadBudget(const UploadBudget& budget);
+    const UploadBudget& GetUploadBudget() const { return mUploadBudget; }
 
     //void InitDirect3D();
     void CreateCommandObjects();
@@ -64,6 +76,12 @@ public:
     Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
+    void PumpResourceUploads();
+    void EnsureDefaultTextures();
+    UploadBudget mUploadBudget;
+    bool mTextureUploadTurn = true;
+    std::deque<MeshID> mMeshUploads;
+    std::unordered_set<MeshID> mQueuedMeshes;
     HWND      mhMainWnd = nullptr;
     int mClientWidth;
     int mClientHeight;
@@ -165,7 +183,7 @@ public:
     void BuildPSOs();
     std::vector<D3D12_STATIC_SAMPLER_DESC> GetStaticSamplers();
 
-    // Mesh upload (lazy loading from ResourceManager)
+    // GetMeshGPU uploads primitives on first draw; other CPU-ready meshes use the BeginFrame queue.
     void SetResourceManager(class ResourceManager* resourceManager);
     MeshGPU* UploadMesh(MeshID meshId);
     MeshGPU* GetMeshGPU(MeshID meshId);

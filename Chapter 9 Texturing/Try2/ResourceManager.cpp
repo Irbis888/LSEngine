@@ -1,4 +1,8 @@
 #include "ResourceManager.h"
+#include "JobSystem.h"
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 #include <algorithm>
 #include <cmath>
@@ -92,6 +96,391 @@ namespace
     }
 }
 
+namespace
+{
+    struct DecodedModel
+    {
+        Mesh mesh;
+        std::vector<MaterialDesc> materials;
+    };
+
+    DecodedModel DecodeModel(const std::string& path)
+    {
+        ZoneScopedN("Model CPU read and decode");
+        Assimp::Importer importer;
+
+        const aiScene* scene = importer.ReadFile(path,
+            aiProcess_Triangulate |
+            aiProcess_ConvertToLeftHanded |
+            aiProcess_FlipUVs |
+            aiProcess_GenNormals |
+            aiProcess_CalcTangentSpace);
+
+        if (!scene || !scene->mRootNode)
+        {
+            throw std::runtime_error(importer.GetErrorString());
+        }
+
+        DecodedModel result;
+        Mesh& mesh = result.mesh;
+
+        // 1. Сначала загрузим все материалы сцены
+        result.materials.resize(scene->mNumMaterials);
+        const auto modelDirectory = std::filesystem::path(path).parent_path();
+        const auto resolveMaterialTexture = [&](const aiString& texturePath)
+        {
+            const auto relativePath = std::filesystem::path(std::u8string(
+                reinterpret_cast<const char8_t*>(texturePath.C_Str()), texturePath.length));
+            const auto modelPath = modelDirectory / relativePath;
+            return ResolveTexturePath((std::filesystem::exists(modelPath) ? modelPath : relativePath).wstring());
+        };
+
+        for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+        {
+            aiMaterial* aiMat = scene->mMaterials[i];
+
+            MaterialDesc& mat = result.materials[i];
+            mat.name = aiMat->GetName().C_Str();
+
+            aiString texPath;
+
+            // --- DIFFUSE ---
+            if (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS)
+            {
+                mat.albedoTexture = resolveMaterialTexture(texPath);
+            }
+
+            // --- NORMAL ---
+            if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texPath) == AI_SUCCESS ||
+                aiMat->GetTexture(aiTextureType_HEIGHT, 0, &texPath) == AI_SUCCESS ||
+                aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
+            {
+                mat.normalTexture = resolveMaterialTexture(texPath);
+            }
+
+
+        }
+
+        // 2. Грузим меши
+
+        for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
+        {
+            aiMesh* aMesh = scene->mMeshes[m];
+
+            Mesh::Submesh submesh;
+
+            // старт индексов этого submesh в global index buffer
+            submesh.indexOffset = static_cast<uint32_t>(mesh.indices.size());
+            submesh.material = aMesh->mMaterialIndex; // Local material index until main-thread publication.
+
+            uint32_t baseVertex = static_cast<uint32_t>(mesh.vertices.size());
+
+            // =========================
+            // VERTICES
+            // =========================
+            for (unsigned int i = 0; i < aMesh->mNumVertices; ++i)
+            {
+                glm::vec3 pos(
+                    aMesh->mVertices[i].x,
+                    aMesh->mVertices[i].y,
+                    aMesh->mVertices[i].z
+                );
+
+                glm::vec3 normal(0.0f);
+                if (aMesh->HasNormals())
+                {
+                    normal = glm::vec3(
+                        aMesh->mNormals[i].x,
+                        aMesh->mNormals[i].y,
+                        aMesh->mNormals[i].z
+                    );
+                }
+
+                glm::vec3 tangent(0.0f);
+                if (aMesh->HasTangentsAndBitangents())
+                {
+                    tangent = glm::vec3(
+                        aMesh->mTangents[i].x,
+                        aMesh->mTangents[i].y,
+                        aMesh->mTangents[i].z
+                    );
+                }
+
+                glm::vec2 uv(0.0f);
+                if (aMesh->HasTextureCoords(0) && aMesh->mTextureCoords[0])
+                {
+                    uv = glm::vec2(
+                        aMesh->mTextureCoords[0][i].x,
+                        aMesh->mTextureCoords[0][i].y
+                    );
+                }
+
+                mesh.vertices.emplace_back(pos, normal, tangent, uv);
+            }
+
+            // =========================
+            // INDICES
+            // =========================
+            uint32_t localIndexCount = 0;
+
+            for (unsigned int i = 0; i < aMesh->mNumFaces; ++i)
+            {
+                const aiFace& face = aMesh->mFaces[i];
+
+                // Assimp already triangulated
+                for (unsigned int j = 0; j < face.mNumIndices; ++j)
+                {
+                    mesh.indices.push_back(baseVertex + face.mIndices[j]);
+                    localIndexCount++;
+                }
+            }
+
+            submesh.indexCount = localIndexCount;
+
+            mesh.submeshes.push_back(submesh);
+        }
+
+        return result;
+    }
+
+}
+
+struct ResourceManager::LoadingState
+{
+    struct Request
+    {
+        bool texture;
+        uint32_t id;
+        std::string modelPath;
+        std::wstring texturePath;
+    };
+    struct Result
+    {
+        ImageData image;
+        DecodedModel model;
+        std::string error;
+    };
+    struct Active
+    {
+        Request request;
+        std::shared_ptr<Result> result;
+        JobSystem::TaskHandle task;
+    };
+    JobSystem* jobs = nullptr;
+    uint32_t concurrency = 1;
+    bool stopped = false;
+    std::deque<Request> queued;
+    std::vector<Active> active;
+};
+
+ResourceManager::ResourceManager()
+{
+    // Available before starting any jobs; no file access or decoder required.
+    mPlaceholderTexture = CreateBuiltinTexture("Loading checkerboard", 2, 2,
+        { 255, 0, 255, 255, 32, 32, 32, 255,
+          32, 32, 32, 255, 255, 0, 255, 255 });
+    mWhiteTexture = CreateBuiltinTexture("White", 1, 1, { 255, 255, 255, 255 });
+    mFlatNormalTexture = CreateBuiltinTexture("Flat normal", 1, 1, { 128, 128, 255, 255 });
+}
+
+ResourceManager::~ResourceManager()
+{
+    ShutdownLoading();
+}
+
+TextureID ResourceManager::CreateBuiltinTexture(const std::string& name,
+    uint32_t width, uint32_t height, std::vector<uint8_t> pixels)
+{
+    Texture texture;
+    texture.name = name;
+    texture.imageData.width = width;
+    texture.imageData.height = height;
+    texture.imageData.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture.imageData.pixels = std::move(pixels);
+    texture.imageData.subresources.push_back({ 0, size_t(width) * 4, size_t(width) * height * 4 });
+    const TextureID id = gNextTextureID++;
+    mTextures.emplace(id, std::move(texture));
+    // Renderer uploads these three textures before pumping regular resources.
+    return id;
+}
+
+void ResourceManager::InitLoading(JobSystem& jobs, uint32_t maxConcurrentLoads)
+{
+    if (mLoading) throw std::logic_error("Resource loading is already initialized");
+    if (!jobs.IsInitialized()) throw std::logic_error("JobSystem must be initialized first");
+    mLoading = std::make_unique<LoadingState>();
+    mLoading->jobs = &jobs;
+    // Keep admission well below enkiTS pipe capacity, avoiding inline decoder
+    // execution on Submit. The engine reserves a core for the rendering thread.
+    mLoading->concurrency = std::clamp<uint32_t>(maxConcurrentLoads, 1,
+        std::min<uint32_t>(jobs.GetWorkerThreadCount(), 8));
+}
+
+void ResourceManager::PumpLoading()
+{
+    if (!mLoading || mLoading->stopped) return;
+    ZoneScopedN("Publish CPU resources and schedule jobs");
+    auto& loading = *mLoading;
+    for (size_t i = 0; i < loading.active.size();)
+    {
+        auto& active = loading.active[i];
+        if (!active.task.IsComplete()) { ++i; continue; }
+        // IsComplete synchronizes with worker writes. Wait cannot execute an
+        // unfinished task here, and workers never access the resource maps.
+        loading.jobs->Wait(active.task);
+        const uint32_t id = active.request.id;
+        auto& result = *active.result;
+        if (active.request.texture)
+        {
+            auto& texture = GetTexture(id);
+            texture.error = std::move(result.error);
+            texture.state = texture.error.empty() ? ResourceState::CpuReady : ResourceState::Failed;
+            if (texture.error.empty())
+            {
+                texture.imageData = std::move(result.image);
+                mTextureUploads.push_back(id);
+            }
+            else std::cerr << texture.error << '\n';
+        }
+        else
+        {
+            auto& mesh = GetMesh(id);
+            if (!result.error.empty())
+            {
+                mesh.state = ResourceState::Failed;
+                mesh.error = std::move(result.error);
+                std::cerr << mesh.error << '\n';
+            }
+            else
+            {
+                std::vector<MaterialID> materials;
+                for (const auto& desc : result.model.materials)
+                    materials.push_back(CreateTexturedMaterial(desc));
+                for (size_t submeshIndex = 0; submeshIndex < result.model.mesh.submeshes.size(); ++submeshIndex)
+                {
+                    auto& submesh = result.model.mesh.submeshes[submeshIndex];
+                    submesh.material = materials.at(submesh.material);
+                    if (auto override = mMeshMaterialOverrides.find(id); override != mMeshMaterialOverrides.end())
+                        submesh.material = override->second;
+                    if (auto overrides = mSubmeshMaterialOverrides.find(id); overrides != mSubmeshMaterialOverrides.end())
+                        if (auto override = overrides->second.find(uint32_t(submeshIndex)); override != overrides->second.end())
+                            submesh.material = override->second;
+                }
+                mesh = std::move(result.model.mesh);
+            }
+            mMeshMaterialOverrides.erase(id);
+            mSubmeshMaterialOverrides.erase(id);
+        }
+        loading.active.erase(loading.active.begin() + i);
+    }
+
+    // Backpressure bounds decoded data awaiting GPU finalization. A single
+    // image may exceed the soft byte limit; in-flight results add at most
+    // concurrency images. CPU copies already uploaded are retained as before.
+    size_t readyBytes = 0;
+    size_t readyCount = 0;
+    for (const auto& [id, texture] : mTextures)
+        if (texture.state == ResourceState::CpuReady && !texture.filename.empty())
+        { readyBytes += texture.imageData.pixels.size(); ++readyCount; }
+    while (!loading.queued.empty() && loading.active.size() < loading.concurrency &&
+        readyCount + loading.active.size() < 32 && readyBytes < 64 * 1024 * 1024)
+    {
+        auto request = std::move(loading.queued.front());
+        loading.queued.pop_front();
+        auto result = std::make_shared<LoadingState::Result>();
+        auto task = loading.jobs->Submit([request, result]
+        {
+            try
+            {
+                if (request.texture) result->image = LoadImage(request.texturePath);
+                else result->model = DecodeModel(request.modelPath);
+            }
+            catch (const std::exception& error) { result->error = error.what(); }
+            catch (...) { result->error = "Unknown CPU resource loading error"; }
+        });
+        loading.active.push_back({ std::move(request), std::move(result), std::move(task) });
+    }
+    TracyPlot("Resource jobs active", int64_t(loading.active.size()));
+    TracyPlot("Resource requests queued", int64_t(loading.queued.size()));
+    TracyPlot("Textures awaiting GPU", int64_t(readyCount));
+}
+
+void ResourceManager::ShutdownLoading()
+{
+    if (!mLoading || mLoading->stopped) return;
+    auto& loading = *mLoading;
+    loading.stopped = true;
+    // Cancel work not submitted. Submitted callbacks capture only their own
+    // request/result, so never retain a ResourceManager or renderer pointer.
+    for (const auto& request : loading.queued)
+    {
+        if (request.texture)
+        {
+            auto& texture = GetTexture(request.id);
+            texture.state = ResourceState::Failed;
+            texture.error = "Loading cancelled during shutdown";
+        }
+        else
+        {
+            auto& mesh = GetMesh(request.id);
+            mesh.state = ResourceState::Failed;
+            mesh.error = "Loading cancelled during shutdown";
+        }
+    }
+    loading.queued.clear();
+    for (const auto& active : loading.active)
+    {
+        loading.jobs->Wait(active.task);
+        if (active.request.texture)
+        {
+            auto& texture = GetTexture(active.request.id);
+            texture.state = ResourceState::Failed;
+            texture.error = "Loading cancelled during shutdown";
+        }
+        else
+        {
+            auto& mesh = GetMesh(active.request.id);
+            mesh.state = ResourceState::Failed;
+            mesh.error = "Loading cancelled during shutdown";
+        }
+    }
+    loading.active.clear();
+}
+
+bool ResourceManager::HasPendingLoads() const
+{
+    return mLoading && (!mLoading->queued.empty() || !mLoading->active.empty());
+}
+size_t ResourceManager::GetActiveLoadCount() const { return mLoading ? mLoading->active.size() : 0; }
+size_t ResourceManager::GetQueuedLoadCount() const { return mLoading ? mLoading->queued.size() : 0; }
+ResourceManager::TextureProgress ResourceManager::GetTextureProgress() const
+{
+    TextureProgress progress;
+    for (const auto& [id, texture] : mTextures)
+    {
+        if (texture.filename.empty()) continue;
+        ++progress.total;
+        if (texture.state == ResourceState::Ready) ++progress.ready;
+        if (texture.state == ResourceState::Failed) ++progress.failed;
+    }
+    return progress;
+}
+
+TextureID ResourceManager::PeekTextureUpload()
+{
+    while (!mTextureUploads.empty() && GetTexture(mTextureUploads.front()).state != ResourceState::CpuReady)
+        mTextureUploads.pop_front();
+    return mTextureUploads.empty() ? 0 : mTextureUploads.front();
+}
+
+void ResourceManager::FinishTextureUpload(TextureID id, const std::string& error)
+{
+    auto& texture = GetTexture(id);
+    texture.state = error.empty() ? ResourceState::Ready : ResourceState::Failed;
+    texture.error = error;
+    if (!error.empty()) std::cerr << texture.name << ": " << error << '\n';
+}
+
 //--------------------------------------------------------------
 // Mesh
 //--------------------------------------------------------------
@@ -105,147 +494,26 @@ MeshID ResourceManager::CreateMesh(Mesh mesh)
 
 MeshID ResourceManager::LoadMesh(const std::string& path)
 {
-    Assimp::Importer importer;
-
-    const aiScene* scene = importer.ReadFile(path,
-        aiProcess_Triangulate |
-        aiProcess_ConvertToLeftHanded |
-        aiProcess_FlipUVs |
-        aiProcess_GenNormals |
-        aiProcess_CalcTangentSpace);
-
-    if (!scene || !scene->mRootNode)
+    if (mLoading)
     {
-        throw std::runtime_error(importer.GetErrorString());
+        if (mLoading->stopped) throw std::logic_error("Resource loading has stopped");
+        Mesh mesh;
+        mesh.state = ResourceState::Loading;
+        const MeshID id = CreateMesh(std::move(mesh));
+        mLoading->queued.push_back({ false, id, std::filesystem::absolute(path).string(), {} });
+        return id;
     }
-
-    Mesh mesh;
-
-    // 1. Сначала загрузим все материалы сцены
-    std::vector<MaterialID> materialIDs(scene->mNumMaterials);
-    const auto modelDirectory = std::filesystem::path(path).parent_path();
-    const auto loadMaterialTexture = [&](const aiString& texturePath)
-    {
-        const auto relativePath = std::filesystem::path(std::u8string(
-            reinterpret_cast<const char8_t*>(texturePath.C_Str()), texturePath.length));
-        const auto modelPath = modelDirectory / relativePath;
-        return LoadTexture((std::filesystem::exists(modelPath) ? modelPath : relativePath).wstring());
-    };
-
-    for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
-    {
-        aiMaterial* aiMat = scene->mMaterials[i];
-
-        Material mat;
-        mat.name = aiMat->GetName().C_Str();
-
-        aiString texPath;
-
-        // --- DIFFUSE ---
-        if (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS)
-        {
-            mat.albedo = loadMaterialTexture(texPath);
-        }
-
-        // --- NORMAL ---
-        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texPath) == AI_SUCCESS ||
-            aiMat->GetTexture(aiTextureType_HEIGHT, 0, &texPath) == AI_SUCCESS ||
-            aiMat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texPath) == AI_SUCCESS)
-        {
-            mat.normal = loadMaterialTexture(texPath);
-        }
-
-        MaterialID matID = CreateMaterial(mat);
-        materialIDs[i] = matID;
-    }
-
-    // 2. Грузим меши
-    uint32_t vertexOffset = 0;
-    uint32_t indexOffset = 0;
-
-    for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
-    {
-        aiMesh* aMesh = scene->mMeshes[m];
-
-        Mesh::Submesh submesh;
-
-        // старт индексов этого submesh в global index buffer
-        submesh.indexOffset = static_cast<uint32_t>(mesh.indices.size());
-        submesh.material = materialIDs[aMesh->mMaterialIndex];
-
-        uint32_t baseVertex = static_cast<uint32_t>(mesh.vertices.size());
-
-        // =========================
-        // VERTICES
-        // =========================
-        for (unsigned int i = 0; i < aMesh->mNumVertices; ++i)
-        {
-            glm::vec3 pos(
-                aMesh->mVertices[i].x,
-                aMesh->mVertices[i].y,
-                aMesh->mVertices[i].z
-            );
-
-            glm::vec3 normal(0.0f);
-            if (aMesh->HasNormals())
-            {
-                normal = glm::vec3(
-                    aMesh->mNormals[i].x,
-                    aMesh->mNormals[i].y,
-                    aMesh->mNormals[i].z
-                );
-            }
-
-            glm::vec3 tangent(0.0f);
-            if (aMesh->HasTangentsAndBitangents())
-            {
-                tangent = glm::vec3(
-                    aMesh->mTangents[i].x,
-                    aMesh->mTangents[i].y,
-                    aMesh->mTangents[i].z
-                );
-            }
-
-            glm::vec2 uv(0.0f);
-            if (aMesh->HasTextureCoords(0) && aMesh->mTextureCoords[0])
-            {
-                uv = glm::vec2(
-                    aMesh->mTextureCoords[0][i].x,
-                    aMesh->mTextureCoords[0][i].y
-                );
-            }
-
-            mesh.vertices.emplace_back(pos, normal, tangent, uv);
-        }
-
-        // =========================
-        // INDICES
-        // =========================
-        uint32_t localIndexCount = 0;
-
-        for (unsigned int i = 0; i < aMesh->mNumFaces; ++i)
-        {
-            const aiFace& face = aMesh->mFaces[i];
-
-            // Assimp already triangulated
-            for (unsigned int j = 0; j < face.mNumIndices; ++j)
-            {
-                mesh.indices.push_back(baseVertex + face.mIndices[j]);
-                localIndexCount++;
-            }
-        }
-
-        submesh.indexCount = localIndexCount;
-
-        mesh.submeshes.push_back(submesh);
-    }
-
-    return CreateMesh(std::move(mesh));
+    auto decoded = DecodeModel(path);
+    std::vector<MaterialID> materials;
+    for (const auto& desc : decoded.materials) materials.push_back(CreateTexturedMaterial(desc));
+    for (auto& submesh : decoded.mesh.submeshes) submesh.material = materials.at(submesh.material);
+    return CreateMesh(std::move(decoded.mesh));
 }
 
 MeshID ResourceManager::CreatePlane(MaterialID material)
 {
     Mesh mesh;
+    mesh.isPrimitive = true;
 
     mesh.vertices =
     {
@@ -264,6 +532,7 @@ MeshID ResourceManager::CreatePlane(MaterialID material)
 MeshID ResourceManager::CreateCube(MaterialID material)
 {
     Mesh mesh;
+    mesh.isPrimitive = true;
 
     const glm::vec3 positions[8] =
     {
@@ -315,6 +584,7 @@ MeshID ResourceManager::CreateCube(MaterialID material)
 MeshID ResourceManager::CreateSphere(MaterialID material, uint32_t slices, uint32_t stacks)
 {
     Mesh mesh;
+    mesh.isPrimitive = true;
 
     constexpr float pi = 3.14159265358979323846f;
     slices = std::max<uint32_t>(slices, 3);
@@ -438,6 +708,11 @@ void ResourceManager::SetMeshMaterial(MeshID meshId, MaterialID materialId)
     GetMaterial(materialId);
 
     Mesh& mesh = GetMesh(meshId);
+    if (mesh.state == ResourceState::Loading)
+    {
+        mMeshMaterialOverrides[meshId] = materialId;
+        mSubmeshMaterialOverrides.erase(meshId);
+    }
     for (Mesh::Submesh& submesh : mesh.submeshes)
     {
         submesh.material = materialId;
@@ -451,6 +726,11 @@ void ResourceManager::SetSubmeshMaterial(MeshID meshId, uint32_t submeshIndex, M
     GetMaterial(materialId);
 
     Mesh& mesh = GetMesh(meshId);
+    if (mesh.state == ResourceState::Loading)
+    {
+        mSubmeshMaterialOverrides[meshId][submeshIndex] = materialId;
+        return;
+    }
     if (submeshIndex >= mesh.submeshes.size())
     {
         throw std::out_of_range("Submesh index out of range");
@@ -485,7 +765,12 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
     Texture tex;
 
     tex.filename = filename;
-    tex.imageData = LoadImage(resolvedFilename);
+    if (mLoading)
+    {
+        if (mLoading->stopped) throw std::logic_error("Resource loading has stopped");
+        tex.state = ResourceState::Loading;
+    }
+    else tex.imageData = LoadImage(resolvedFilename);
 
     // имя можно вытащить из пути (пока просто копия)
     tex.name = WideToUtf8(filename);
@@ -493,6 +778,8 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
     TextureID id = gNextTextureID++;
     mTextures[id] = std::move(tex);
     mTextureIDsByFilename[resolvedFilename] = id;
+    if (mLoading) mLoading->queued.push_back({ true, id, {}, resolvedFilename });
+    else mTextureUploads.push_back(id);
 
     return id;
 }

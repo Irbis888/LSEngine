@@ -1,5 +1,6 @@
 #include "EditorContext.h"
 #include "ImGuiBridge.h"
+#include <Engine.h>
 
 #include <imgui.h>
 
@@ -25,7 +26,8 @@ bool Editor_IsPhysicsEnabled()
 
 bool Editor_CanEditComponents()
 {
-    return g_EditorContext.mode == EditorMode::Edit;
+    return g_EditorContext.mode == EditorMode::Edit &&
+        (!g_EditorContext.engine || !g_EditorContext.engine->IsSceneLoading());
 }
 
 bool Editor_WantsInputCapture()

@@ -12,16 +12,22 @@ foreach ($line in $environmentLines) {
     if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
 }
 $project = Join-Path $repo 'Chapter 9 Texturing\Try2'
-$compilerArgs = @('/nologo', '/std:c++20', '/permissive', '/EHsc', '/MDd', '/Od', '/Zi', '/W3', '/D_DEBUG', '/DUNICODE', '/D_UNICODE',
-    "/I$project", "/I$(Join-Path $repo 'Common')", "/I$(Join-Path $repo 'external\tracy\public')",
+$msbuild = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
+& $msbuild (Join-Path $repo 'external\enkiTS\enkiTS.vcxproj') /nologo /verbosity:minimal /p:Configuration=Debug /p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw 'enkiTS library did not build.' }
+$compilerArgs = @('/nologo', '/MP2', '/std:c++20', '/permissive', '/EHsc', '/MDd', '/Od', '/Zi', '/W3', '/D_DEBUG', '/DUNICODE', '/D_UNICODE',
+    "/I$project", "/I$(Join-Path $repo 'IMGUI_works\src')", "/I$(Join-Path $repo 'external\enkiTS\src')", "/I$(Join-Path $repo 'Common')", "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fd$output\", "/Fe$output\TextureLoadingTests.exe",
-    (Join-Path $PSScriptRoot 'TextureLoadingTests.cpp'),
-    (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'D3DRenderAdapter.cpp'),
+    (Join-Path $PSScriptRoot 'TextureLoadingTests.cpp'), (Join-Path $PSScriptRoot 'ResourceStreamingTests.cpp'), (Join-Path $PSScriptRoot 'SceneSwitchStreamingTests.cpp'),
+    (Join-Path $project 'Engine.cpp'), (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'CameraControllerSystem.cpp'),
+    (Join-Path $project 'PhysicsSystem.cpp'), (Join-Path $project 'SceneFactory.cpp'), (Join-Path $project 'DemoScene.cpp'),
+    (Join-Path $repo 'Common\GameTimer.cpp'),
+    (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'JobSystem.cpp'), (Join-Path $project 'D3DRenderAdapter.cpp'),
     (Join-Path $project 'd3dUtils.cpp'), (Join-Path $project 'FrameRes.cpp'),
     (Join-Path $project 'Commons.cpp'),
     (Join-Path $repo 'Common\DDSTextureLoader.cpp'), (Join-Path $repo 'Common\MathHelper.cpp'),
     (Join-Path $repo 'Chapter 9 Texturing\TexColumns\CustomBuffer.cpp'),
-    '/link', (Join-Path $repo 'Libs\assimp-vc143-mt.lib'), 'd3d12.lib', 'dxgi.lib', 'd3dcompiler.lib', 'user32.lib')
+    '/link', (Join-Path $repo 'external\enkiTS\.build\x64\Debug\enkiTS.lib'), (Join-Path $repo 'Libs\assimp-vc143-mt.lib'), 'd3d12.lib', 'dxgi.lib', 'd3dcompiler.lib', 'user32.lib')
 & cl.exe @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Texture tests did not compile.' }
 $env:PATH = (Join-Path $project 'dlls') + ';' + $env:PATH

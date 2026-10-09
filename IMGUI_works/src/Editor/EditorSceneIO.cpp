@@ -57,7 +57,7 @@ void EditorSceneIO::LoadScene(EditorContext& ctx, const char* path)
     {
         ctx.selected = entt::null;
         ctx.registry = &ctx.engine->GetRegistry();
-        ctx.statusMessage = std::string("Loaded from ") + path;
+        ctx.statusMessage = std::string("Loading ") + path;
     }
     else
         ctx.statusMessage = "Load failed: " + error;

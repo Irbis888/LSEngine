@@ -1,6 +1,8 @@
 #include "SceneSerializer.h"
 
 #include <fstream>
+#include <filesystem>
+#include <algorithm>
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
@@ -39,76 +41,55 @@ namespace
 
     std::wstring StringToWide(const std::string& value)
     {
-        return std::wstring(value.begin(), value.end());
+        return std::filesystem::path(std::u8string(
+            reinterpret_cast<const char8_t*>(value.data()), value.size())).wstring();
     }
 
-    MaterialID JsonToMaterial(ResourceManager& resources, const json& value, const std::string& fallbackName)
+    MaterialDesc ReadMaterial(const json& value, const std::string& fallbackName)
     {
-        Material material;
+        MaterialDesc material;
         material.name = value.value("name", fallbackName);
         material.color = JsonToVec3(value.value("color", json::array()), glm::vec3(1.0f));
         material.roughness = value.value("roughness", 0.5f);
-
-        if (value.contains("albedo"))
-        {
-            material.albedo = resources.LoadTexture(StringToWide(value.at("albedo").get<std::string>()));
-        }
-
-        if (value.contains("normal"))
-        {
-            material.normal = resources.LoadTexture(StringToWide(value.at("normal").get<std::string>()));
-        }
-
-        return resources.CreateMaterial(material);
+        if (value.contains("albedo")) material.albedoTexture = StringToWide(value.at("albedo").get<std::string>());
+        if (value.contains("normal")) material.normalTexture = StringToWide(value.at("normal").get<std::string>());
+        return material;
     }
 
-    MeshID JsonToMesh(ResourceManager& resources, const json& value, const std::string& entityName)
+    SceneSerializer::MeshDescription ReadMesh(const json& value, const std::string& entityName)
     {
-        if (value.contains("id"))
+        SceneSerializer::MeshDescription mesh;
+        if (value.contains("id")) { mesh.existing = value.at("id").get<MeshID>(); return mesh; }
+        mesh.source = value.value("source", "primitive");
+        if (mesh.source == "model")
         {
-            return value.value("id", 0u);
+            mesh.path = value.at("path").get<std::string>();
+            if (value.contains("material")) mesh.material = ReadMaterial(value.at("material"), entityName + "Material");
         }
-
-        const std::string source = value.value("source", "primitive");
-        if (source == "model")
+        else if (mesh.source == "primitive")
         {
-            const MeshID mesh = resources.LoadMesh(value.at("path").get<std::string>());
-            if (value.contains("material"))
-            {
-                const MaterialID material = JsonToMaterial(
-                    resources,
-                    value.at("material"),
-                    entityName + "Material");
-                resources.SetMeshMaterial(mesh, material);
-            }
-            return mesh;
+            mesh.primitive = value.value("primitive", "cube");
+            if (mesh.primitive != "plane" && mesh.primitive != "cube" && mesh.primitive != "sphere")
+                throw std::runtime_error("Unknown primitive type: " + mesh.primitive);
+            mesh.material = ReadMaterial(value.value("material", json::object()), entityName + "Material");
         }
+        else throw std::runtime_error("Unknown mesh source: " + mesh.source);
+        return mesh;
+    }
 
-        if (source != "primitive")
+    MeshID CreateMesh(ResourceManager& resources, const SceneSerializer::MeshDescription& mesh)
+    {
+        if (mesh.existing) return *mesh.existing;
+        if (mesh.source == "model")
         {
-            throw std::runtime_error("Unknown mesh source: " + source);
+            const MeshID id = resources.LoadMesh(mesh.path);
+            if (mesh.material) resources.SetMeshMaterial(id, resources.CreateTexturedMaterial(*mesh.material));
+            return id;
         }
-
-        const json materialJson = value.value("material", json::object());
-        MaterialID material = JsonToMaterial(resources, materialJson, entityName + "Material");
-        const std::string primitive = value.value("primitive", "cube");
-
-        if (primitive == "plane")
-        {
-            return resources.CreatePlane(material);
-        }
-
-        if (primitive == "cube")
-        {
-            return resources.CreateCube(material);
-        }
-
-        if (primitive == "sphere")
-        {
-            return resources.CreateSphere(material);
-        }
-
-        throw std::runtime_error("Unknown primitive type: " + primitive);
+        const MaterialID material = resources.CreateTexturedMaterial(*mesh.material);
+        if (mesh.primitive == "plane") return resources.CreatePlane(material);
+        if (mesh.primitive == "sphere") return resources.CreateSphere(material);
+        return resources.CreateCube(material);
     }
 
     const char* RigidbodyTypeToString(RigidbodyType type)
@@ -382,78 +363,63 @@ void SceneSerializer::Load(World& world, const std::string& path)
     Load(world, resources, path);
 }
 
-void SceneSerializer::Load(World& world, ResourceManager& resources, const std::string& path)
+SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
 {
-    std::ifstream in(path);
-    if (!in)
-        throw std::runtime_error("Failed to open scene file for reading: " + path);
-
+    ZoneScopedN("Scene CPU read parse and validate");
+    std::ifstream in(std::filesystem::path(StringToWide(path)));
+    if (!in) throw std::runtime_error("Failed to open scene file for reading: " + path);
     json scene;
     in >> scene;
-
-    world.registry.clear();
-
-    for (const json& serializedEntity : scene.value("entities", json::array()))
+    SceneData data;
+    // Use a reference: value("entities", ...) copied the entire JSON tree.
+    if (!scene.contains("entities")) return data;
+    const auto& entities = scene.at("entities");
+    if (!entities.is_array()) throw std::runtime_error("Scene entities must be an array");
+    data.entities.reserve(entities.size());
+    for (const auto& value : entities)
     {
-        entt::entity entity = world.registry.create();
-        const std::string tag = serializedEntity.value("tag", "Entity");
-
-        world.registry.emplace<TagComponent>(
-            entity,
-            TagComponent{ tag });
-
-        world.registry.emplace<TransformComponent>(
-            entity,
-            JsonToTransform(serializedEntity.value("transform", json::object())));
-
-        if (serializedEntity.contains("mesh"))
-        {
-            const json& mesh = serializedEntity.at("mesh");
-            world.registry.emplace<MeshComponent>(
-                entity,
-                MeshComponent{ JsonToMesh(resources, mesh, tag) });
-        }
-
-        if (serializedEntity.contains("camera"))
-        {
-            world.registry.emplace<CameraComponent>(
-                entity,
-                JsonToCamera(serializedEntity.at("camera")));
-        }
-
-        if (serializedEntity.contains("directionalLight"))
-        {
-            world.registry.emplace<DirectionalLightComponent>(
-                entity,
-                JsonToDirectionalLight(serializedEntity.at("directionalLight")));
-        }
-
-        if (serializedEntity.contains("pointLight"))
-        {
-            world.registry.emplace<PointLightComponent>(
-                entity,
-                JsonToPointLight(serializedEntity.at("pointLight")));
-        }
-
-        if (serializedEntity.contains("spotLight"))
-        {
-            world.registry.emplace<SpotLightComponent>(
-                entity,
-                JsonToSpotLight(serializedEntity.at("spotLight")));
-        }
-
-        if (serializedEntity.contains("rigidbody"))
-        {
-            world.registry.emplace<RigidbodyComponent>(
-                entity,
-                JsonToRigidbody(serializedEntity.at("rigidbody")));
-        }
-
-        if (serializedEntity.contains("collider"))
-        {
-            world.registry.emplace<ColliderComponent>(
-                entity,
-                JsonToCollider(serializedEntity.at("collider")));
-        }
+        EntityDescription entity;
+        entity.tag = value.value("tag", "Entity");
+        entity.transform = JsonToTransform(value.value("transform", json::object()));
+        if (value.contains("mesh")) entity.mesh = ReadMesh(value.at("mesh"), entity.tag);
+        if (value.contains("camera")) entity.camera = JsonToCamera(value.at("camera"));
+        if (value.contains("directionalLight")) entity.directionalLight = JsonToDirectionalLight(value.at("directionalLight"));
+        if (value.contains("pointLight")) entity.pointLight = JsonToPointLight(value.at("pointLight"));
+        if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
+        if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
+        if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
+        data.entities.push_back(std::move(entity));
     }
+    // A scene can put its camera last. Publish camera and lights before mesh
+    // batches, so progressive rendering has a valid view from the first batch.
+    const auto priority = [](const EntityDescription& entity)
+    { return entity.camera ? 0 : (entity.directionalLight || entity.pointLight || entity.spotLight ? 1 : 2); };
+    std::stable_sort(data.entities.begin(), data.entities.end(), [&](const auto& a, const auto& b)
+        { return priority(a) < priority(b); });
+    return data; // The large JSON tree is destroyed on the reading worker.
+}
+
+void SceneSerializer::CreateEntity(World& world, ResourceManager& resources, const EntityDescription& description)
+{
+    const entt::entity entity = world.registry.create();
+    try
+    {
+        world.registry.emplace<TagComponent>(entity, TagComponent{ description.tag });
+        world.registry.emplace<TransformComponent>(entity, description.transform);
+        if (description.mesh) world.registry.emplace<MeshComponent>(entity, MeshComponent{ CreateMesh(resources, *description.mesh) });
+        if (description.camera) world.registry.emplace<CameraComponent>(entity, *description.camera);
+        if (description.directionalLight) world.registry.emplace<DirectionalLightComponent>(entity, *description.directionalLight);
+        if (description.pointLight) world.registry.emplace<PointLightComponent>(entity, *description.pointLight);
+        if (description.spotLight) world.registry.emplace<SpotLightComponent>(entity, *description.spotLight);
+        if (description.rigidbody) world.registry.emplace<RigidbodyComponent>(entity, *description.rigidbody);
+        if (description.collider) world.registry.emplace<ColliderComponent>(entity, *description.collider);
+    }
+    catch (...) { world.registry.destroy(entity); throw; }
+}
+
+void SceneSerializer::Load(World& world, ResourceManager& resources, const std::string& path)
+{
+    auto data = Read(path);
+    world.registry.clear();
+    for (const auto& entity : data.entities) CreateEntity(world, resources, entity);
 }

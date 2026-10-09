@@ -34,7 +34,9 @@ Application::Application(HINSTANCE hInstance)
 
 Application::~Application()
 {
-   
+    // Engine drains CPU jobs while its resource manager and renderer still exist.
+    mEngine.reset();
+    mRenderAdapter.reset();
 }
 HINSTANCE Application::AppInst() const
 {
@@ -159,6 +161,8 @@ int Application::Run()
 		
 	}
 
+	if (mEngine) mEngine->Shutdown();
+	if (mRenderAdapter) static_cast<D3DRenderAdapter*>(mRenderAdapter.get())->FlushCommandQueue();
 	ImGuiBridge::OnApplicationShutdown();
 	return (int)msg.wParam;
 }

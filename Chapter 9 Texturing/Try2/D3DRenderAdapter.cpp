@@ -2,6 +2,8 @@
 #include "TextureBenchmark.h"
 
 #include <stdexcept>
+#include <chrono>
+#include <cmath>
 #include <assert.h>
 #include "ResourceManager.h"
 
@@ -34,6 +36,81 @@ namespace
 
         gpuMesh.materialVersion = cpuMesh.materialVersion;
     }
+}
+
+D3DRenderAdapter::~D3DRenderAdapter()
+{
+    // No texture/mesh/upload heap may disappear while queued commands use it.
+    if (mCommandQueue && mFence)
+    {
+        try { FlushCommandQueue(); }
+        catch (...) { OutputDebugStringA("GPU flush failed during renderer shutdown\n"); }
+    }
+}
+
+void D3DRenderAdapter::SetUploadBudget(const UploadBudget& budget)
+{
+    if (!budget.maxTextures || !budget.maxMeshes || !budget.maxBytes ||
+        !std::isfinite(budget.maxMilliseconds) || budget.maxMilliseconds <= 0)
+        throw std::invalid_argument("Upload budget limits must be positive");
+    mUploadBudget = budget;
+}
+
+void D3DRenderAdapter::EnsureDefaultTextures()
+{
+    if (!mResourceManager) return;
+    if (UploadTexture(mResourceManager->GetPlaceholderTexture()) < 0 ||
+        UploadTexture(mResourceManager->GetWhiteTexture()) < 0 ||
+        UploadTexture(mResourceManager->GetFlatNormalTexture()) < 0)
+        throw std::runtime_error("Could not create default GPU textures");
+}
+
+void D3DRenderAdapter::PumpResourceUploads()
+{
+    if (!mResourceManager) return;
+    // This is called only after resetting the frame command list. Uploads and
+    // draws use one queue, so copy + transition precede sampling in this frame.
+    EnsureDefaultTextures();
+    mResourceManager->PumpLoading();
+    ZoneScopedN("Bounded GPU resource finalization");
+    const auto start = std::chrono::steady_clock::now();
+    size_t uploadedBytes = 0;
+    uint32_t textures = 0, meshes = 0;
+    bool textureTurn = mTextureUploadTurn;
+    mTextureUploadTurn = !mTextureUploadTurn;
+    for (;;)
+    {
+        const TextureID texture = textures < mUploadBudget.maxTextures ? mResourceManager->PeekTextureUpload() : 0;
+        const bool meshAvailable = meshes < mUploadBudget.maxMeshes && !mMeshUploads.empty();
+        if (!texture && !meshAvailable) break;
+        const bool uploadTexture = texture && (textureTurn || !meshAvailable);
+        const MeshID mesh = meshAvailable ? mMeshUploads.front() : 0;
+        const size_t bytes = uploadTexture ? mResourceManager->GetTexture(texture).imageData.pixels.size()
+            : mResourceManager->GetMesh(mesh).vertices.size() * sizeof(Vertex) +
+              mResourceManager->GetMesh(mesh).indices.size() * sizeof(uint32_t);
+        // At least one resource progresses even if it exceeds the soft budget.
+        if (textures + meshes > 0 && (bytes > mUploadBudget.maxBytes - std::min(uploadedBytes, mUploadBudget.maxBytes) ||
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= mUploadBudget.maxMilliseconds))
+            break;
+        if (uploadTexture)
+        {
+            if (UploadTexture(texture) < 0)
+                mResourceManager->FinishTextureUpload(texture, "GPU texture upload failed (resource creation or SRV capacity)");
+            ++textures;
+        }
+        else
+        {
+            UploadMesh(mesh);
+            mMeshUploads.pop_front();
+            mQueuedMeshes.erase(mesh);
+            ++meshes;
+        }
+        uploadedBytes += bytes;
+        textureTurn = !uploadTexture;
+    }
+    TracyPlot("Texture uploads this frame", int64_t(textures));
+    TracyPlot("Mesh uploads this frame", int64_t(meshes));
+    TracyPlot("GPU upload bytes this frame", int64_t(uploadedBytes));
 }
 
 // -------------------------------------------------------------
@@ -271,6 +348,7 @@ void D3DRenderAdapter::BeginFrame()
     // Reset command allocator for this frame
     ThrowIfFailed(mCurrFrameResource->CmdListAlloc->Reset());
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
+    PumpResourceUploads();
 
     // Update pass constants for this frame
     //UpdateMainPassCB();
@@ -967,6 +1045,8 @@ void D3DRenderAdapter::BuildPSOs()
 void D3DRenderAdapter::SetResourceManager(ResourceManager* resourceManager)
 {
     mResourceManager = resourceManager;
+    mMeshUploads.clear();
+    mQueuedMeshes.clear();
 }
 
 MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
@@ -986,6 +1066,7 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
     // Get CPU mesh data from ResourceManager
     Mesh& cpuMesh = mResourceManager->GetMesh(meshId);
 
+    if (cpuMesh.state == ResourceState::Loading || cpuMesh.state == ResourceState::Failed) return nullptr;
     if (cpuMesh.vertices.empty() || cpuMesh.indices.empty())
     {
         throw std::runtime_error("Mesh has no vertices or indices");
@@ -1048,6 +1129,7 @@ MeshGPU* D3DRenderAdapter::UploadMesh(MeshID meshId)
     // Store in geometry map
     MeshGPU* result = meshGPU.get();
     mGeometries[meshId] = std::move(meshGPU);
+    cpuMesh.state = ResourceState::Ready;
 
     return result;
 }
@@ -1067,8 +1149,13 @@ MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
         return it->second.get();
     }
 
-    // Lazy load
-    return UploadMesh(meshId);
+    if (!mResourceManager) return nullptr;
+    const auto& mesh = mResourceManager->GetMesh(meshId);
+    if (mesh.state == ResourceState::Loading || mesh.state == ResourceState::Failed) return nullptr;
+    // Record the copies and barriers before this draw so a primitive needs no extra frame.
+    if (mesh.isPrimitive) return UploadMesh(meshId);
+    if (mQueuedMeshes.insert(meshId).second) mMeshUploads.push_back(meshId);
+    return nullptr; // Finalization occurs in BeginFrame, within the upload budget.
 }
 
 void D3DRenderAdapter::DrawMesh(MeshID meshId)
@@ -1100,7 +1187,7 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
 	{
 		const auto& submesh = meshGPU->submeshes[i];
 
-		// Get or load material (this will lazily load textures on first use)
+		// Refresh material SRVs, using defaults until the upload pump publishes textures.
 		MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
 
 		// Bind textures if available
@@ -1160,7 +1247,7 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
         mCurrFrameResource->ObjectCB->ElementByteSize();
     mCommandList->SetGraphicsRootConstantBufferView(2, objectCBAddress);
 
-    // Get or load material (this will lazily load textures on first use)
+    // Refresh material SRVs, using defaults until the upload pump publishes textures.
     MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
 
     // Bind textures if available
@@ -1205,7 +1292,8 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
 
     const Texture& cpuTexture = mResourceManager->GetTexture(textureId);
     const ImageData& image = cpuTexture.imageData;
-    if (image.pixels.empty() || image.subresources.empty()) return -1;
+    if (cpuTexture.state == ResourceState::Loading || cpuTexture.state == ResourceState::Failed ||
+        image.pixels.empty() || image.subresources.empty()) return -1;
     ZoneScopedN("Texture GPU upload");
 
     D3D12_RESOURCE_DESC desc = {};
@@ -1302,72 +1390,36 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
     md3dDevice->CreateShaderResourceView(textureGPU->Resource.Get(), &srvDesc, handle);
     const int srvIndex = static_cast<int>(mNextCbvSrvIndex++);
     textureGPU->SrvHeapIndex = srvIndex;
+    textureGPU->uploadCompleteFence = mCurrentFence + 1;
     mTextures[key] = std::move(textureGPU);
+    mResourceManager->FinishTextureUpload(textureId);
     return srvIndex;
 }
 
 MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
 {
-    if (!mResourceManager)
-        return nullptr;
-
-    std::string matKey = std::to_string((uint32_t)materialId);
-    auto it = mMaterials.find(matKey);
-    if (it != mMaterials.end())
+    if (!mResourceManager) return nullptr;
+    const auto& cpuMaterial = mResourceManager->GetMaterial(materialId);
+    auto& material = mMaterials[std::to_string(materialId)];
+    if (!material) material = std::make_unique<MaterialGPU>();
+    material->Name = cpuMaterial.name;
+    material->DiffuseAlbedo = DirectX::XMFLOAT4(cpuMaterial.color.x,
+        cpuMaterial.color.y, cpuMaterial.color.z, 1.0f);
+    material->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
+    material->Roughness = cpuMaterial.roughness;
+    const auto descriptor = [&](TextureID id, TextureID fallback)
     {
-        return it->second.get();
-    }
-
-    Material& cpuMaterial = mResourceManager->GetMaterial(materialId);
-
-    auto materialGPU = std::make_unique<MaterialGPU>();
-    materialGPU->Name = cpuMaterial.name;
-    materialGPU->DiffuseAlbedo = DirectX::XMFLOAT4(
-        cpuMaterial.color.x,
-        cpuMaterial.color.y,
-        cpuMaterial.color.z,
-        1.0f);
-    materialGPU->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-    materialGPU->Roughness = cpuMaterial.roughness;
-
-    MaterialGPU* matGPU = materialGPU.get();
-
-    if (cpuMaterial.albedo != 0)
-    {
-        try
-        {
-            matGPU->DiffuseSrvHeapIndex = UploadTexture(cpuMaterial.albedo);
-        }
-        catch (...)
-        {
-            // Texture not found or loading failed - leave as -1
-        }
-    }
-
-    if (cpuMaterial.normal != 0)
-    {
-        try
-        {
-            matGPU->NormalSrvHeapIndex = UploadTexture(cpuMaterial.normal);
-        }
-        catch (...)
-        {
-            // Texture not found or loading failed - leave as -1
-        }
-    }
-
-    if (matGPU->DiffuseSrvHeapIndex < 0)
-    {
-        matGPU->DiffuseSrvHeapIndex = UploadTexture(mResourceManager->LoadTexture(L"white1x1.dds"));
-    }
-
-    if (matGPU->NormalSrvHeapIndex < 0)
-    {
-        matGPU->NormalSrvHeapIndex = UploadTexture(mResourceManager->LoadTexture(L"default_nmap.dds"));
-    }
-
-    mMaterials[matKey] = std::move(materialGPU);
-    return matGPU;
+        auto found = mTextures.find(std::to_string(id));
+        if (found != mTextures.end()) return found->second->SrvHeapIndex;
+        return mTextures.at(std::to_string(fallback))->SrvHeapIndex;
+    };
+    // Re-evaluate every draw: a cached material switches to the real SRV as
+    // soon as the upload pump publishes it. Shared fallback SRVs are never
+    // overwritten, so frames already submitted remain valid.
+    material->DiffuseSrvHeapIndex = descriptor(cpuMaterial.albedo,
+        cpuMaterial.albedo ? mResourceManager->GetPlaceholderTexture() : mResourceManager->GetWhiteTexture());
+    material->NormalSrvHeapIndex = descriptor(cpuMaterial.normal, mResourceManager->GetFlatNormalTexture());
+    return material.get();
 }
 
 void D3DRenderAdapter::CleanupMeshUploadBuffers()
@@ -1382,6 +1434,14 @@ void D3DRenderAdapter::CleanupMeshUploadBuffers()
             meshGPU->vertexUploadBuffer.Reset();
             meshGPU->indexUploadBuffer.Reset();
             meshGPU->uploadCompleteFence = 0;  // Mark as cleaned up
+        }
+    }
+    for (auto& [key, texture] : mTextures)
+    {
+        if (texture->uploadCompleteFence && mFence->GetCompletedValue() >= texture->uploadCompleteFence)
+        {
+            texture->UploadHeap.Reset();
+            texture->uploadCompleteFence = 0;
         }
     }
 }

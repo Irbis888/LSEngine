@@ -1,6 +1,7 @@
 #include "EditorContext.h"
 #include "EditorSceneIO.h"
 #include <ResourceManager.h>
+#include <Engine.h>
 #include <SceneFactory.h>
 
 #include <Windows.h>
@@ -275,7 +276,7 @@ static void DrawMainMenu(EditorContext& ctx)
 
         if (ImGui::MenuItem("Restore Play Snapshot Now", EditorSceneIO::PlaySnapshotPath()))
             EditorSceneIO::RestorePlaySnapshot(ctx);
-        ImGui::SetItemTooltip("Loads %s immediately (works in Play or Edit).", EditorSceneIO::PlaySnapshotPath());
+        ImGui::SetItemTooltip("Loads %s in the background (works in Play or Edit).", EditorSceneIO::PlaySnapshotPath());
 
         ImGui::EndMenu();
     }
@@ -332,6 +333,28 @@ static void DrawToolbar(EditorContext& ctx)
     ImGui::SameLine();
     ImGui::TextDisabled("| Undo/Redo [PLACEHOLDER]");
 
+    if (ctx.engine)
+    {
+        const auto& scene = ctx.engine->GetSceneLoadProgress();
+        if (scene.active)
+        {
+            if (scene.total) ImGui::Text("Scene objects: %zu / %zu", scene.created, scene.total);
+            else ImGui::TextUnformatted("Reading scene...");
+        }
+        else if (!scene.error.empty())
+        {
+            ImGui::TextWrapped("Scene load failed: %s", scene.error.c_str());
+        }
+        if (ctx.resources)
+        {
+            const auto textures = ctx.resources->GetTextureProgress();
+            if (textures.total)
+            {
+                    ImGui::Text("Textures: %zu / %zu", textures.ready, textures.total);
+                if (textures.failed) { ImGui::SameLine(); ImGui::Text("(%zu failed)", textures.failed); }
+            }
+        }
+    }
     if (!ctx.statusMessage.empty())
     {
         ImGui::SameLine();
@@ -343,6 +366,15 @@ void Editor_BeginFrame(const FrameContext& context)
 {
     (void)context;
     EditorContext& ctx = *Editor_GetContext();
+    static bool wasLoading = false;
+    const bool loading = ctx.engine && ctx.engine->IsSceneLoading();
+    if (loading || wasLoading) ctx.selected = entt::null;
+    if (wasLoading && !loading)
+    {
+        const auto& scene = ctx.engine->GetSceneLoadProgress();
+        ctx.statusMessage = scene.error.empty() ? "Loaded from " + scene.path : "Load failed: " + scene.error;
+    }
+    wasLoading = loading;
     ImGuizmo::BeginFrame();
     DrawMainMenu(ctx);
     DrawToolbar(ctx);

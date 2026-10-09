@@ -2,7 +2,7 @@
 
 ## Overview
 
-You now have a **lazy-loading mesh upload system** that bridges CPU mesh data (from `ResourceManager`) to GPU resources (D3D12 buffers).
+Imported mesh requests use the bounded resource upload pump in `BeginFrame`. Generated planes, cubes, and spheres upload lazily on their first draw, with copies and barriers recorded before that draw in the same command list. See `RESOURCE_MANAGER.md` for CPU jobs, placeholders, upload budgets, and shutdown. `GetMeshGPU` returns `nullptr` while an imported mesh is pending.
 
 ## Architecture
 
@@ -17,8 +17,8 @@ You now have a **lazy-loading mesh upload system** that bridges CPU mesh data (f
 
 2. **Upload Functions** (in `D3DRenderAdapter`)
    - `SetResourceManager(ResourceManager* rm)`: Must call once after creating adapter to link mesh data
-   - `UploadMesh(MeshID meshId)`: Synchronously uploads mesh to GPU (idempotent - safe to call multiple times)
-   - `GetMeshGPU(MeshID meshId)`: Convenience function that auto-uploads if not already uploaded (lazy load)
+   - `UploadMesh(MeshID meshId)`: Records GPU upload commands and caches the buffers (idempotent; requires an open command list)
+   - `GetMeshGPU(MeshID meshId)`: Returns cached buffers, uploads a CPU-ready primitive immediately, or queues another CPU-ready mesh for a later BeginFrame (returns nullptr while pending)
 
 ## Usage Pattern
 
@@ -41,20 +41,24 @@ adapter.SetResourceManager(&resourceMgr);
 // After ResourceManager has loaded mesh data
 MeshID sponzaMeshId = resourceMgr.LoadMesh("Assets/Sponza.gltf");
 
-// Upload to GPU when needed (e.g., in first frame or on-demand)
+// Explicit tools/tests path: a command list must be open.
+adapter.BeginFrame();
 MeshGPU* gpuMesh = adapter.UploadMesh(sponzaMeshId);
+// gpuMesh can be nullptr while an asynchronous CPU import is pending.
+adapter.EndFrame();
 
 // Use gpuMesh->vbView and gpuMesh->ibView in draw calls
 ```
 
-### Step 2b: Lazy Load (Automatic on-demand)
+### Step 2b: Queue on Demand
 
 ```cpp
 // Called during render pass for each entity
 MeshID entityMeshId = entity.meshComponent.meshId;
 
-// Automatically uploads if not already uploaded
+// Queues if not already uploaded; finalization runs in BeginFrame
 MeshGPU* gpuMesh = adapter.GetMeshGPU(entityMeshId);
+if (!gpuMesh) return; // Try again after the next BeginFrame upload pump.
 
 // Bind and draw
 mCommandList->IASetVertexBuffers(0, 1, &gpuMesh->vbView);
@@ -69,12 +73,12 @@ mCommandList->DrawIndexedInstanced(gpuMesh->indexCount, 1, 0, 0, 0);
 1. **Fetch CPU Data**: Get vertex/index arrays from ResourceManager via MeshID
 2. **Create GPU Buffers**: 
    - Uses `d3dUtils::CreateDefaultBuffer()` to create GPU default buffers
-   - Staging: Upload buffers are created internally and kept alive in `mOwnedResources`
+   - Staging: Upload buffers are stored in MeshGPU until its uploadCompleteFence
 3. **Create Views**: 
    - Vertex buffer view with correct stride (sizeof(Vertex) = 44 bytes)
    - Index buffer view with DXGI_FORMAT_R32_UINT format
 4. **Store**: MeshGPU struct stored in `mGeometries` map with MeshID as key
-5. **Lifecycle**: Upload buffers kept alive until GPU work completes via `FlushCommandQueue()`
+5. **Lifecycle**: CleanupMeshUploadBuffers releases staging buffers once the GPU fence completes; normal frames do not flush for each upload
 
 ### Vertex Format (44 bytes stride)
 
@@ -95,10 +99,11 @@ This matches the input layout defined in `BuildShadersAndInputLayout()`.
 
 - **NOT at adapter Init()**: ResourceManager may not have loaded meshes yet
 - **After ResourceManager is ready**: Call `SetResourceManager()` first
-- **Lazy load strategy (recommended)**: Call `GetMeshGPU()` when rendering an entity
-  - First entity with mesh: Triggers upload
-  - Subsequent entities with same mesh: Returns cached GPU resource
-  - Zero overhead after first use
+- **Queued upload strategy**: Call `GetMeshGPU()` when rendering an entity
+  - First request for a CPU-ready primitive: Records the upload and returns usable buffers for this draw
+  - First request for another CPU-ready mesh: Queues upload and returns nullptr
+  - A subsequent BeginFrame processes queued meshes within its upload budget
+  - Subsequent entities with an uploaded mesh receive cached GPU buffers
 
 ## Integration with Draw Calls
 
@@ -115,21 +120,22 @@ if (mesh) {
 
 ## Key Design Decisions
 
-1. **Lazy Loading**: Meshes uploaded on-demand, not at Init
+1. **On-demand Uploads**: Primitives upload on first draw; other meshes are finalized in BeginFrame
    - Supports async resource loading
    - No upfront cost for unused meshes
 
 2. **Idempotent**: `UploadMesh()` safe to call multiple times
    - Returns cached GPU resource if already uploaded
-   - No re-uploads or GPU stalls
+   - Cached geometry is reused
 
 3. **Resource Ownership**: 
    - MeshGPU stored in `mGeometries` map
-   - Upload buffers kept alive in `mOwnedResources` until GPU completes
+   - Upload buffers kept alive in MeshGPU until its fence completes
 
 4. **Error Handling**:
    - Throws if ResourceManager not set
-   - Throws if mesh is empty (no vertices/indices)
+   - Returns nullptr while CPU import is pending or failed
+   - Throws if a CPU-ready mesh has no vertices/indices
    - Propagates D3D12 errors via `ThrowIfFailed()`
 
 ## Next Steps

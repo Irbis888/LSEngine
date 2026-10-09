@@ -3,10 +3,16 @@
 #include "Commons.h"
 #include "World.h"
 #include "ResourceManager.h"
+#include "JobSystem.h"
 
 class Engine
 {
 private:
+    struct PendingScene;
+    std::unique_ptr<PendingScene> mPendingScene;
+    std::unique_ptr<World> mRetiredWorld;
+    void PumpSceneLoading();
+    bool mStartupScene = false;
 	World world;
 
 	std::vector<std::unique_ptr<ISystem>> updateSystems;
@@ -14,11 +20,22 @@ private:
 	std::vector<std::unique_ptr<ISystem>> renderSystems;
 
     IRenderAdapter* mRenderAdapter;
+	JobSystem mJobs; // Must outlive ResourceManager's submitted work.
 	ResourceManager mResourceManager;
 public:
-    Engine(IRenderAdapter* renderer)
-        : mRenderAdapter(renderer) {
+    Engine(IRenderAdapter* renderer);
+    ~Engine();
+    void Shutdown();
+    struct SceneLoadProgress
+    {
+        bool active = false;
+        size_t created = 0;
+        size_t total = 0;
+        std::string path;
+        std::string error;
     };
+    const SceneLoadProgress& GetSceneLoadProgress() const { return mSceneProgress; }
+    bool IsSceneLoading() const { return mSceneProgress.active; }
 
 	void Init(const GameTimer& gt);
 	void Update(const FrameContext& context);
@@ -31,4 +48,6 @@ public:
 
 	bool SaveScene(const std::string& path, std::string& outError);
 	bool LoadScene(const std::string& path, std::string& outError);
+private:
+    SceneLoadProgress mSceneProgress;
 };

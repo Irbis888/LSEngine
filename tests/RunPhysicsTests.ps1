@@ -27,15 +27,18 @@ if ($LASTEXITCODE -ne 0) { throw 'Physics tests did not compile.' }
 if ($LASTEXITCODE -ne 0) { throw 'Physics tests failed.' }
 
 
-$sceneCompilerArgs = @('/nologo', '/std:c++20', '/permissive', '/EHsc', '/O2', '/W3',
-    "/I$project", "/I$(Join-Path $repo 'Common')",
+$msbuild = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
+& $msbuild (Join-Path $repo 'external\enkiTS\enkiTS.vcxproj') /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw 'enkiTS library did not build.' }
+$sceneCompilerArgs = @('/nologo', '/MD', '/std:c++20', '/permissive', '/EHsc', '/O2', '/W3',
+    "/I$project", "/I$(Join-Path $repo 'external\enkiTS\src')", "/I$(Join-Path $repo 'Common')",
     "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fe$output\SceneLoadingTests.exe",
     (Join-Path $PSScriptRoot 'SceneLoadingTests.cpp'),
     (Join-Path $project 'SceneSerializer.cpp'),
-    (Join-Path $project 'ResourceManager.cpp'),
+    (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'JobSystem.cpp'),
     (Join-Path $repo 'Common\DDSTextureLoader.cpp'),
-    '/link', 'd3d12.lib', 'dxgi.lib',
+    '/link', (Join-Path $repo 'external\enkiTS\.build\x64\Release\enkiTS.lib'), 'd3d12.lib', 'dxgi.lib',
     (Join-Path $repo 'Libs\assimp-vc143-mt.lib'))
 & cl.exe @sceneCompilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Scene loader tests did not compile.' }

@@ -176,6 +176,7 @@ struct TextureGPU
 
     Microsoft::WRL::ComPtr<ID3D12Resource> Resource = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> UploadHeap = nullptr;
+    UINT64 uploadCompleteFence = 0;
 
     // Index into SRV heap for this texture
     int SrvHeapIndex = -1;
