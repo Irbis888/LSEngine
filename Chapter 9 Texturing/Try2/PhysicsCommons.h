@@ -248,6 +248,24 @@ inline CollisionManifold GetColliderCollision(
 
 namespace PhysicsStats
 {
+    struct StepTimings
+    {
+        double prepareMs = 0;
+        double integrateMs = 0;
+        double aabbMs = 0;
+        double broadPhaseMs = 0;
+        double solverMs = 0; // Includes grid updates and re-queries after correction.
+        double totalMs = 0;
+        size_t bodies = 0;
+        size_t colliders = 0;
+        bool parallelIntegration = false;
+        bool parallelAabb = false;
+    };
+    inline StepTimings& Timings()
+    {
+        static StepTimings timings;
+        return timings;
+    }
     // All counters describe the last completed physics step, not a render frame.
     struct BroadPhaseStats
     {

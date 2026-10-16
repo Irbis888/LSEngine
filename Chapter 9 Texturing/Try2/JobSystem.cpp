@@ -8,6 +8,16 @@
 
 namespace
 {
+    enki::TaskPriority ToEnkiPriority(JobSystem::Priority priority)
+    {
+        switch (priority)
+        {
+        case JobSystem::Priority::High: return enki::TASK_PRIORITY_HIGH;
+        case JobSystem::Priority::Normal: return enki::TASK_PRIORITY_MED;
+        case JobSystem::Priority::Low: return enki::TASK_PRIORITY_LOW;
+        }
+        throw std::invalid_argument("Invalid job priority");
+    }
     struct ExecutionContext
     {
         JobSystem* system = nullptr;
@@ -119,24 +129,25 @@ void JobSystem::Shutdown()
     // captured exception; Shutdown and destruction only drain/join work.
 }
 
-JobSystem::TaskHandle JobSystem::Submit(Job job)
+JobSystem::TaskHandle JobSystem::Submit(Job job, Priority priority)
 {
     if (!job) throw std::invalid_argument("Cannot submit an empty job");
-    return Schedule(1, 1, [job = std::move(job)](uint32_t, uint32_t) { job(); });
+    return Schedule(1, 1, [job = std::move(job)](uint32_t, uint32_t) { job(); }, priority);
 }
 
-JobSystem::TaskHandle JobSystem::Dispatch(uint32_t itemCount, RangeJob job, uint32_t minRange)
+JobSystem::TaskHandle JobSystem::Dispatch(uint32_t itemCount, RangeJob job, uint32_t minRange, Priority priority)
 {
     if (!job) throw std::invalid_argument("Cannot dispatch an empty job");
     if (!minRange) throw std::invalid_argument("Dispatch minRange must be greater than zero");
-    return Schedule(itemCount, minRange, std::move(job));
+    return Schedule(itemCount, minRange, std::move(job), priority);
 }
 
-JobSystem::TaskHandle JobSystem::Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job)
+JobSystem::TaskHandle JobSystem::Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job, Priority priority)
 {
     RequireTaskThread();
     CollectCompletedTasks();
     auto task = std::make_shared<Task>(this, itemCount, minRange, std::move(job));
+    task->m_Priority = ToEnkiPriority(priority);
     if (itemCount != 0)
     {
         {
@@ -151,20 +162,29 @@ JobSystem::TaskHandle JobSystem::Schedule(uint32_t itemCount, uint32_t minRange,
     return TaskHandle(std::move(task));
 }
 
-void JobSystem::Wait(const TaskHandle& handle)
+void JobSystem::Wait(const TaskHandle& handle, Priority lowestToRun)
 {
     if (!handle.mTask) return;
     const auto& task = handle.mTask;
     if (task->owner != this) throw std::invalid_argument("Task belongs to another JobSystem");
     if (gExecution.task == task.get()) throw std::logic_error("A job cannot wait for itself");
+    const auto lowest = ToEnkiPriority(lowestToRun);
+    if (task->m_Priority > lowest)
+        throw std::invalid_argument("Wait priority excludes the target task");
     if (!handle.IsComplete())
     {
         RequireTaskThread();
-        mScheduler.WaitforTask(task.get());
+        mScheduler.WaitforTask(task.get(), lowest);
     }
     const auto error = task->GetError(true);
     CollectCompletedTasks();
     if (error) std::rethrow_exception(error);
+}
+
+void JobSystem::RunHighPriorityTasks()
+{
+    RequireTaskThread();
+    mScheduler.WaitforTask(nullptr, enki::TASK_PRIORITY_HIGH);
 }
 
 void JobSystem::WaitAll()

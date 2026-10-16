@@ -230,6 +230,7 @@
     <None Include="Scenes\DemoScene.json" />
     <None Include="Scenes\PhysicsMixed512.json" />
     <None Include="Scenes\PhysicsStress256.json" />
+    <None Include="Scenes\PhysicsStress10000.json" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\TexColumns\CustomBuffer.h" />

@@ -5,6 +5,8 @@
 #include "ResourceManager.h"
 #include "JobSystem.h"
 
+class PhysicsSystem;
+
 class Engine
 {
 private:
@@ -52,6 +54,7 @@ public:
 	World& GetWorld() { return world; }
 	entt::registry& GetRegistry() { return world.registry; }
 	ResourceManager& GetResources() { return mResourceManager; }
+    PhysicsSystem& GetPhysics(); // Available after Init, before Shutdown.
 
 	bool SaveScene(const std::string& path, std::string& outError);
 	bool LoadScene(const std::string& path, std::string& outError);
