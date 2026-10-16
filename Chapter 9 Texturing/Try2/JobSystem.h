@@ -17,7 +17,6 @@ class JobSystem
     struct Task;
 
 public:
-    enum class Priority { High, Normal, Low };
     class TaskHandle
     {
     public:
@@ -50,17 +49,12 @@ public:
     void Shutdown();
 
     // enkiTS can execute a callback on the submitting thread if its pipe is full.
-    TaskHandle Submit(Job job, Priority priority = Priority::Normal);
-    TaskHandle Dispatch(uint32_t itemCount, RangeJob job, uint32_t minRange = 64,
-        Priority priority = Priority::Normal);
+    TaskHandle Submit(Job job);
+    TaskHandle Dispatch(uint32_t itemCount, RangeJob job, uint32_t minRange = 64);
 
     // Wait can help execute other jobs on the calling thread. A callback's
     // exception is captured and rethrown here after its task has completed.
-    void Wait(const TaskHandle& task, Priority lowestToRun = Priority::Low);
-    // Helps only high-priority work; rejects a lower-priority target to avoid deadlock.
-    void WaitHighPriority(const TaskHandle& task) { Wait(task, Priority::High); }
-    // Cooperative yield between units of background work. Does not interrupt a callback.
-    void RunHighPriorityTasks();
+    void Wait(const TaskHandle& task);
     // Owner thread only, outside a job. Drains all work before reporting the
     // first unobserved task exception. Callbacks must eventually finish.
     void WaitAll();
@@ -72,14 +66,15 @@ private:
     enum class State { Stopped, Running, Stopping };
     void RequireOwnerThread() const;
     void RequireTaskThread() const;
-    TaskHandle Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job, Priority priority);
-    void CollectCompletedTasks();
+    TaskHandle Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job);
 
     enki::TaskScheduler mScheduler;
     std::atomic<State> mState{ State::Stopped };
     std::atomic<uint32_t> mWorkerThreadCount{ 0 };
     std::thread::id mOwnerThread;
-    std::mutex mTasksMutex;
-    std::vector<std::shared_ptr<Task>> mTasks;
+    // Tasks keep themselves alive while queued. Only failed tasks are tracked
+    // here, so WaitAll can report exceptions nobody observed through Wait.
+    std::mutex mFailedTasksMutex;
+    std::vector<std::shared_ptr<Task>> mFailedTasks;
 };
 

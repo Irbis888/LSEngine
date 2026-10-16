@@ -1,6 +1,5 @@
 #include "JobSystem.h"
 
-#include <algorithm>
 #include <exception>
 #include <limits>
 #include <stdexcept>
@@ -38,8 +37,42 @@ namespace
 
 struct JobSystem::Task final : enki::ITaskSet
 {
+    // Runs on the thread that completes the task, after enkiTS has stopped
+    // using it, and drops the task's reference to itself.
+    struct Completion final : enki::ICompletable
+    {
+        explicit Completion(Task* task) : task(task) {}
+
+        void OnDependenciesComplete(enki::TaskScheduler* scheduler, uint32_t threadNum) override
+        {
+            enki::ICompletable::OnDependenciesComplete(scheduler, threadNum);
+            // May destroy this Completion; enkiTS allows that here.
+            task->Finish();
+        }
+
+        Task* const task;
+    };
+
     Task(JobSystem* owner, uint32_t count, uint32_t minRange, RangeJob job)
-        : enki::ITaskSet(count, minRange), owner(owner), job(std::move(job)) {}
+        : enki::ITaskSet(count, minRange), owner(owner), job(std::move(job)), completion(this)
+    {
+        completion.SetDependency(dependency, this);
+    }
+
+    void Finish()
+    {
+        std::shared_ptr<Task> keepAlive = std::move(self);
+        bool unobservedError;
+        {
+            std::lock_guard lock(errorMutex);
+            unobservedError = error && !errorObserved;
+        }
+        if (unobservedError)
+        {
+            std::lock_guard lock(owner->mFailedTasksMutex);
+            owner->mFailedTasks.push_back(keepAlive);
+        }
+    }
 
     void ExecuteRange(enki::TaskSetPartition range, uint32_t) override
     {
@@ -56,35 +89,38 @@ struct JobSystem::Task final : enki::ITaskSet
         }
     }
 
-    std::exception_ptr GetError(bool observe = false)
+    std::exception_ptr ObserveError()
     {
         std::lock_guard lock(errorMutex);
-        if (observe) errorObserved = true;
+        errorObserved = true;
         return error;
     }
 
-    bool CanRelease()
+    std::exception_ptr TakeUnobservedError()
     {
-        if (!submitted.load(std::memory_order_acquire) || !GetIsComplete()) return false;
         std::lock_guard lock(errorMutex);
-        return !error || errorObserved;
+        if (errorObserved) return nullptr;
+        errorObserved = true;
+        return error;
     }
 
     JobSystem* const owner;
     RangeJob job;
-    // Initially enkiTS reports complete, until AddTaskSetToPipe is called.
-    // Keep this task alive while submission is still in progress.
-    std::atomic<bool> submitted{ false };
+    // Owns the task while enkiTS holds a raw pointer to it; cleared by Finish.
+    std::shared_ptr<Task> self;
     std::mutex errorMutex;
     std::exception_ptr error;
     bool errorObserved = false;
+    // Declared after completion so it is destroyed first.
+    Completion completion;
+    enki::Dependency dependency;
 };
 
 JobSystem::TaskHandle::TaskHandle(std::shared_ptr<Task> task) : mTask(std::move(task)) {}
 
 bool JobSystem::TaskHandle::IsComplete() const
 {
-    return !mTask || (mTask->submitted.load(std::memory_order_acquire) && mTask->GetIsComplete());
+    return !mTask || mTask->GetIsComplete();
 }
 
 JobSystem::~JobSystem()
@@ -118,10 +154,10 @@ void JobSystem::Shutdown()
     mState.store(State::Stopping, std::memory_order_release);
     // Existing jobs may still submit child work while the scheduler drains.
     mScheduler.WaitforAllAndShutdown();
-    std::vector<std::shared_ptr<Task>> completed;
+    std::vector<std::shared_ptr<Task>> failed;
     {
-        std::lock_guard lock(mTasksMutex);
-        completed.swap(mTasks);
+        std::lock_guard lock(mFailedTasksMutex);
+        failed.swap(mFailedTasks);
     }
     mWorkerThreadCount.store(0, std::memory_order_relaxed);
     mState.store(State::Stopped, std::memory_order_release);
@@ -145,20 +181,14 @@ JobSystem::TaskHandle JobSystem::Dispatch(uint32_t itemCount, RangeJob job, uint
 JobSystem::TaskHandle JobSystem::Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job, Priority priority)
 {
     RequireTaskThread();
-    CollectCompletedTasks();
     auto task = std::make_shared<Task>(this, itemCount, minRange, std::move(job));
     task->m_Priority = ToEnkiPriority(priority);
     if (itemCount != 0)
     {
-        {
-            std::lock_guard lock(mTasksMutex);
-            mTasks.push_back(task);
-        }
-        // Do not hold mTasksMutex: a full enkiTS pipe can execute work here,
-        // and that work can submit more jobs or wait for a child task.
+        // A full enkiTS pipe can run the task (and Finish) right here.
+        task->self = task;
         mScheduler.AddTaskSetToPipe(task.get());
     }
-    task->submitted.store(true, std::memory_order_release);
     return TaskHandle(std::move(task));
 }
 
@@ -176,8 +206,7 @@ void JobSystem::Wait(const TaskHandle& handle, Priority lowestToRun)
         RequireTaskThread();
         mScheduler.WaitforTask(task.get(), lowest);
     }
-    const auto error = task->GetError(true);
-    CollectCompletedTasks();
+    const auto error = task->ObserveError();
     if (error) std::rethrow_exception(error);
 }
 
@@ -191,16 +220,17 @@ void JobSystem::WaitAll()
 {
     if (!IsInitialized()) return;
     RequireOwnerThread();
+    // Completion actions run on worker threads before WaitforAll sees them idle.
     mScheduler.WaitforAll();
-    std::vector<std::shared_ptr<Task>> completed;
+    std::vector<std::shared_ptr<Task>> failed;
     {
-        std::lock_guard lock(mTasksMutex);
-        completed.swap(mTasks);
+        std::lock_guard lock(mFailedTasksMutex);
+        failed.swap(mFailedTasks);
     }
     std::exception_ptr firstError;
-    for (const auto& task : completed)
+    for (const auto& task : failed)
     {
-        const auto error = task->GetError(true);
+        const auto error = task->TakeUnobservedError();
         if (!firstError) firstError = error;
     }
     if (firstError) std::rethrow_exception(firstError);
@@ -230,21 +260,4 @@ void JobSystem::RequireTaskThread() const
         throw std::logic_error("JobSystem is not accepting work");
     if (!insideJob && std::this_thread::get_id() != mOwnerThread)
         throw std::logic_error("JobSystem call from an unregistered external thread");
-}
-
-void JobSystem::CollectCompletedTasks()
-{
-    // Retire outside the mutex so destruction of callback captures never
-    // happens while the submission mutex is held.
-    std::vector<std::shared_ptr<Task>> retired;
-    {
-        std::lock_guard lock(mTasksMutex);
-        auto first = std::remove_if(mTasks.begin(), mTasks.end(), [&](const auto& task)
-        {
-            if (!task->CanRelease()) return false;
-            retired.push_back(task);
-            return true;
-        });
-        mTasks.erase(first, mTasks.end());
-    }
 }
