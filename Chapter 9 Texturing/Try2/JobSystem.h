@@ -67,13 +67,14 @@ private:
     void RequireOwnerThread() const;
     void RequireTaskThread() const;
     TaskHandle Schedule(uint32_t itemCount, uint32_t minRange, RangeJob job);
-    void CollectCompletedTasks();
 
     enki::TaskScheduler mScheduler;
     std::atomic<State> mState{ State::Stopped };
     std::atomic<uint32_t> mWorkerThreadCount{ 0 };
     std::thread::id mOwnerThread;
-    std::mutex mTasksMutex;
-    std::vector<std::shared_ptr<Task>> mTasks;
+    // Tasks keep themselves alive while queued. Only failed tasks are tracked
+    // here, so WaitAll can report exceptions nobody observed through Wait.
+    std::mutex mFailedTasksMutex;
+    std::vector<std::shared_ptr<Task>> mFailedTasks;
 };
 
