@@ -1,0 +1,521 @@
+{
+  "version": 1,
+  "name": "LuaDemo",
+  "entities": [
+    {
+      "tag": "Floor",
+      "transform": {
+        "position": [
+          0,
+          0,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          20,
+          1,
+          20
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "plane",
+        "material": {
+          "name": "FloorMaterial",
+          "color": [
+            0.22,
+            0.25,
+            0.3
+          ],
+          "roughness": 0.55
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "halfExtents": [
+          0.5,
+          0.1,
+          0.5
+        ],
+        "radius": 0.5,
+        "isTrigger": false,
+        "restitution": 0,
+        "friction": 0.5
+      },
+      "rigidbody": {
+        "type": "static",
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ],
+        "mass": 1,
+        "useGravity": false
+      }
+    },
+    {
+      "tag": "SpinnerSlow",
+      "transform": {
+        "position": [
+          -3,
+          1.5,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "SpinnerSlowMaterial",
+          "color": [
+            0.2,
+            0.5,
+            1
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/Rotate.lua",
+        "enabled": true,
+        "parameters": {
+          "speed": {
+            "type": "number",
+            "value": 0.6
+          },
+          "label": {
+            "type": "string",
+            "value": "slow independent instance"
+          },
+          "axis": {
+            "type": "Vec3",
+            "value": [
+              0,
+              1,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "tag": "SpinnerFast",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "SpinnerFastMaterial",
+          "color": [
+            1,
+            0.5,
+            0.15
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/Rotate.lua",
+        "enabled": true,
+        "parameters": {
+          "speed": {
+            "type": "number",
+            "value": -1.8
+          },
+          "label": {
+            "type": "string",
+            "value": "fast independent instance"
+          },
+          "axis": {
+            "type": "Vec3",
+            "value": [
+              1,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "tag": "KeyboardCube",
+      "transform": {
+        "position": [
+          -3,
+          0.6,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "KeyboardCubeMaterial",
+          "color": [
+            1,
+            0.9,
+            0.15
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/KeyboardMove.lua",
+        "enabled": true,
+        "parameters": {
+          "speed": {
+            "type": "number",
+            "value": 3
+          },
+          "enabledMovement": {
+            "type": "bool",
+            "value": true
+          }
+        }
+      }
+    },
+    {
+      "tag": "PhysicsBody",
+      "transform": {
+        "position": [
+          0,
+          2,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PhysicsBodyMaterial",
+          "color": [
+            0.95,
+            0.2,
+            0.2
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/PhysicsMover.lua",
+        "enabled": true,
+        "parameters": {
+          "speed": {
+            "type": "number",
+            "value": 3
+          },
+          "jumpImpulse": {
+            "type": "number",
+            "value": 8
+          }
+        }
+      },
+      "rigidbody": {
+        "type": "dynamic",
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ],
+        "mass": 2,
+        "useGravity": true
+      },
+      "collider": {
+        "type": "aabb",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "isTrigger": false,
+        "restitution": 0,
+        "friction": 0.5
+      }
+    },
+    {
+      "tag": "DoorButton",
+      "transform": {
+        "position": [
+          4,
+          0.3,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.4,
+          0.8
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "DoorButtonMaterial",
+          "color": [
+            0.2,
+            0.9,
+            0.4
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/DoorController.lua",
+        "enabled": true,
+        "parameters": {
+          "targetName": {
+            "type": "string",
+            "value": "Door"
+          },
+          "speed": {
+            "type": "number",
+            "value": 1.5
+          }
+        }
+      }
+    },
+    {
+      "tag": "Door",
+      "transform": {
+        "position": [
+          4,
+          1.6,
+          3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.5,
+          3,
+          0.4
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "DoorMaterial",
+          "color": [
+            0.25,
+            0.65,
+            0.8
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/Door.lua",
+        "enabled": true,
+        "parameters": {
+          "height": {
+            "type": "number",
+            "value": 3
+          },
+          "defaultSpeed": {
+            "type": "number",
+            "value": 1.5
+          }
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "isTrigger": false,
+        "restitution": 0,
+        "friction": 0.5
+      }
+    },
+    {
+      "tag": "DeleteMe",
+      "transform": {
+        "position": [
+          0,
+          0.6,
+          6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "DeleteMeMaterial",
+          "color": [
+            0.8,
+            0.2,
+            0.95
+          ],
+          "roughness": 0.55
+        }
+      },
+      "script": {
+        "path": "Scripts/DeleteOnKey.lua",
+        "enabled": true,
+        "parameters": {
+          "message": {
+            "type": "string",
+            "value": "Purple cube requests safe deferred deletion"
+          }
+        }
+      }
+    },
+    {
+      "tag": "LuaDemoSun",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "directionalLight": {
+        "color": [
+          1,
+          0.96,
+          0.88
+        ],
+        "intensity": 1.25,
+        "direction": [
+          -0.55,
+          -0.8,
+          0.25
+        ],
+        "enabled": true
+      }
+    },
+    {
+      "tag": "LuaDemoCamera",
+      "transform": {
+        "position": [
+          10,
+          10,
+          -17
+        ],
+        "rotation": [
+          0.35,
+          -0.5,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "camera": {
+        "fov": 1.15,
+        "nearZ": 0.1,
+        "farZ": 1500,
+        "aspectRatio": 1.3333334
+      }
+    }
+  ]
+}

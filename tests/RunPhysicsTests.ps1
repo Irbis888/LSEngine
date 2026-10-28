@@ -41,7 +41,7 @@ $sceneCompilerArgs = @('/nologo', '/MD', '/std:c++20', '/permissive', '/EHsc', '
     "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fe$output\SceneLoadingTests.exe",
     (Join-Path $PSScriptRoot 'SceneLoadingTests.cpp'),
-    (Join-Path $project 'SceneSerializer.cpp'),
+    (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'AssetPaths.cpp'),
     (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'JobSystem.cpp'),
     (Join-Path $repo 'Common\DDSTextureLoader.cpp'),
     '/link', (Join-Path $repo 'external\enkiTS\.build\x64\Release\enkiTS.lib'), 'd3d12.lib', 'dxgi.lib',

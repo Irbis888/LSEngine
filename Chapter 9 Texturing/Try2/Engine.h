@@ -4,8 +4,10 @@
 #include "World.h"
 #include "ResourceManager.h"
 #include "JobSystem.h"
+#include <filesystem>
 
 class PhysicsSystem;
+class ScriptSystem;
 
 class Engine
 {
@@ -15,6 +17,10 @@ private:
     std::unique_ptr<World> mRetiredWorld;
     void PumpSceneLoading();
     bool mStartupScene = false;
+
+    std::filesystem::path mAssetRoot;
+    std::string mQueuedRestore;
+    ScriptSystem* mScripts = nullptr; // Owned by updateSystems; runs as a real ISystem.
 	World world;
 
 	std::vector<std::unique_ptr<ISystem>> updateSystems;
@@ -25,7 +31,7 @@ private:
 	JobSystem mJobs; // Must outlive ResourceManager's submitted work.
 	ResourceManager mResourceManager;
 public:
-    Engine(IRenderAdapter* renderer);
+    Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot = {});
     ~Engine();
     void Shutdown();
     struct SceneLoadProgress
@@ -37,7 +43,7 @@ public:
         std::string error;
     };
     const SceneLoadProgress& GetSceneLoadProgress() const { return mSceneProgress; }
-    bool IsSceneLoading() const { return mSceneProgress.active; }
+    bool IsSceneLoading() const { return mSceneProgress.active || !mQueuedRestore.empty(); }
     struct SceneLoadingBudget
     {
         double initialMilliseconds = 8.0;
@@ -55,6 +61,12 @@ public:
 	entt::registry& GetRegistry() { return world.registry; }
 	ResourceManager& GetResources() { return mResourceManager; }
     PhysicsSystem& GetPhysics(); // Available after Init, before Shutdown.
+    ScriptSystem& GetScripts();
+    bool BeginPlay(std::string& outError);
+    void EndPlay();
+    bool IsPlaying() const;
+    bool RestorePlaySnapshot(const std::string& path, std::string& outError);
+    const std::filesystem::path& GetAssetRoot() const { return mAssetRoot; }
 
 	bool SaveScene(const std::string& path, std::string& outError);
 	bool LoadScene(const std::string& path, std::string& outError);

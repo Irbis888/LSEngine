@@ -15,7 +15,7 @@ namespace
             return false;
         }
 
-        if (!ctx.engine->LoadScene(EditorSceneIO::PlaySnapshotPath(), outError))
+        if (!ctx.engine->RestorePlaySnapshot(EditorSceneIO::PlaySnapshotPath(), outError))
             return false;
 
         ctx.selected = entt::null;
@@ -78,12 +78,18 @@ void EditorSceneIO::BeginPlay(EditorContext& ctx)
         return;
     }
 
+    if (!ctx.engine->BeginPlay(error))
+    {
+        ctx.statusMessage = "Play failed (scripts): " + error;
+        return;
+    }
     ctx.mode = EditorMode::Play;
     ctx.statusMessage = std::string("Play — snapshot at ") + PlaySnapshotPath();
 }
 
 void EditorSceneIO::RestorePlaySnapshot(EditorContext& ctx)
 {
+    ctx.mode = EditorMode::Edit;
     std::string error;
     if (RestorePlaySnapshotInternal(ctx, error))
         ctx.statusMessage = std::string("Restored from ") + PlaySnapshotPath();
@@ -101,12 +107,7 @@ void EditorSceneIO::EndPlay(EditorContext& ctx)
     }
 
     ctx.mode = EditorMode::Edit;
-
-    if (!ctx.restoreSceneOnStop)
-    {
-        ctx.statusMessage = "Stopped — scene unchanged (Debug: Restore on Stop is off).";
-        return;
-    }
+    ctx.engine->EndPlay();
 
     std::string error;
     if (RestorePlaySnapshotInternal(ctx, error))

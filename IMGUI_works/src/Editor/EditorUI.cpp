@@ -209,6 +209,9 @@ static void DrawMainMenu(EditorContext& ctx)
     if (ImGui::BeginMenu("Scenes"))
     {
         const bool canSwitchScene = ctx.mode == EditorMode::Edit && ctx.engine;
+        if (ImGui::MenuItem("Lua Scripting Demo", EditorSceneIO::LuaDemoPath(), false, canSwitchScene))
+            EditorSceneIO::LoadScene(ctx, EditorSceneIO::LuaDemoPath());
+        ImGui::SetItemTooltip("Play: arrows move, J/L control body, Space jumps, O opens door, X deletes purple cube.");
         if (ImGui::MenuItem("Demo Scene", EditorSceneIO::DemoScenePath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::DemoScenePath());
         ImGui::SetItemTooltip("Load the original engine demonstration scene.");
@@ -274,10 +277,7 @@ static void DrawMainMenu(EditorContext& ctx)
 
     if (ImGui::BeginMenu("Debug"))
     {
-        ImGui::MenuItem("Restore scene on Stop", nullptr, &ctx.restoreSceneOnStop);
-        ImGui::SetItemTooltip(
-            "When enabled, Stop reloads Scenes/EditorPlaySnapshot.json. "
-            "When disabled, Stop only returns to Edit mode and keeps simulated changes.");
+        ImGui::TextDisabled("Stop always restores the Play snapshot.");
 
         if (ImGui::MenuItem("Restore Play Snapshot Now", EditorSceneIO::PlaySnapshotPath()))
             EditorSceneIO::RestorePlaySnapshot(ctx);
@@ -301,6 +301,8 @@ static void DrawMainMenu(EditorContext& ctx)
 
 static void DrawToolbar(EditorContext& ctx)
 {
+    if (ctx.engine && ctx.engine->GetSceneLoadProgress().path.find("LuaDemo") != std::string::npos)
+        ImGui::TextWrapped("Lua demo: Arrows = move | J/L = body velocity | Space = impulse | O = door event | X = delete. Click the viewport before using keys.");
     ImGui::Text("Mode:");
     ImGui::SameLine();
     if (ctx.mode == EditorMode::Edit)
@@ -309,7 +311,7 @@ static void DrawToolbar(EditorContext& ctx)
         ImGui::SameLine();
         if (ImGui::Button("Play##toolbar"))
             EditorSceneIO::BeginPlay(ctx);
-        ImGui::SetItemTooltip("Save snapshot and run physics (Play mode).");
+        ImGui::SetItemTooltip("Save snapshot and run scripts and physics (Play mode).");
     }
     else
     {
@@ -318,16 +320,12 @@ static void DrawToolbar(EditorContext& ctx)
         if (ImGui::Button("Stop##toolbar"))
             EditorSceneIO::EndPlay(ctx);
         ImGui::SetItemTooltip(
-            "Exit Play mode. Restores snapshot only if Debug > Restore scene on Stop is checked.");
+            "Stop scripts and physics, call OnDestroy and restore the Play snapshot.");
 
         ImGui::SameLine();
         if (ImGui::Button("Restore Snapshot##toolbar"))
             EditorSceneIO::RestorePlaySnapshot(ctx);
-        ImGui::SetItemTooltip("Reload %s now without leaving Play mode.", EditorSceneIO::PlaySnapshotPath());
-
-        ImGui::SameLine();
-        ImGui::Checkbox("Restore on Stop##debug", &ctx.restoreSceneOnStop);
-        ImGui::SetItemTooltip("Debug: auto-restore snapshot when Stop is pressed.");
+        ImGui::SetItemTooltip("Stop Play and restore %s.", EditorSceneIO::PlaySnapshotPath());
     }
 
     ImGui::SameLine();

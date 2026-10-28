@@ -3,6 +3,88 @@
 #include <imgui.h>
 #include <Commons.h>
 #include <cstring>
+#include <Engine.h>
+#include <ScriptSystem.h>
+#include <AssetPaths.h>
+#include <cmath>
+
+static void DrawScriptEditor(EditorContext& ctx, entt::entity entity)
+{
+    if (!ctx.engine) return;
+    auto& registry = *ctx.registry;
+    const bool canEdit = Editor_CanEditComponents();
+    auto* component = registry.try_get<ScriptComponent>(entity);
+    if (!component)
+    {
+        ImGui::BeginDisabled(!canEdit);
+        if (ImGui::Button("Add Lua Script")) registry.emplace<ScriptComponent>(entity);
+        ImGui::EndDisabled();
+        return;
+    }
+    if (!ImGui::CollapsingHeader("Lua Script", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    auto& scripts = ctx.engine->GetScripts();
+    ImGui::TextWrapped("State: %s", scripts.GetStatus(entity).c_str());
+    const auto runtimeError = scripts.GetError(entity);
+    if (!runtimeError.empty()) ImGui::TextWrapped("%s", runtimeError.c_str());
+    ImGui::BeginDisabled(ctx.engine->IsSceneLoading());
+    ImGui::Checkbox("Script enabled", &component->enabled);
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("Disabling pauses callbacks/events and preserves the instance. Init is not repeated on re-enable.");
+    ImGui::BeginDisabled(!canEdit);
+    char path[4097]{};
+    strncpy_s(path, component->path.c_str(), sizeof(path) - 1);
+    if (ImGui::InputText("Lua file", path, sizeof(path))) component->path = path;
+    ImGui::SetItemTooltip("UTF-8 path relative to the asset root, for example Scripts/Rotate.lua. Reload is Edit-only.");
+    bool reload = ImGui::Button("Reload description");
+    ImGui::SameLine();
+    if (ImGui::Button("Reset parameter overrides")) component->parameters.clear();
+    ImGui::EndDisabled();
+    if (!canEdit) ImGui::TextDisabled("File, parameters and Reload are editable only outside Play.");
+    if (!component->path.empty())
+    {
+        try
+        {
+            if (reload) component->path = AssetPaths::ScriptPath(ctx.engine->GetAssetRoot(), component->path);
+            const auto& description = scripts.Describe(component->path, reload);
+            if (!description.error.empty()) ImGui::TextWrapped("%s", description.error.c_str());
+            ImGui::BeginDisabled(!canEdit);
+            for (const auto& [name, defaultValue] : description.defaults)
+            {
+                ImGui::PushID(name.c_str());
+                const auto existing = component->parameters.find(name);
+                auto value = existing == component->parameters.end() ? defaultValue : existing->second;
+                if (value.index() != defaultValue.index())
+                {
+                    ImGui::TextWrapped("%s: incompatible type, expected %s. Reset overrides.", name.c_str(), ScriptValueType(defaultValue));
+                    ImGui::PopID();
+                    continue;
+                }
+                bool changed = false;
+                if (auto* v = std::get_if<bool>(&value)) changed = ImGui::Checkbox(name.c_str(), v);
+                else if (auto* v = std::get_if<double>(&value))
+                { changed = ImGui::InputDouble(name.c_str(), v, 0.1, 1, "%.5f"); if (!std::isfinite(*v)) changed = false; }
+                else if (auto* v = std::get_if<glm::vec3>(&value))
+                { changed = ImGui::DragFloat3(name.c_str(), &v->x, 0.01f); }
+                else
+                {
+                    char text[4097]{};
+                    strncpy_s(text, std::get<std::string>(value).c_str(), sizeof(text) - 1);
+                    changed = ImGui::InputText(name.c_str(), text, sizeof(text));
+                    if (changed) value = std::string(text);
+                }
+                if (changed) component->parameters[name] = std::move(value);
+                ImGui::PopID();
+            }
+            for (const auto& [name, value] : component->parameters)
+                if (!description.defaults.contains(name)) ImGui::TextWrapped("Unknown parameter: %s. Reset overrides.", name.c_str());
+            ImGui::EndDisabled();
+        }
+        catch (const std::exception& error) { ImGui::TextWrapped("%s", error.what()); }
+    }
+    ImGui::BeginDisabled(!canEdit);
+    if (ImGui::Button("Remove ScriptComponent")) registry.remove<ScriptComponent>(entity);
+    ImGui::EndDisabled();
+}
 
 static void DrawTransformEditor(TransformComponent& t)
 {
@@ -149,6 +231,7 @@ static void DrawInspectorPanel(EditorContext& ctx)
         ImGui::TextDisabled("Editing disabled in Play mode.");
     }
 
+    DrawScriptEditor(ctx, entity);
     ImGui::End();
 }
 

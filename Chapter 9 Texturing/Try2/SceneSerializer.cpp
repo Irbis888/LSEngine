@@ -1,4 +1,6 @@
 #include "SceneSerializer.h"
+#include "AssetPaths.h"
+#include <cmath>
 
 #include <fstream>
 #include <filesystem>
@@ -294,7 +296,68 @@ namespace
     }
 }
 
-void SceneSerializer::Save(const World& world, const std::string& path)
+namespace
+{
+    json ScriptToJson(const ScriptComponent& script, const std::filesystem::path& root)
+    {
+        json parameters = json::object();
+        for (const auto& [name, value] : script.parameters)
+        {
+            json item;
+            item["type"] = ScriptValueType(value);
+            std::visit([&](const auto& v)
+            {
+                using T = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<T, glm::vec3>) item["value"] = Vec3ToJson(v);
+                else item["value"] = v;
+            }, value);
+            parameters[name] = std::move(item);
+        }
+        return { { "path", AssetPaths::ScriptPath(root, script.path) },
+            { "enabled", script.enabled }, { "parameters", std::move(parameters) } };
+    }
+    ScriptComponent ScriptFromJson(const json& value)
+    {
+        if (!value.is_object()) throw std::runtime_error("Script must be an object");
+        ScriptComponent result;
+        result.path = value.at("path").get<std::string>();
+        const auto path = AssetPaths::FromUtf8(result.path).lexically_normal();
+        if (result.path.empty() || result.path.size() > 4096 || result.path.find('\0') != std::string::npos ||
+            path.is_absolute() || path.begin() == path.end() || *path.begin() != "Scripts")
+            throw std::runtime_error("Script path must be relative to the asset root, inside Scripts/");
+        result.path = AssetPaths::ToUtf8(path);
+        result.enabled = value.value("enabled", true);
+        const auto parameters = value.value("parameters", json::object());
+        if (!parameters.is_object() || parameters.size() > 64) throw std::runtime_error("Script parameters must contain at most 64 named values");
+        for (auto it = parameters.begin(); it != parameters.end(); ++it)
+        {
+            if (it.key().empty() || it.key().size() > 128 || it.key().find('\0') != std::string::npos)
+                throw std::runtime_error("Invalid script parameter name");
+            const auto type = it.value().at("type").get<std::string>();
+            const auto& data = it.value().at("value");
+            ScriptValue parameter;
+            if (type == "bool" && data.is_boolean()) parameter = data.get<bool>();
+            else if (type == "number" && data.is_number() && std::isfinite(data.get<double>())) parameter = data.get<double>();
+            else if (type == "string" && data.is_string() && data.get_ref<const std::string&>().size() <= 4096) parameter = data.get<std::string>();
+            else if (type == "Vec3" && data.is_array() && data.size() == 3)
+            {
+                glm::vec3 vector;
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    if (!data[axis].is_number() || !std::isfinite(data[axis].get<float>()))
+                        throw std::runtime_error("Script Vec3 must contain finite numbers");
+                    vector[axis] = data[axis].get<float>();
+                }
+                parameter = vector;
+            }
+            else throw std::runtime_error("Unsupported or incompatible script parameter: " + it.key());
+            result.parameters.emplace(it.key(), std::move(parameter));
+        }
+        return result;
+    }
+}
+
+void SceneSerializer::Save(const World& world, const std::string& path, const std::filesystem::path& assetRoot)
 {
     json scene;
     scene["version"] = 1;
@@ -346,11 +409,13 @@ void SceneSerializer::Save(const World& world, const std::string& path)
         {
             serializedEntity["collider"] = ColliderToJson(*collider);
         }
+        if (const auto* script = world.registry.try_get<ScriptComponent>(entity))
+            serializedEntity["script"] = ScriptToJson(*script, assetRoot.empty() ? AssetPaths::FindRoot() : assetRoot);
 
         scene["entities"].push_back(serializedEntity);
     }
 
-    std::ofstream out(path);
+    std::ofstream out(AssetPaths::FromUtf8(path));
     if (!out)
         throw std::runtime_error("Failed to open scene file for writing: " + path);
 
@@ -388,6 +453,7 @@ SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
         if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
         if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
         if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
+        if (value.contains("script")) entity.script = ScriptFromJson(value.at("script"));
         data.entities.push_back(std::move(entity));
     }
     // A scene can put its camera last. Publish camera and lights before mesh
@@ -413,6 +479,7 @@ void SceneSerializer::CreateEntity(World& world, ResourceManager& resources, con
         if (description.spotLight) world.registry.emplace<SpotLightComponent>(entity, *description.spotLight);
         if (description.rigidbody) world.registry.emplace<RigidbodyComponent>(entity, *description.rigidbody);
         if (description.collider) world.registry.emplace<ColliderComponent>(entity, *description.collider);
+        if (description.script) world.registry.emplace<ScriptComponent>(entity, *description.script);
     }
     catch (...) { world.registry.destroy(entity); throw; }
 }

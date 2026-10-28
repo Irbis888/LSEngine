@@ -139,8 +139,13 @@
   </ItemDefinitionGroup>
   <ImportGroup Label="PropertySheets">
     <Import Project="..\..\external\enkiTS\enkiTS.props" />
+    <Import Project="..\..\external\lua\Lua.props" />
   </ImportGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\external\lua\Lua.vcxproj">
+      <Project>{A32B5651-514A-4D9B-BDE2-AE3777655501}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\..\external\enkiTS\enkiTS.vcxproj">
       <Project>{25E63670-6AF2-43E5-8EC1-46B478472BE1}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -159,6 +164,9 @@
     <ClCompile Include="DemoScene.cpp" />
     <ClCompile Include="d3dUtils.cpp" />
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="AssetPaths.cpp" />
+    <ClCompile Include="ScriptRuntime.cpp" />
+    <ClCompile Include="ScriptSystem.cpp" />
     <ClCompile Include="FrameRes.cpp" />
     <ClCompile Include="JobSystem.cpp" />
     <ClCompile Include="PhysicsSystem.cpp" />
@@ -203,6 +211,10 @@
     <ClInclude Include="DemoScene.h" />
     <ClInclude Include="d3dUtils.h" />
     <ClInclude Include="Engine.h" />
+    <ClInclude Include="AssetPaths.h" />
+    <ClInclude Include="ScriptComponent.h" />
+    <ClInclude Include="ScriptRuntime.h" />
+    <ClInclude Include="ScriptSystem.h" />
     <ClInclude Include="FrameRes.h" />
     <ClInclude Include="PhysicsBroadPhase.h" />
     <ClInclude Include="PhysicsCommons.h" />
@@ -228,6 +240,9 @@
     <None Include="MESH_UPLOAD_GUIDE.md" />
     <None Include="Scenes\CharacterShowcase.json" />
     <None Include="Scenes\DemoScene.json" />
+    <None Include="Scenes\LuaDemo.json" />
+    <None Include="Scripts\*.lua" />
+    <None Include="SCRIPTING.md" />
     <None Include="Scenes\PhysicsMixed512.json" />
     <None Include="Scenes\PhysicsStress256.json" />
     <None Include="Scenes\PhysicsStress10000.json" />

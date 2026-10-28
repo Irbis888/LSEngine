@@ -6,6 +6,8 @@
 #include "PhysicsSystem.h"
 #include "Editor/EditorContext.h"
 #include "SceneSerializer.h"
+#include "ScriptSystem.h"
+#include "AssetPaths.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -49,7 +51,8 @@ struct Engine::PendingScene
     bool publishing = false;
 };
 
-Engine::Engine(IRenderAdapter* renderer) : mRenderAdapter(renderer) {}
+Engine::Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot)
+    : mRenderAdapter(renderer), mAssetRoot(assetRoot.empty() ? AssetPaths::FindRoot() : std::filesystem::weakly_canonical(assetRoot)) {}
 
 void Engine::Init(const GameTimer& gt) {
 	const uint32_t hardwareThreads = std::thread::hardware_concurrency();
@@ -57,6 +60,11 @@ void Engine::Init(const GameTimer& gt) {
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
 	updateSystems.push_back(std::make_unique<CameraControllerSystem>());
+    auto scripts = std::make_unique<ScriptSystem>(mAssetRoot);
+    auto* scriptSystem = scripts.get();
+    updateSystems.push_back(std::move(scripts));
+    mScripts = scriptSystem;
+    mScripts->Bind(world.registry);
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 
@@ -64,9 +72,9 @@ void Engine::Init(const GameTimer& gt) {
 	{
         std::string error;
         mStartupScene = true;
-        LoadScene(scenePath->string(), error);
+        LoadScene(AssetPaths::ToUtf8(std::filesystem::absolute(*scenePath)), error);
 	}
-	else DemoScene::Build(world, mResourceManager);
+	else { DemoScene::Build(world, mResourceManager); mScripts->SceneReady(); }
 }
 
 Engine::~Engine()
@@ -75,10 +83,12 @@ Engine::~Engine()
 }
 void Engine::Shutdown()
 {
+    EndPlay(); // OnDestroy runs while the world and resources still exist.
 	mResourceManager.ShutdownLoading();
 	mJobs.Shutdown();
     mPendingScene.reset();
     mSceneProgress.active = false;
+    mQueuedRestore.clear();
     mRetiredWorld.reset();
 	mRenderAdapter->SetResourceManager(nullptr);
 }
@@ -92,14 +102,16 @@ void Engine::Update(const FrameContext& context)
 
 	for (auto& system : updateSystems)
 	{
+        if (system.get() == mScripts && IsSceneLoading()) continue;
 		system->Update(world.registry, context);
 	}
 }
 void Engine::PhysicsUpdate(const FrameContext& context)
 {
-	if (IsSceneLoading() || !Editor_IsPhysicsEnabled())
+	if (IsSceneLoading() || (!IsPlaying() && !Editor_IsPhysicsEnabled()))
 		return;
 
+    if (mScripts) mScripts->FixedUpdate(context);
 	for (auto& system : physicsSystems)
 	{
 		system->Update(world.registry, context);
@@ -110,6 +122,34 @@ PhysicsSystem& Engine::GetPhysics()
 {
     if (physicsSystems.empty()) throw std::logic_error("Physics is not initialized");
     return static_cast<PhysicsSystem&>(*physicsSystems.front());
+}
+
+ScriptSystem& Engine::GetScripts()
+{
+    if (!mScripts) throw std::logic_error("Scripting is not initialized");
+    return *mScripts;
+}
+bool Engine::BeginPlay(std::string& outError)
+{
+    if (!mScripts || IsSceneLoading()) { outError = "Wait for the complete scene before Play"; return false; }
+    try { mScripts->BeginPlay(); outError.clear(); return true; }
+    catch (const std::exception& error) { outError = error.what(); return false; }
+}
+void Engine::EndPlay() { if (mScripts) mScripts->EndPlay(); }
+bool Engine::IsPlaying() const { return mScripts && mScripts->IsPlaying(); }
+bool Engine::RestorePlaySnapshot(const std::string& path, std::string& outError)
+{
+    EndPlay();
+    try
+    {
+        const auto absolute = AssetPaths::Resolve(mAssetRoot, path);
+        // Validate now. A parse failure keeps the current stopped scene intact.
+        if (!std::filesystem::is_regular_file(absolute)) throw std::runtime_error("Play snapshot is missing: " + path);
+        const auto filename = AssetPaths::ToUtf8(absolute);
+        if (mPendingScene) { mQueuedRestore = filename; outError.clear(); return true; }
+        return LoadScene(filename, outError);
+    }
+    catch (const std::exception& error) { outError = error.what(); return false; }
 }
 
 void Engine::Draw(const FrameContext& context)
@@ -125,7 +165,7 @@ bool Engine::SaveScene(const std::string& path, std::string& outError)
     if (IsSceneLoading()) { outError = "Scene is still loading"; return false; }
 	try
 	{
-		SceneSerializer::Save(world, path);
+		SceneSerializer::Save(world, AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path)), mAssetRoot);
 		outError.clear();
 		return true;
 	}
@@ -144,9 +184,7 @@ bool Engine::LoadScene(const std::string& path, std::string& outError)
     {
         auto pending = std::make_unique<PendingScene>();
         pending->result = std::make_shared<PendingScene::Result>();
-        const auto absolute = std::filesystem::absolute(std::filesystem::path(std::u8string(
-            reinterpret_cast<const char8_t*>(path.data()), path.size()))).u8string();
-        const std::string filename(reinterpret_cast<const char*>(absolute.data()), absolute.size());
+        const std::string filename = AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path));
         pending->task = mJobs.Submit([result = pending->result, filename]
         {
             try { result->data = SceneSerializer::Read(filename); }
@@ -174,6 +212,13 @@ void Engine::PumpSceneLoading()
 {
     ZoneScopedN("Bounded scene entity publication");
     const auto start = std::chrono::steady_clock::now();
+    if (!mPendingScene && !mQueuedRestore.empty())
+    {
+        auto path = std::move(mQueuedRestore);
+        mQueuedRestore.clear();
+        std::string error;
+        if (!LoadScene(path, error)) mSceneProgress.error = "Snapshot restore failed: " + error;
+    }
     const double budgetMs = mStartupScene ? mSceneLoadingBudget.initialMilliseconds : mSceneLoadingBudget.streamingMilliseconds;
     const auto overBudget = [&]
     { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= budgetMs; };
@@ -198,14 +243,16 @@ void Engine::PumpSceneLoading()
             mSceneProgress.active = false;
             std::cerr << mSceneProgress.error << '\n';
             mPendingScene.reset();
-            if (mStartupScene) DemoScene::Build(world, mResourceManager);
+            if (mStartupScene) { DemoScene::Build(world, mResourceManager); mScripts->SceneReady(); }
             mStartupScene = false;
             return;
         }
         // Finish retiring an older switch before exchanging registries again.
         if (mRetiredWorld) return;
         mRetiredWorld = std::make_unique<World>();
+        mScripts->BeforeSceneChange();
         world.registry.swap(mRetiredWorld->registry);
+        mScripts->Bind(world.registry);
         mSceneProgress.total = pending.result->data.entities.size();
         pending.publishing = true;
     }
@@ -227,6 +274,7 @@ void Engine::PumpSceneLoading()
             mStartupScene = false;
             std::cout << "Loaded scene from " << mSceneProgress.path << '\n';
             mPendingScene.reset();
+            if (mQueuedRestore.empty()) mScripts->SceneReady();
         }
     }
     catch (const std::exception& error)
@@ -236,5 +284,7 @@ void Engine::PumpSceneLoading()
         mStartupScene = false;
         std::cerr << mSceneProgress.error << '\n';
         mPendingScene.reset();
+        // A failed publication stays stopped rather than initializing a partial scene.
+        EndPlay();
     }
 }

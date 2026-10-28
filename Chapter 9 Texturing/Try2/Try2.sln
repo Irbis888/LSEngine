@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencie
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "enkiTS", "..\..\external\enkiTS\enkiTS.vcxproj", "{25E63670-6AF2-43E5-8EC1-46B478472BE1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Lua", "..\..\external\lua\Lua.vcxproj", "{A32B5651-514A-4D9B-BDE2-AE3777655501}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -17,6 +19,14 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Debug|x64.ActiveCfg = Debug|x64
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Debug|x64.Build.0 = Debug|x64
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Debug|x86.ActiveCfg = Debug|Win32
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Debug|x86.Build.0 = Debug|Win32
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Release|x64.ActiveCfg = Release|x64
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Release|x64.Build.0 = Release|x64
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Release|x86.ActiveCfg = Release|Win32
+		{A32B5651-514A-4D9B-BDE2-AE3777655501}.Release|x86.Build.0 = Release|Win32
 		{566E0558-C01F-4D61-835D-D608E64C1AD2}.Debug|x64.ActiveCfg = Debug|x64
 		{566E0558-C01F-4D61-835D-D608E64C1AD2}.Debug|x64.Build.0 = Debug|x64
 		{566E0558-C01F-4D61-835D-D608E64C1AD2}.Debug|x86.ActiveCfg = Debug|Win32
@@ -38,6 +48,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{A32B5651-514A-4D9B-BDE2-AE3777655501} = {397A0E6C-4452-4A5B-AA56-A3DB35057439}
 		{25E63670-6AF2-43E5-8EC1-46B478472BE1} = {397A0E6C-4452-4A5B-AA56-A3DB35057439}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
