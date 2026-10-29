@@ -1,5 +1,5 @@
 {
   "title": "Ball Field",
   "scene": "Scenes/Games/BallField.json",
-  "controls": "WASD/arrows: move | Shift: run | R: reset | Esc: exit"
+  "controls": "Blue: WASD + Shift | Red: arrows + Enter | R: kickoff | Esc: exit"
 }

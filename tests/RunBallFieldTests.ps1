@@ -7,6 +7,7 @@ New-Item -ItemType Directory -Force $output | Out-Null
 $process = Start-Process -FilePath (Join-Path $project "x64/$Configuration/Try2.exe") `
     -ArgumentList '--game-smoke','Games/BallField/game.json' -WorkingDirectory $output -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $output 'stdout.log') -RedirectStandardError (Join-Path $output 'stderr.log')
+$null = $process.Handle # Windows PowerShell 5.1 reports no ExitCode unless the handle is opened before exit.
 try {
     if (!$process.WaitForExit(45000)) { throw 'Game smoke timed out' }
     $process.WaitForExit()

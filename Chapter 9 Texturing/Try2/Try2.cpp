@@ -73,6 +73,8 @@ private:
     bool mGameSmoke = false;
     int mGameSteps = 0;
     float mBallMaxX = 0;
+    bool mGoalSeen = false, mKickoffSeen = false;
+    InputState GameSmokeInput() const;
     bool mScriptSmoke = false;
     int mScriptSmokeStage = 0, mScriptSmokeFrames = 0, mScriptSmokeTotalFrames = 0;
     //virtual void Init()override;
@@ -92,14 +94,22 @@ TestApp::TestApp(HINSTANCE hInstance, bool scriptSmoke, const std::string& gameS
 }
 
 
+// Blue (WASD) dribbles straight into the east goal while red (arrows) steps out of the way.
+InputState TestApp::GameSmokeInput() const
+{
+    InputState input;
+    input.keys[mGameSteps < 240 ? 'D' : mGameSteps < 420 ? 'W' : mGameSteps < 660 ? 'A' : 'S'] = true;
+    if (mGameSteps < 240) input.keys[VK_UP] = true;
+    return input;
+}
+
 void TestApp::PhysicsUpdate(const FrameContext& context)
 {
 	ZoneScopedN("PhysicsUpdate");
     if (mGameSmoke && mEngine->IsPlaying())
     {
         auto scripted = context;
-        scripted.input = {};
-        scripted.input.keys[mGameSteps < 240 ? 'D' : mGameSteps < 420 ? 'W' : mGameSteps < 660 ? 'A' : 'S'] = true;
+        scripted.input = GameSmokeInput();
         ++mGameSteps;
         mEngine->PhysicsUpdate(scripted);
     }
@@ -112,8 +122,7 @@ void TestApp::Update(const FrameContext& context)
     if (mGameSmoke)
     {
         auto scripted = context;
-        scripted.input = {};
-        scripted.input.keys[mGameSteps < 240 ? 'D' : mGameSteps < 420 ? 'W' : mGameSteps < 660 ? 'A' : 'S'] = true;
+        scripted.input = GameSmokeInput();
         mEngine->Update(scripted);
     }
     else mEngine->Update(context);
@@ -203,11 +212,19 @@ void TestApp::CheckGameSmoke()
         {
             const auto& tag = reg.get<TagComponent>(entity).tag;
             const auto& p = reg.get<TransformComponent>(entity).position;
-            if (tag == "Ball") mBallMaxX = (std::max)(mBallMaxX, p.x);
-            if ((tag == "Ball" || tag == "Player") && (std::abs(p.x) > 12.1f || std::abs(p.z) > 8.1f || p.y < -0.1f))
+            if (tag == "Ball")
+            {
+                mBallMaxX = (std::max)(mBallMaxX, p.x);
+                if (p.x > 12.65f && std::abs(p.z) < 2.5f) mGoalSeen = true; // fully over the east goal line
+                if (mGoalSeen && std::abs(p.x) < 0.01f && std::abs(p.z) < 0.01f) mKickoffSeen = true;
+            }
+            // Bodies stay on the field or inside a goal box (x in 12..14, z in -2.5..2.5).
+            const bool inGoal = std::abs(p.x) <= 14.1f && std::abs(p.z) < 2.6f;
+            if ((tag == "Ball" || tag == "Player" || tag == "Player2") &&
+                ((std::abs(p.x) > 12.1f && !inGoal) || std::abs(p.z) > 8.1f || p.y < -0.1f))
                 throw std::runtime_error("Body escaped the static field");
             if (tag == "Camera" && p != glm::vec3(0,19,-19)) throw std::runtime_error("Editor camera consumed gameplay input");
-            if ((tag == "Field" || tag.ends_with("Border")) && reg.get<RigidbodyComponent>(entity).type != RigidbodyType::Static)
+            if ((tag == "Field" || tag.ends_with("Border") || tag.ends_with("Wall")) && reg.get<RigidbodyComponent>(entity).type != RigidbodyType::Static)
                 throw std::runtime_error("Field/border is not static");
             if (reg.all_of<ScriptComponent>(entity) && !mEngine->GetScripts().GetError(entity).empty())
                 throw std::runtime_error(mEngine->GetScripts().GetError(entity));
@@ -215,7 +232,9 @@ void TestApp::CheckGameSmoke()
         if (mGameSteps >= 840)
         {
             if (mBallMaxX < 3) throw std::runtime_error("Player did not physically push the ball");
-            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, player hitbox, ball pushed, static field/borders; max_ball_x=" << mBallMaxX << std::endl;
+            if (!mGoalSeen) throw std::runtime_error("Ball never entered the east goal");
+            if (!mKickoffSeen) throw std::runtime_error("No kickoff after the goal");
+            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, two players, ball pushed into goal, kickoff, static field/borders/goals; max_ball_x=" << mBallMaxX << std::endl;
             mGameSmoke = false; PostQuitMessage(0);
         }
     }

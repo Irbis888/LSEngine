@@ -16,7 +16,7 @@
           0
         ],
         "scale": [
-          24,
+          29.2,
           0.5,
           16
         ]
@@ -67,12 +67,12 @@
       }
     },
     {
-      "tag": "WestBorder",
+      "tag": "WestNorthBorder",
       "transform": {
         "position": [
           -12.3,
           0.9,
-          0
+          5.55
         ],
         "rotation": [
           0,
@@ -82,14 +82,14 @@
         "scale": [
           0.6,
           1.8,
-          17.2
+          6.1
         ]
       },
       "mesh": {
         "source": "primitive",
         "primitive": "cube",
         "material": {
-          "name": "WestBorderMaterial",
+          "name": "WestNorthBorderMaterial",
           "color": [
             0.3,
             0.4,
@@ -131,12 +131,12 @@
       }
     },
     {
-      "tag": "EastBorder",
+      "tag": "WestSouthBorder",
       "transform": {
         "position": [
-          12.3,
+          -12.3,
           0.9,
-          0
+          -5.55
         ],
         "rotation": [
           0,
@@ -146,14 +146,14 @@
         "scale": [
           0.6,
           1.8,
-          17.2
+          6.1
         ]
       },
       "mesh": {
         "source": "primitive",
         "primitive": "cube",
         "material": {
-          "name": "EastBorderMaterial",
+          "name": "WestSouthBorderMaterial",
           "color": [
             0.3,
             0.4,
@@ -192,6 +192,716 @@
           0,
           0
         ]
+      }
+    },
+    {
+      "tag": "WestGoalBackWall",
+      "transform": {
+        "position": [
+          -14.3,
+          1.1,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          2.2,
+          5.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "WestGoalBackWallMaterial",
+          "color": [
+            0.55,
+            0.7,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "WestGoalNorthWall",
+      "transform": {
+        "position": [
+          -13.3,
+          1.1,
+          2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.6,
+          2.2,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "WestGoalNorthWallMaterial",
+          "color": [
+            0.55,
+            0.7,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "WestGoalSouthWall",
+      "transform": {
+        "position": [
+          -13.3,
+          1.1,
+          -2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.6,
+          2.2,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "WestGoalSouthWallMaterial",
+          "color": [
+            0.55,
+            0.7,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "WestPostNorth",
+      "transform": {
+        "position": [
+          -12.1,
+          1.15,
+          2.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          2.3,
+          0.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "WestPostSouth",
+      "transform": {
+        "position": [
+          -12.1,
+          1.15,
+          -2.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          2.3,
+          0.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "WestCrossbar",
+      "transform": {
+        "position": [
+          -12.1,
+          2.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          0.2,
+          5.4
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "EastNorthBorder",
+      "transform": {
+        "position": [
+          12.3,
+          0.9,
+          5.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          1.8,
+          6.1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastNorthBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastSouthBorder",
+      "transform": {
+        "position": [
+          12.3,
+          0.9,
+          -5.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          1.8,
+          6.1
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastSouthBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastGoalBackWall",
+      "transform": {
+        "position": [
+          14.3,
+          1.1,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          2.2,
+          5.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastGoalBackWallMaterial",
+          "color": [
+            0.95,
+            0.6,
+            0.55
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastGoalNorthWall",
+      "transform": {
+        "position": [
+          13.3,
+          1.1,
+          2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.6,
+          2.2,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastGoalNorthWallMaterial",
+          "color": [
+            0.95,
+            0.6,
+            0.55
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastGoalSouthWall",
+      "transform": {
+        "position": [
+          13.3,
+          1.1,
+          -2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.6,
+          2.2,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastGoalSouthWallMaterial",
+          "color": [
+            0.95,
+            0.6,
+            0.55
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.1
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastPostNorth",
+      "transform": {
+        "position": [
+          12.1,
+          1.15,
+          2.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          2.3,
+          0.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "EastPostSouth",
+      "transform": {
+        "position": [
+          12.1,
+          1.15,
+          -2.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          2.3,
+          0.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "EastCrossbar",
+      "transform": {
+        "position": [
+          12.1,
+          2.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.2,
+          0.2,
+          5.4
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
       }
     },
     {
@@ -431,7 +1141,7 @@
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -494,13 +1204,13 @@
       "tag": "PlayerHead",
       "transform": {
         "position": [
-          -4,
+          -4.0,
           1.66,
-          0
+          0.0
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -527,13 +1237,13 @@
       "tag": "PlayerLeftArm",
       "transform": {
         "position": [
-          -4.55,
+          -4.0,
           0.89,
-          0
+          0.55
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -560,13 +1270,13 @@
       "tag": "PlayerRightArm",
       "transform": {
         "position": [
-          -3.45,
+          -4.0,
           0.89,
-          0
+          -0.55
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -593,13 +1303,13 @@
       "tag": "PlayerLeftLeg",
       "transform": {
         "position": [
-          -4.22,
+          -4.0,
           0.31,
-          0
+          0.22
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -626,13 +1336,13 @@
       "tag": "PlayerRightLeg",
       "transform": {
         "position": [
-          -3.78,
+          -4.0,
           0.31,
-          0
+          -0.22
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -761,13 +1471,13 @@
       "tag": "PlayerLeftEye",
       "transform": {
         "position": [
-          -4.1,
+          -3.743,
           1.69,
-          0.257
+          0.1
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -794,13 +1504,13 @@
       "tag": "PlayerRightEye",
       "transform": {
         "position": [
-          -3.9,
+          -3.743,
           1.69,
-          0.257
+          -0.1
         ],
         "rotation": [
           0,
-          0,
+          1.5708,
           0
         ],
         "scale": [
@@ -820,6 +1530,868 @@
             0.06
           ],
           "roughness": 0.5
+        }
+      }
+    },
+    {
+      "tag": "Player2",
+      "transform": {
+        "position": [
+          4,
+          0.91,
+          0
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.8,
+          1,
+          0.5
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Player2Material",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.9,
+          0.7
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0,
+        "restitution": 0
+      },
+      "rigidbody": {
+        "type": "dynamic",
+        "mass": 8,
+        "useGravity": true,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      },
+      "script": {
+        "path": "Scripts/Games/FieldPlayer.lua",
+        "enabled": true,
+        "parameters": {
+          "controls": {
+            "type": "string",
+            "value": "arrows"
+          },
+          "runKey": {
+            "type": "string",
+            "value": "Enter"
+          }
+        }
+      }
+    },
+    {
+      "tag": "Player2Head",
+      "transform": {
+        "position": [
+          4.0,
+          1.66,
+          0.0
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.55,
+          0.55,
+          0.55
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "Player2HeadMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player2LeftArm",
+      "transform": {
+        "position": [
+          4.0,
+          0.89,
+          -0.55
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.25,
+          0.8,
+          0.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Player2LeftArmMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player2RightArm",
+      "transform": {
+        "position": [
+          4.0,
+          0.89,
+          0.55
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.25,
+          0.8,
+          0.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Player2RightArmMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player2LeftLeg",
+      "transform": {
+        "position": [
+          4.0,
+          0.31,
+          -0.22
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.28,
+          0.65,
+          0.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Player2LeftLegMaterial",
+          "color": [
+            0.12,
+            0.15,
+            0.23
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player2RightLeg",
+      "transform": {
+        "position": [
+          4.0,
+          0.31,
+          0.22
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.28,
+          0.65,
+          0.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Player2RightLegMaterial",
+          "color": [
+            0.12,
+            0.15,
+            0.23
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player2LeftEye",
+      "transform": {
+        "position": [
+          3.743,
+          1.69,
+          -0.1
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.09,
+          0.09,
+          0.09
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "EyeMaterial",
+          "color": [
+            0.04,
+            0.04,
+            0.06
+          ],
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "tag": "Player2RightEye",
+      "transform": {
+        "position": [
+          3.743,
+          1.69,
+          0.1
+        ],
+        "rotation": [
+          0,
+          -1.5708,
+          0
+        ],
+        "scale": [
+          0.09,
+          0.09,
+          0.09
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "EyeMaterial",
+          "color": [
+            0.04,
+            0.04,
+            0.06
+          ],
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "tag": "Match",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "script": {
+        "path": "Scripts/Games/FootballMatch.lua",
+        "enabled": true,
+        "parameters": {}
+      }
+    },
+    {
+      "tag": "Scoreboard",
+      "transform": {
+        "position": [
+          0,
+          2.4,
+          10.3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          9,
+          3.4,
+          0.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreboardMaterial",
+          "color": [
+            0.08,
+            0.09,
+            0.12
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreDash",
+      "transform": {
+        "position": [
+          0,
+          2.4,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          0.2,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PostMaterial",
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueA",
+      "transform": {
+        "position": [
+          -2.0,
+          3.5,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueB",
+      "transform": {
+        "position": [
+          -1.4,
+          2.95,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueC",
+      "transform": {
+        "position": [
+          -1.4,
+          1.85,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueD",
+      "transform": {
+        "position": [
+          -2.0,
+          1.3,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueE",
+      "transform": {
+        "position": [
+          -2.6,
+          1.85,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueF",
+      "transform": {
+        "position": [
+          -2.6,
+          2.95,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreBlueG",
+      "transform": {
+        "position": [
+          -2.0,
+          2.4,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreBlueMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedA",
+      "transform": {
+        "position": [
+          2.0,
+          3.5,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedB",
+      "transform": {
+        "position": [
+          2.6,
+          2.95,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedC",
+      "transform": {
+        "position": [
+          2.6,
+          1.85,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedD",
+      "transform": {
+        "position": [
+          2.0,
+          1.3,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedE",
+      "transform": {
+        "position": [
+          1.4,
+          1.85,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedF",
+      "transform": {
+        "position": [
+          1.4,
+          2.95,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          1.1,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "ScoreRedG",
+      "transform": {
+        "position": [
+          2.0,
+          2.4,
+          10.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          0.25,
+          0.12
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "ScoreRedMaterial",
+          "color": [
+            0.9,
+            0.2,
+            0.15
+          ],
+          "roughness": 0.65
         }
       }
     },
