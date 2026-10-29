@@ -93,5 +93,7 @@ protected:
 	std::unique_ptr<IRenderAdapter> mRenderAdapter;
 
 	RenderAPI mRenderAPI = RenderAPI::DX12;
+    std::string mGameScene;
+    bool mStandalone = false;
 };
 

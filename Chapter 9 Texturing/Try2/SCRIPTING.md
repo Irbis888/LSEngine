@@ -25,6 +25,9 @@ If the editor is hidden, press **~** (the existing editor toggle). Select
 * J/L set the red dynamic body's horizontal velocity; Space requests one impulse.
 * O makes the controller send an `Open` event; the blue door slides upward.
 * X requests deletion of the purple cube. Its OnDestroy runs before component removal.
+* The green FlyingSphere runs `Scripts/FlyInCircle.lua`: x = center.x + radius*cos(angle),
+  z = center.z + radius*sin(angle), y = center.y; angle advances by angularSpeed*dt.
+  Its center/altitude, radius and angular speed (radians/second) are editable in the inspector.
 
 Click the viewport before using gameplay keys; editor-captured input is suppressed using
 the same `ImGuiBridge::WantsCaptureInput()` policy as the existing camera controller.

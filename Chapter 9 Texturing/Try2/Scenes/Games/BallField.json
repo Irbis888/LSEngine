@@ -1,0 +1,887 @@
+{
+  "version": 1,
+  "name": "BallField",
+  "entities": [
+    {
+      "tag": "Field",
+      "transform": {
+        "position": [
+          0,
+          -0.25,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          24,
+          0.5,
+          16
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "FieldMaterial",
+          "color": [
+            0.13,
+            0.38,
+            0.18
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "WestBorder",
+      "transform": {
+        "position": [
+          -12.3,
+          0.9,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          1.8,
+          17.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "WestBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "EastBorder",
+      "transform": {
+        "position": [
+          12.3,
+          0.9,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          1.8,
+          17.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "EastBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "NorthBorder",
+      "transform": {
+        "position": [
+          0,
+          0.9,
+          8.3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          24,
+          1.8,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "NorthBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "SouthBorder",
+      "transform": {
+        "position": [
+          0,
+          0.9,
+          -8.3
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          24,
+          1.8,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "SouthBorderMaterial",
+          "color": [
+            0.3,
+            0.4,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "static",
+        "mass": 1,
+        "useGravity": false,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "tag": "Line-6",
+      "transform": {
+        "position": [
+          -6,
+          0.005,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.04,
+          0.01,
+          15.9
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Line-6Material",
+          "color": [
+            0.8,
+            0.9,
+            0.8
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Line0",
+      "transform": {
+        "position": [
+          0,
+          0.005,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.04,
+          0.01,
+          15.9
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Line0Material",
+          "color": [
+            0.8,
+            0.9,
+            0.8
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Line6",
+      "transform": {
+        "position": [
+          6,
+          0.005,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.04,
+          0.01,
+          15.9
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Line6Material",
+          "color": [
+            0.8,
+            0.9,
+            0.8
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Player",
+      "transform": {
+        "position": [
+          -4,
+          0.91,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.8,
+          1,
+          0.5
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PlayerMaterial",
+          "color": [
+            0.15,
+            0.4,
+            0.95
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "aabb",
+        "halfExtents": [
+          0.5,
+          0.9,
+          0.7
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0,
+        "restitution": 0
+      },
+      "rigidbody": {
+        "type": "dynamic",
+        "mass": 8,
+        "useGravity": true,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      },
+      "script": {
+        "path": "Scripts/Games/FieldPlayer.lua",
+        "enabled": true,
+        "parameters": {}
+      }
+    },
+    {
+      "tag": "PlayerHead",
+      "transform": {
+        "position": [
+          -4,
+          1.66,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.55,
+          0.55,
+          0.55
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "PlayerHeadMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "PlayerLeftArm",
+      "transform": {
+        "position": [
+          -4.55,
+          0.89,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          0.8,
+          0.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PlayerLeftArmMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "PlayerRightArm",
+      "transform": {
+        "position": [
+          -3.45,
+          0.89,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          0.8,
+          0.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PlayerRightArmMaterial",
+          "color": [
+            0.95,
+            0.72,
+            0.5
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "PlayerLeftLeg",
+      "transform": {
+        "position": [
+          -4.22,
+          0.31,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.28,
+          0.65,
+          0.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PlayerLeftLegMaterial",
+          "color": [
+            0.12,
+            0.15,
+            0.23
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "PlayerRightLeg",
+      "transform": {
+        "position": [
+          -3.78,
+          0.31,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.28,
+          0.65,
+          0.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "PlayerRightLegMaterial",
+          "color": [
+            0.12,
+            0.15,
+            0.23
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "Ball",
+      "transform": {
+        "position": [
+          0,
+          0.66,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.3,
+          1.3,
+          1.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "BallMaterial",
+          "color": [
+            0.95,
+            0.75,
+            0.12
+          ],
+          "roughness": 0.65
+        }
+      },
+      "collider": {
+        "type": "sphere",
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "radius": 0.5,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "friction": 0.02,
+        "restitution": 0.35
+      },
+      "rigidbody": {
+        "type": "dynamic",
+        "mass": 1,
+        "useGravity": true,
+        "velocity": [
+          0,
+          0,
+          0
+        ],
+        "acceleration": [
+          0,
+          0,
+          0
+        ]
+      },
+      "script": {
+        "path": "Scripts/Games/BallRoll.lua",
+        "enabled": true,
+        "parameters": {}
+      }
+    },
+    {
+      "tag": "BallSpot",
+      "transform": {
+        "position": [
+          0,
+          1.29,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "BallSpotMaterial",
+          "color": [
+            0.05,
+            0.08,
+            0.12
+          ],
+          "roughness": 0.65
+        }
+      }
+    },
+    {
+      "tag": "PlayerLeftEye",
+      "transform": {
+        "position": [
+          -4.1,
+          1.69,
+          0.257
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.09,
+          0.09,
+          0.09
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "EyeMaterial",
+          "color": [
+            0.04,
+            0.04,
+            0.06
+          ],
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "tag": "PlayerRightEye",
+      "transform": {
+        "position": [
+          -3.9,
+          1.69,
+          0.257
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.09,
+          0.09,
+          0.09
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "EyeMaterial",
+          "color": [
+            0.04,
+            0.04,
+            0.06
+          ],
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "tag": "Camera",
+      "transform": {
+        "position": [
+          0,
+          19,
+          -19
+        ],
+        "rotation": [
+          0.72,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "camera": {
+        "fov": 1.05,
+        "nearZ": 0.1,
+        "farZ": 200,
+        "aspectRatio": 1.3333334
+      }
+    },
+    {
+      "tag": "Sun",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "directionalLight": {
+        "color": [
+          1,
+          0.97,
+          0.9
+        ],
+        "intensity": 1.4,
+        "direction": [
+          -0.4,
+          -0.8,
+          0.3
+        ],
+        "enabled": true
+      }
+    }
+  ]
+}

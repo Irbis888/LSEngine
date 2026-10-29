@@ -88,8 +88,12 @@ int main(int argc, char** argv)
             auto& reg = engine.GetRegistry();
             const auto slow = Find(reg, "SpinnerSlow"), fast = Find(reg, "SpinnerFast");
             Check(slow != entt::null && fast != entt::null, "Lua demo did not publish entities");
+            const auto flying = Find(reg, "FlyingSphere");
+            Check(flying != entt::null, "Flying sphere missing from Lua demo");
+            const auto flightStart = reg.get<TransformComponent>(flying).position;
             for (int i = 0; i < 3; ++i) frame();
             Check(reg.get<TransformComponent>(slow).rotation == glm::vec3(0), "Script ran in Edit");
+            Check(reg.get<TransformComponent>(flying).position == flightStart, "Flying sphere moved in Edit");
             EditorSceneIO::BeginPlay(editor);
             Check(editor.mode == EditorMode::Play && engine.IsPlaying(), "Actual editor BeginPlay failed");
             updateDt = 0;
@@ -98,6 +102,14 @@ int main(int argc, char** argv)
                 "OnUpdate dt or first spinner parameter incorrect");
             Check(std::abs(reg.get<TransformComponent>(fast).rotation.x + updateDt * 1.8) < 1e-4,
                 "Shared file instances did not keep different parameters");
+            const auto& flightParams = reg.get<ScriptComponent>(flying).parameters;
+            const auto center = std::get<glm::vec3>(flightParams.at("center"));
+            const double radius = std::get<double>(flightParams.at("radius"));
+            const double angle = updateDt * std::get<double>(flightParams.at("angularSpeed"));
+            const auto position = reg.get<TransformComponent>(flying).position;
+            Check(glm::length(position - (center + glm::vec3(float(radius * std::cos(angle)), 0,
+                float(radius * std::sin(angle))))) < 1e-4f, "Lua circular flight formula or frame dt incorrect");
+            Check(glm::length(position - flightStart) > 0, "Flying sphere did not move in Play");
             input.keysPressed['O'] = true; frame();
             const auto door = Find(reg, "Door"); const auto oldDoorY = reg.get<TransformComponent>(door).position.y;
             for (int i = 0; i < 10; ++i) frame();
@@ -116,6 +128,8 @@ int main(int argc, char** argv)
             Check(!engine.GetScripts().GetRuntime().Valid(oldSession), "Stop did not invalidate entity references");
             waitScene();
             Check(Find(reg, "DeleteMe") != entt::null, "Stop did not restore deleted entity");
+            Check(reg.get<TransformComponent>(Find(reg, "FlyingSphere")).position == flightStart,
+                "Stop did not restore flying sphere's position");
             const auto restoredSlow = Find(reg, "SpinnerSlow");
             Check(reg.get<TransformComponent>(restoredSlow).rotation == glm::vec3(0), "Snapshot rotation was not restored");
             Check(std::get<std::string>(reg.get<ScriptComponent>(restoredSlow).parameters.at("label")) == "slow independent instance",

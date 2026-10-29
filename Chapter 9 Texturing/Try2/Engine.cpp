@@ -54,12 +54,13 @@ struct Engine::PendingScene
 Engine::Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot)
     : mRenderAdapter(renderer), mAssetRoot(assetRoot.empty() ? AssetPaths::FindRoot() : std::filesystem::weakly_canonical(assetRoot)) {}
 
-void Engine::Init(const GameTimer& gt) {
+void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool standalone) {
+    mStandalone = standalone;
 	const uint32_t hardwareThreads = std::thread::hardware_concurrency();
 	mJobs.Init(std::min<uint32_t>(15, hardwareThreads > 1 ? hardwareThreads - 1 : 1));
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
-	updateSystems.push_back(std::make_unique<CameraControllerSystem>());
+	if (!mStandalone) updateSystems.push_back(std::make_unique<CameraControllerSystem>());
     auto scripts = std::make_unique<ScriptSystem>(mAssetRoot);
     auto* scriptSystem = scripts.get();
     updateSystems.push_back(std::move(scripts));
@@ -68,7 +69,12 @@ void Engine::Init(const GameTimer& gt) {
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 
-	if (const std::filesystem::path* scenePath = FindScenePath())
+    if (!startupScene.empty())
+    {
+        std::string error;
+        if (!LoadScene(startupScene, error)) throw std::runtime_error(error);
+    }
+	else if (const std::filesystem::path* scenePath = FindScenePath())
 	{
         std::string error;
         mStartupScene = true;
@@ -108,7 +114,7 @@ void Engine::Update(const FrameContext& context)
 }
 void Engine::PhysicsUpdate(const FrameContext& context)
 {
-	if (IsSceneLoading() || (!IsPlaying() && !Editor_IsPhysicsEnabled()))
+	if (IsSceneLoading() || (!IsPlaying() && (mStandalone || !Editor_IsPhysicsEnabled())))
 		return;
 
     if (mScripts) mScripts->FixedUpdate(context);
@@ -274,7 +280,15 @@ void Engine::PumpSceneLoading()
             mStartupScene = false;
             std::cout << "Loaded scene from " << mSceneProgress.path << '\n';
             mPendingScene.reset();
-            if (mQueuedRestore.empty()) mScripts->SceneReady();
+            if (mQueuedRestore.empty())
+            {
+                mScripts->SceneReady();
+                if (mStandalone && !IsPlaying())
+                {
+                    std::string error;
+                    if (!BeginPlay(error)) throw std::runtime_error(error);
+                }
+            }
         }
     }
     catch (const std::exception& error)

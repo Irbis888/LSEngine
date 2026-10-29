@@ -242,6 +242,9 @@
     <None Include="Scenes\DemoScene.json" />
     <None Include="Scenes\LuaDemo.json" />
     <None Include="Scripts\*.lua" />
+    <None Include="Scripts\Games\*.lua" />
+    <None Include="Scenes\Games\*.json" />
+    <None Include="Games\BallField\*" />
     <None Include="SCRIPTING.md" />
     <None Include="Scenes\PhysicsMixed512.json" />
     <None Include="Scenes\PhysicsStress256.json" />

@@ -178,7 +178,7 @@ bool Application::Initialize()
 	ImGuiBridge::OnApplicationInit(mhMainWnd, static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
 
 	mEngine = std::make_unique<Engine>(mRenderAdapter.get());
-	mEngine->Init(mTimer);
+	mEngine->Init(mTimer, mGameScene, mStandalone);
 
 	OnResize();
 

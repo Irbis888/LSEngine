@@ -458,6 +458,61 @@
       }
     },
     {
+      "tag": "FlyingSphere",
+      "transform": {
+        "position": [
+          3.5,
+          4,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          0.6,
+          0.6
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "FlyingSphereMaterial",
+          "color": [
+            0.25,
+            1.0,
+            0.65
+          ],
+          "roughness": 0.35
+        }
+      },
+      "script": {
+        "path": "Scripts/FlyInCircle.lua",
+        "enabled": true,
+        "parameters": {
+          "center": {
+            "type": "Vec3",
+            "value": [
+              0,
+              4,
+              2
+            ]
+          },
+          "radius": {
+            "type": "number",
+            "value": 3.5
+          },
+          "angularSpeed": {
+            "type": "number",
+            "value": 0.9
+          }
+        }
+      }
+    },
+    {
       "tag": "LuaDemoSun",
       "transform": {
         "position": [

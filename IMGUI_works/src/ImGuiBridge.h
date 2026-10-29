@@ -9,6 +9,7 @@ class Engine;
 
 namespace ImGuiBridge
 {
+    void SetRuntimeMode(bool game);
     void SetAppInstance(HINSTANCE inst);
     void SetEngine(Engine* engine);
 

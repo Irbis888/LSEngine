@@ -8,6 +8,11 @@
 #include "ScriptSystem.h"
 #include "Editor/EditorContext.h"
 #include "Editor/EditorSceneIO.h"
+#include "AssetPaths.h"
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <shellapi.h>
+#pragma comment(lib, "Shell32.lib")
 
 #include <string>
 #include <filesystem>
@@ -54,7 +59,8 @@ namespace
 class TestApp : public Application
 {
 public:
-    TestApp(HINSTANCE hInstance, bool scriptSmoke = false);
+    TestApp(HINSTANCE hInstance, bool scriptSmoke = false, const std::string& gameScene = {},
+        const std::wstring& title = L"LS Engine", bool gameSmoke = false);
     /*TestApp(const TestApp& rhs) = delete;
     TestApp& operator=(const TestApp& rhs) = delete;
     ~TestApp();*/
@@ -63,6 +69,10 @@ public:
 
 private:
     void CheckScriptSmoke();
+    void CheckGameSmoke();
+    bool mGameSmoke = false;
+    int mGameSteps = 0;
+    float mBallMaxX = 0;
     bool mScriptSmoke = false;
     int mScriptSmokeStage = 0, mScriptSmokeFrames = 0, mScriptSmokeTotalFrames = 0;
     //virtual void Init()override;
@@ -71,23 +81,45 @@ private:
     virtual void Draw(const FrameContext& context)override;
 };
 
-TestApp::TestApp(HINSTANCE hInstance, bool scriptSmoke)
-    : Application(hInstance), mScriptSmoke(scriptSmoke)
+TestApp::TestApp(HINSTANCE hInstance, bool scriptSmoke, const std::string& gameScene,
+    const std::wstring& title, bool gameSmoke)
+    : Application(hInstance), mScriptSmoke(scriptSmoke), mGameSmoke(gameSmoke)
 {
+    mGameScene = gameScene;
+    mStandalone = !gameScene.empty();
+    mMainWndCaption = title;
+    ImGuiBridge::SetRuntimeMode(mStandalone);
 }
 
 
 void TestApp::PhysicsUpdate(const FrameContext& context)
 {
 	ZoneScopedN("PhysicsUpdate");
-    mEngine->PhysicsUpdate(context);
+    if (mGameSmoke && mEngine->IsPlaying())
+    {
+        auto scripted = context;
+        scripted.input = {};
+        scripted.input.keys[mGameSteps < 240 ? 'D' : mGameSteps < 420 ? 'W' : mGameSteps < 660 ? 'A' : 'S'] = true;
+        ++mGameSteps;
+        mEngine->PhysicsUpdate(scripted);
+    }
+    else mEngine->PhysicsUpdate(context);
 }
 void TestApp::Update(const FrameContext& context)
 {
 	ZoneScopedN("Update");
-    if (mScriptSmoke) mTimer.Start(); // Hidden smoke runs still need a ticking game clock.
-	mEngine->Update(context);
+    if (mScriptSmoke || mGameSmoke) mTimer.Start(); // Hidden validation still needs a ticking clock.
+    if (mGameSmoke)
+    {
+        auto scripted = context;
+        scripted.input = {};
+        scripted.input.keys[mGameSteps < 240 ? 'D' : mGameSteps < 420 ? 'W' : mGameSteps < 660 ? 'A' : 'S'] = true;
+        mEngine->Update(scripted);
+    }
+    else mEngine->Update(context);
     if (mScriptSmoke) CheckScriptSmoke();
+    if (mGameSmoke) CheckGameSmoke();
+    if (mStandalone && context.input.keysPressed[VK_ESCAPE]) PostQuitMessage(0);
 }
 void TestApp::Draw(const FrameContext& context)
 {
@@ -159,14 +191,66 @@ void TestApp::CheckScriptSmoke()
     }
 }
 
+void TestApp::CheckGameSmoke()
+{
+    try
+    {
+        if (!mEngine->GetSceneLoadProgress().error.empty()) throw std::runtime_error(mEngine->GetSceneLoadProgress().error);
+        if (!mEngine->IsPlaying()) return;
+        if (ImGuiBridge::IsVisible() || ImGuiBridge::IsLicensed()) throw std::runtime_error("Editor enabled in game mode");
+        auto& reg = mEngine->GetRegistry();
+        for (auto entity : reg.view<TagComponent, TransformComponent>())
+        {
+            const auto& tag = reg.get<TagComponent>(entity).tag;
+            const auto& p = reg.get<TransformComponent>(entity).position;
+            if (tag == "Ball") mBallMaxX = (std::max)(mBallMaxX, p.x);
+            if ((tag == "Ball" || tag == "Player") && (std::abs(p.x) > 12.1f || std::abs(p.z) > 8.1f || p.y < -0.1f))
+                throw std::runtime_error("Body escaped the static field");
+            if (tag == "Camera" && p != glm::vec3(0,19,-19)) throw std::runtime_error("Editor camera consumed gameplay input");
+            if ((tag == "Field" || tag.ends_with("Border")) && reg.get<RigidbodyComponent>(entity).type != RigidbodyType::Static)
+                throw std::runtime_error("Field/border is not static");
+            if (reg.all_of<ScriptComponent>(entity) && !mEngine->GetScripts().GetError(entity).empty())
+                throw std::runtime_error(mEngine->GetScripts().GetError(entity));
+        }
+        if (mGameSteps >= 840)
+        {
+            if (mBallMaxX < 3) throw std::runtime_error("Player did not physically push the ball");
+            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, player hitbox, ball pushed, static field/borders; max_ball_x=" << mBallMaxX << std::endl;
+            mGameSmoke = false; PostQuitMessage(0);
+        }
+    }
+    catch (const std::exception& error) { std::cerr << "GAME_SMOKE_FAIL: " << error.what() << std::endl; mGameSmoke = false; PostQuitMessage(2); }
+}
+
 int main(int argc, char** argv)
 {   
 
     try
     {
         ConfigureRuntimeDirectory();
+        std::string gameScene;
+        std::wstring title = L"LS Engine";
+        bool gameSmoke = false;
+        int argumentCount = 0;
+        auto** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+        if (!arguments) throw std::runtime_error("Cannot parse command line");
+        std::vector<std::wstring> options(arguments, arguments + argumentCount);
+        LocalFree(arguments);
+        if (options.size() > 1 && (options[1] == L"--game" || options[1] == L"--game-smoke"))
+        {
+            if (options.size() != 3) throw std::runtime_error("Usage: Try2.exe --game Games/BallField/game.json");
+            gameSmoke = options[1] == L"--game-smoke";
+            const auto manifest = AssetPaths::Resolve(AssetPaths::FindRoot(), AssetPaths::ToUtf8(std::filesystem::path(options[2])));
+            std::ifstream file(manifest);
+            if (!file) throw std::runtime_error("Cannot open game manifest");
+            const auto data = nlohmann::json::parse(file);
+            gameScene = data.at("scene").get<std::string>();
+            if (gameScene.empty()) throw std::runtime_error("Game scene must not be empty");
+            const auto controls = data.value("controls", "");
+            title = AssetPaths::FromUtf8(data.value("title", "LS Engine Game") + (controls.empty() ? "" : " | " + controls)).native();
+        }
         HINSTANCE hInstance = GetModuleHandle(nullptr);
-        TestApp theApp(hInstance, argc == 2 && std::string_view(argv[1]) == "--lua-smoke");
+        TestApp theApp(hInstance, argc == 2 && std::string_view(argv[1]) == "--lua-smoke", gameScene, title, gameSmoke);
         if (!theApp.Initialize())
             return 0;
 

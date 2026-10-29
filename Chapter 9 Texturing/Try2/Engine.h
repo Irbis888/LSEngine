@@ -17,6 +17,7 @@ private:
     std::unique_ptr<World> mRetiredWorld;
     void PumpSceneLoading();
     bool mStartupScene = false;
+    bool mStandalone = false;
 
     std::filesystem::path mAssetRoot;
     std::string mQueuedRestore;
@@ -52,7 +53,8 @@ public:
     void SetSceneLoadingBudget(const SceneLoadingBudget& budget);
     const SceneLoadingBudget& GetSceneLoadingBudget() const { return mSceneLoadingBudget; }
 
-	void Init(const GameTimer& gt);
+	void Init(const GameTimer& gt, const std::string& startupScene = {}, bool standalone = false);
+    bool IsStandalone() const { return mStandalone; }
 	void Update(const FrameContext& context);
 	void PhysicsUpdate(const FrameContext& context);
 	void Draw(const FrameContext& context);

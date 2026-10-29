@@ -23,6 +23,7 @@ namespace
     D3DRenderAdapter* g_Adapter = nullptr;
 
     bool g_Licensed = false;
+    bool g_RuntimeMode = false;
     bool g_Visible = false;
     bool g_Initialized = false;
 
@@ -125,10 +126,16 @@ namespace
     }
 }
 
+void ImGuiBridge::SetRuntimeMode(bool game)
+{
+    g_RuntimeMode = game;
+    if (game) { g_Licensed = false; g_Visible = false; }
+}
+
 void ImGuiBridge::SetAppInstance(HINSTANCE inst)
 {
     g_AppInst = inst;
-    g_Licensed = ImGuiPlatform::IsLicensed(inst);
+    g_Licensed = !g_RuntimeMode && ImGuiPlatform::IsLicensed(inst);
 }
 
 void ImGuiBridge::SetEngine(Engine* engine)
@@ -144,7 +151,7 @@ void ImGuiBridge::OnApplicationInit(HWND hwnd, D3DRenderAdapter* adapter)
     g_Adapter = adapter;
     if (!g_AppInst)
         g_AppInst = (HINSTANCE)GetModuleHandle(nullptr);
-    g_Licensed = ImGuiPlatform::IsLicensed(g_AppInst);
+    g_Licensed = !g_RuntimeMode && ImGuiPlatform::IsLicensed(g_AppInst);
 }
 
 void ImGuiBridge::OnApplicationShutdown()
