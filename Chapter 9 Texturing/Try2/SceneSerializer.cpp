@@ -61,7 +61,9 @@ namespace
     SceneSerializer::MeshDescription ReadMesh(const json& value, const std::string& entityName)
     {
         SceneSerializer::MeshDescription mesh;
-        if (value.contains("id")) { mesh.existing = value.at("id").get<MeshID>(); return mesh; }
+        // A Play snapshot stores both: the session id for reuse and the source for later saves.
+        if (value.contains("id")) mesh.existing = value.at("id").get<MeshID>();
+        if (mesh.existing && !value.contains("source")) return mesh;
         mesh.source = value.value("source", "primitive");
         if (mesh.source == "model")
         {
@@ -77,6 +79,23 @@ namespace
         }
         else throw std::runtime_error("Unknown mesh source: " + mesh.source);
         return mesh;
+    }
+
+    json MaterialToJson(const MaterialDesc& material)
+    {
+        json value{ { "name", material.name }, { "color", Vec3ToJson(material.color) }, { "roughness", material.roughness } };
+        if (!material.albedoTexture.empty()) value["albedo"] = AssetPaths::ToUtf8(material.albedoTexture);
+        if (!material.normalTexture.empty()) value["normal"] = AssetPaths::ToUtf8(material.normalTexture);
+        return value;
+    }
+
+    json MeshToJson(const SceneSerializer::MeshDescription& mesh)
+    {
+        json value{ { "source", mesh.source } };
+        if (mesh.source == "model") value["path"] = mesh.path;
+        else value["primitive"] = mesh.primitive;
+        if (mesh.material) value["material"] = MaterialToJson(*mesh.material);
+        return value;
     }
 
     MeshID CreateMesh(ResourceManager& resources, const SceneSerializer::MeshDescription& mesh)
@@ -355,16 +374,38 @@ namespace
         }
         return result;
     }
+    SceneSerializer::EntityDescription ReadEntity(const json& value, const std::string& defaultTag)
+    {
+        if (!value.is_object()) throw std::runtime_error("Entity must be an object");
+        SceneSerializer::EntityDescription entity;
+        entity.tag = value.value("tag", defaultTag);
+        entity.transform = JsonToTransform(value.value("transform", json::object()));
+        if (value.contains("mesh")) entity.mesh = ReadMesh(value.at("mesh"), entity.tag);
+        if (value.contains("camera")) entity.camera = JsonToCamera(value.at("camera"));
+        if (value.contains("directionalLight")) entity.directionalLight = JsonToDirectionalLight(value.at("directionalLight"));
+        if (value.contains("pointLight")) entity.pointLight = JsonToPointLight(value.at("pointLight"));
+        if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
+        if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
+        if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
+        if (value.contains("script")) entity.script = ScriptFromJson(value.at("script"));
+        return entity;
+    }
 }
 
-void SceneSerializer::Save(const World& world, const std::string& path, const std::filesystem::path& assetRoot)
+size_t SceneSerializer::Save(const World& world, const std::string& path, const std::filesystem::path& assetRoot,
+    bool keepRuntimeMeshIds)
 {
     json scene;
     scene["version"] = 1;
+    scene["name"] = AssetPaths::ToUtf8(AssetPaths::FromUtf8(path).stem());
     scene["entities"] = json::array();
+    size_t runtimeOnlyMeshes = 0;
 
     auto view = world.registry.view<TagComponent, TransformComponent>();
-    for (entt::entity entity : view)
+    // EnTT iterates newest first; write entities in creation order so load/save keeps the file order.
+    std::vector<entt::entity> entities(view.begin(), view.end());
+    std::reverse(entities.begin(), entities.end());
+    for (entt::entity entity : entities)
     {
         const auto& tag = view.get<TagComponent>(entity);
         const auto& transform = view.get<TransformComponent>(entity);
@@ -375,9 +416,11 @@ void SceneSerializer::Save(const World& world, const std::string& path, const st
 
         if (const auto* mesh = world.registry.try_get<MeshComponent>(entity))
         {
-            serializedEntity["mesh"] = {
-                { "id", mesh->meshID }
-            };
+            const auto* source = world.registry.try_get<MeshSourceComponent>(entity);
+            json value = source ? MeshToJson(source->mesh) : json::object();
+            if (!source) ++runtimeOnlyMeshes;
+            if (!source || keepRuntimeMeshIds) value["id"] = mesh->meshID;
+            serializedEntity["mesh"] = std::move(value);
         }
 
         if (const auto* camera = world.registry.try_get<CameraComponent>(entity))
@@ -419,7 +462,8 @@ void SceneSerializer::Save(const World& world, const std::string& path, const st
     if (!out)
         throw std::runtime_error("Failed to open scene file for writing: " + path);
 
-    out << scene.dump(4);
+    out << scene.dump(2) << '\n';
+    return runtimeOnlyMeshes;
 }
 
 void SceneSerializer::Load(World& world, const std::string& path)
@@ -441,21 +485,7 @@ SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
     const auto& entities = scene.at("entities");
     if (!entities.is_array()) throw std::runtime_error("Scene entities must be an array");
     data.entities.reserve(entities.size());
-    for (const auto& value : entities)
-    {
-        EntityDescription entity;
-        entity.tag = value.value("tag", "Entity");
-        entity.transform = JsonToTransform(value.value("transform", json::object()));
-        if (value.contains("mesh")) entity.mesh = ReadMesh(value.at("mesh"), entity.tag);
-        if (value.contains("camera")) entity.camera = JsonToCamera(value.at("camera"));
-        if (value.contains("directionalLight")) entity.directionalLight = JsonToDirectionalLight(value.at("directionalLight"));
-        if (value.contains("pointLight")) entity.pointLight = JsonToPointLight(value.at("pointLight"));
-        if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
-        if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
-        if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
-        if (value.contains("script")) entity.script = ScriptFromJson(value.at("script"));
-        data.entities.push_back(std::move(entity));
-    }
+    for (const auto& value : entities) data.entities.push_back(ReadEntity(value, "Entity"));
     // A scene can put its camera last. Publish camera and lights before mesh
     // batches, so progressive rendering has a valid view from the first batch.
     const auto priority = [](const EntityDescription& entity)
@@ -465,22 +495,49 @@ SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
     return data; // The large JSON tree is destroyed on the reading worker.
 }
 
+SceneSerializer::EntityDescription SceneSerializer::ReadPrefab(const std::filesystem::path& file, const std::string& defaultTag)
+{
+    std::ifstream in(file);
+    if (!in) throw std::runtime_error("Failed to open prefab: " + AssetPaths::ToUtf8(file));
+    if (std::filesystem::file_size(file) > 1024 * 1024) throw std::runtime_error("Prefab exceeds 1 MiB");
+    json value;
+    try { in >> value; }
+    catch (const json::exception& error) { throw std::runtime_error("Prefab JSON error: " + std::string(error.what())); }
+    // Mesh IDs are runtime handles of one session; a template must describe its mesh.
+    if (value.is_object() && value.contains("mesh") && value.at("mesh").contains("id"))
+        throw std::runtime_error("Prefab mesh must use source/primitive or a model path, not a runtime id");
+    if (value.is_object() && value.contains("camera")) throw std::runtime_error("Prefabs cannot contain a camera");
+    return ReadEntity(value, defaultTag);
+}
+
+void SceneSerializer::Instantiate(entt::registry& registry, entt::entity entity, ResourceManager& resources,
+    const EntityDescription& description)
+{
+    registry.emplace<TagComponent>(entity, TagComponent{ description.tag });
+    registry.emplace<TransformComponent>(entity, description.transform);
+    if (description.mesh)
+    {
+        registry.emplace<MeshComponent>(entity, MeshComponent{ CreateMesh(resources, *description.mesh) });
+        if (!description.mesh->source.empty())
+        {
+            auto source = *description.mesh;
+            source.existing.reset();
+            registry.emplace<MeshSourceComponent>(entity, MeshSourceComponent{ std::move(source) });
+        }
+    }
+    if (description.camera) registry.emplace<CameraComponent>(entity, *description.camera);
+    if (description.directionalLight) registry.emplace<DirectionalLightComponent>(entity, *description.directionalLight);
+    if (description.pointLight) registry.emplace<PointLightComponent>(entity, *description.pointLight);
+    if (description.spotLight) registry.emplace<SpotLightComponent>(entity, *description.spotLight);
+    if (description.rigidbody) registry.emplace<RigidbodyComponent>(entity, *description.rigidbody);
+    if (description.collider) registry.emplace<ColliderComponent>(entity, *description.collider);
+    if (description.script) registry.emplace<ScriptComponent>(entity, *description.script);
+}
+
 void SceneSerializer::CreateEntity(World& world, ResourceManager& resources, const EntityDescription& description)
 {
     const entt::entity entity = world.registry.create();
-    try
-    {
-        world.registry.emplace<TagComponent>(entity, TagComponent{ description.tag });
-        world.registry.emplace<TransformComponent>(entity, description.transform);
-        if (description.mesh) world.registry.emplace<MeshComponent>(entity, MeshComponent{ CreateMesh(resources, *description.mesh) });
-        if (description.camera) world.registry.emplace<CameraComponent>(entity, *description.camera);
-        if (description.directionalLight) world.registry.emplace<DirectionalLightComponent>(entity, *description.directionalLight);
-        if (description.pointLight) world.registry.emplace<PointLightComponent>(entity, *description.pointLight);
-        if (description.spotLight) world.registry.emplace<SpotLightComponent>(entity, *description.spotLight);
-        if (description.rigidbody) world.registry.emplace<RigidbodyComponent>(entity, *description.rigidbody);
-        if (description.collider) world.registry.emplace<ColliderComponent>(entity, *description.collider);
-        if (description.script) world.registry.emplace<ScriptComponent>(entity, *description.script);
-    }
+    try { Instantiate(world.registry, entity, resources, description); }
     catch (...) { world.registry.destroy(entity); throw; }
 }
 

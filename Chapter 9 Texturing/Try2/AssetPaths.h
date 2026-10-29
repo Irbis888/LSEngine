@@ -10,4 +10,6 @@ namespace AssetPaths
     std::filesystem::path Resolve(const std::filesystem::path& root, const std::string& value);
     // Returns a canonical relative script path; rejects paths outside Scripts/.
     std::string ScriptPath(const std::filesystem::path& root, const std::string& value);
+    // Same containment rule for entity templates: a .json file inside Prefabs/.
+    std::string PrefabPath(const std::filesystem::path& root, const std::string& value);
 }

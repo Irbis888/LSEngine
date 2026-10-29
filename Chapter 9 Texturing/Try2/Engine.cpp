@@ -49,6 +49,7 @@ struct Engine::PendingScene
     std::shared_ptr<Result> result;
     JobSystem::TaskHandle task;
     bool publishing = false;
+    bool restore = false; // Play snapshot: keep the current scene path.
 };
 
 Engine::Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot)
@@ -60,12 +61,13 @@ void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool sta
 	mJobs.Init(std::min<uint32_t>(15, hardwareThreads > 1 ? hardwareThreads - 1 : 1));
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
-	if (!mStandalone) updateSystems.push_back(std::make_unique<CameraControllerSystem>());
+	if (!mStandalone) updateSystems.push_back(std::make_unique<CameraControllerSystem>([this] { return IsPlaying(); }));
     auto scripts = std::make_unique<ScriptSystem>(mAssetRoot);
     auto* scriptSystem = scripts.get();
     updateSystems.push_back(std::move(scripts));
     mScripts = scriptSystem;
     mScripts->Bind(world.registry);
+    mScripts->SetResources(&mResourceManager);
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 
@@ -153,7 +155,7 @@ bool Engine::RestorePlaySnapshot(const std::string& path, std::string& outError)
         if (!std::filesystem::is_regular_file(absolute)) throw std::runtime_error("Play snapshot is missing: " + path);
         const auto filename = AssetPaths::ToUtf8(absolute);
         if (mPendingScene) { mQueuedRestore = filename; outError.clear(); return true; }
-        return LoadScene(filename, outError);
+        return RequestScene(filename, outError, true);
     }
     catch (const std::exception& error) { outError = error.what(); return false; }
 }
@@ -166,12 +168,14 @@ void Engine::Draw(const FrameContext& context)
 	}
 }
 
-bool Engine::SaveScene(const std::string& path, std::string& outError)
+bool Engine::SaveScene(const std::string& path, std::string& outError, bool keepRuntimeMeshIds, size_t* runtimeOnlyMeshes)
 {
     if (IsSceneLoading()) { outError = "Scene is still loading"; return false; }
 	try
 	{
-		SceneSerializer::Save(world, AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path)), mAssetRoot);
+		const size_t runtimeOnly = SceneSerializer::Save(world, AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path)),
+            mAssetRoot, keepRuntimeMeshIds);
+        if (runtimeOnlyMeshes) *runtimeOnlyMeshes = runtimeOnly;
 		outError.clear();
 		return true;
 	}
@@ -184,12 +188,18 @@ bool Engine::SaveScene(const std::string& path, std::string& outError)
 
 bool Engine::LoadScene(const std::string& path, std::string& outError)
 {
+    return RequestScene(path, outError, false);
+}
+
+bool Engine::RequestScene(const std::string& path, std::string& outError, bool restore)
+{
     if (!mJobs.IsInitialized()) { outError = "Engine is not initialized"; return false; }
     if (IsSceneLoading()) { outError = "A scene load is already in progress"; return false; }
     try
     {
         auto pending = std::make_unique<PendingScene>();
         pending->result = std::make_shared<PendingScene::Result>();
+        pending->restore = restore;
         const std::string filename = AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path));
         pending->task = mJobs.Submit([result = pending->result, filename]
         {
@@ -223,7 +233,7 @@ void Engine::PumpSceneLoading()
         auto path = std::move(mQueuedRestore);
         mQueuedRestore.clear();
         std::string error;
-        if (!LoadScene(path, error)) mSceneProgress.error = "Snapshot restore failed: " + error;
+        if (!RequestScene(path, error, true)) mSceneProgress.error = "Snapshot restore failed: " + error;
     }
     const double budgetMs = mStartupScene ? mSceneLoadingBudget.initialMilliseconds : mSceneLoadingBudget.streamingMilliseconds;
     const auto overBudget = [&]
@@ -279,6 +289,7 @@ void Engine::PumpSceneLoading()
             mSceneProgress.active = false;
             mStartupScene = false;
             std::cout << "Loaded scene from " << mSceneProgress.path << '\n';
+            if (!pending.restore) mScenePath = mSceneProgress.path;
             mPendingScene.reset();
             if (mQueuedRestore.empty())
             {

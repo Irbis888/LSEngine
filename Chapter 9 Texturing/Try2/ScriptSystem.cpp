@@ -1,5 +1,6 @@
 #include "ScriptSystem.h"
 #include "ImGuiBridge.h"
+#include <iostream>
 
 ScriptSystem::ScriptSystem(std::filesystem::path root) : mRuntime(std::move(root)) {}
 ScriptSystem::~ScriptSystem() { EndPlay(); Disconnect(); mRuntime.Unbind(); }
@@ -30,7 +31,7 @@ void ScriptSystem::BeforeSceneChange()
 void ScriptSystem::SceneReady()
 {
     mReady = true;
-    if (mPlaying) { Sync(); FlushDestructions(); }
+    if (mPlaying) { Sync(); FlushSpawns(); FlushDestructions(); }
 }
 void ScriptSystem::BeginPlay()
 {
@@ -40,6 +41,7 @@ void ScriptSystem::BeginPlay()
     mPlaying = true;
     mLastErrors.clear();
     Sync();
+    FlushSpawns();
     FlushDestructions();
 }
 void ScriptSystem::EndPlay()
@@ -51,6 +53,7 @@ void ScriptSystem::EndPlay()
 void ScriptSystem::DestroyAll()
 {
     mStopping = true;
+    DiscardSpawns();
     mRuntime.ClearCommands();
     while (!mInstances.empty())
     {
@@ -58,6 +61,7 @@ void ScriptSystem::DestroyAll()
         if (mRegistry && mRegistry->valid(entity)) RemoveInstance(*mRegistry, entity);
         else { mRuntime.Release(mInstances.begin()->second); mInstances.erase(mInstances.begin()); }
     }
+    DiscardSpawns();
     mRuntime.ClearCommands(); // Discard commands/events emitted by OnDestroy during teardown.
     mStopping = false;
 }
@@ -106,8 +110,10 @@ void ScriptSystem::Update(entt::registry& registry, const FrameContext& context)
     Sync();
     for (auto& [entity, instance] : mInstances)
         if (mRegistry->get<ScriptComponent>(entity).enabled) mRuntime.Call(instance, "OnUpdate", context.timer.DeltaTime());
+    FlushSpawns();
     FlushDestructions();
     DeliverEvents();
+    FlushSpawns();
     FlushDestructions();
 }
 void ScriptSystem::FixedUpdate(const FrameContext& context)
@@ -119,6 +125,7 @@ void ScriptSystem::FixedUpdate(const FrameContext& context)
     Sync();
     for (auto& [entity, instance] : mInstances)
         if (mRegistry->get<ScriptComponent>(entity).enabled) mRuntime.Call(instance, "OnFixedUpdate", context.physDT);
+    FlushSpawns();
     FlushDestructions(); // All scripts finish before PhysicsSystem dispatches any workers.
 }
 void ScriptSystem::DeliverEvents()
@@ -139,6 +146,38 @@ void ScriptSystem::FlushDestructions()
     if (mStopping) return;
     auto commands = mRuntime.TakeDestructions();
     for (auto entity : commands) if (mRuntime.Valid(entity)) DestroyEntity(entity.entity);
+}
+// Spawned components appear here, never inside a callback. Their scripts start
+// (OnInit) at the next Sync, i.e. the following fixed step or update.
+void ScriptSystem::FlushSpawns()
+{
+    if (mStopping) return;
+    for (auto& spawn : mRuntime.TakeSpawns())
+    {
+        if (!mRuntime.Valid(spawn.entity)) continue; // Destroyed again before the boundary.
+        try
+        {
+            if (!mResources) throw std::logic_error("Entity.Spawn requires the engine's ResourceManager");
+            auto description = *spawn.prefab;
+            description.transform.position = spawn.position;
+            for (auto& [name, value] : spawn.overrides) description.script->parameters[name] = std::move(value);
+            SceneSerializer::Instantiate(*mRegistry, spawn.entity.entity, *mResources, description);
+            // Later copies reuse this mesh/material, so repeated spawns do not grow resource tables.
+            if (spawn.prefab->mesh && !spawn.prefab->mesh->existing)
+                spawn.prefab->mesh->existing = mRegistry->get<MeshComponent>(spawn.entity.entity).meshID;
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "[Lua] Spawn " << spawn.path << " failed: " << error.what() << std::endl;
+            DestroyEntity(spawn.entity.entity);
+        }
+    }
+}
+void ScriptSystem::DiscardSpawns()
+{
+    // Reserved IDs have no components yet; drop them with the stopped session.
+    for (const auto& spawn : mRuntime.TakeSpawns())
+        if (mRegistry && mRuntime.Valid(spawn.entity)) mRegistry->destroy(spawn.entity.entity);
 }
 void ScriptSystem::DestroyEntity(entt::entity entity)
 {

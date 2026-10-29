@@ -9,6 +9,7 @@ public:
     explicit ScriptSystem(std::filesystem::path root);
     ~ScriptSystem();
     void Bind(entt::registry& registry);
+    void SetResources(ResourceManager* resources) { mResources = resources; } // Needed by Entity.Spawn meshes.
     void BeforeSceneChange();
     void SceneReady();
     void BeginPlay();
@@ -25,11 +26,14 @@ private:
     void Sync();
     void DeliverEvents();
     void FlushDestructions();
+    void FlushSpawns();
+    void DiscardSpawns();
     void RemoveInstance(entt::registry& registry, entt::entity entity);
     void DestroyAll();
     void Disconnect();
     ScriptRuntime mRuntime;
     entt::registry* mRegistry = nullptr;
+    ResourceManager* mResources = nullptr;
     bool mPlaying = false, mReady = true, mStopping = false;
     std::map<entt::entity, ScriptRuntime::Instance> mInstances;
     std::unordered_set<entt::entity> mDestroying;

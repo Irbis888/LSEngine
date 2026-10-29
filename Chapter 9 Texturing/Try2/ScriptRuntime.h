@@ -1,6 +1,7 @@
 #pragma once
 #include "Commons.h"
 #include "ScriptComponent.h"
+#include "SceneSerializer.h"
 #include <deque>
 #include <filesystem>
 #include <functional>
@@ -26,6 +27,16 @@ public:
         std::string error;
     };
     struct Description { ScriptParameters defaults; std::string error; };
+    // Entity.Spawn reserves the ID at once; components are added at the next safe boundary.
+    struct SpawnRequest
+    {
+        EntityRef entity;
+        std::string path; // Canonical Prefabs/... path, for diagnostics.
+        // Shared with the per-session prefab cache; ScriptSystem stores the first mesh ID in it.
+        std::shared_ptr<SceneSerializer::EntityDescription> prefab;
+        glm::vec3 position{};
+        ScriptParameters overrides;
+    };
 
     explicit ScriptRuntime(std::filesystem::path assetRoot);
     ~ScriptRuntime();
@@ -41,6 +52,7 @@ public:
     void ClearCommands();
     std::deque<Event> TakeEvents(); // Snapshot: newly sent events wait until next pass.
     std::vector<EntityRef> TakeDestructions();
+    std::vector<SpawnRequest> TakeSpawns();
     bool Valid(EntityRef entity) const;
     EntityRef Reference(entt::entity entity) const;
     const std::filesystem::path& GetAssetRoot() const;

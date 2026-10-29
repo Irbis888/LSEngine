@@ -1,0 +1,51 @@
+{
+  "tag": "ConfettiRed",
+  "transform": {
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.18,
+      0.04,
+      0.12
+    ]
+  },
+  "mesh": {
+    "source": "primitive",
+    "primitive": "cube",
+    "material": {
+      "name": "ConfettiRedMaterial",
+      "color": [
+        0.9,
+        0.2,
+        0.15
+      ],
+      "roughness": 0.4
+    }
+  },
+  "script": {
+    "path": "Scripts/Games/Confetti.lua",
+    "enabled": true,
+    "parameters": {
+      "lifetime": {
+        "type": "number",
+        "value": 1.6
+      },
+      "speed": {
+        "type": "number",
+        "value": 7.0
+      },
+      "gravity": {
+        "type": "number",
+        "value": 14.0
+      }
+    }
+  }
+}

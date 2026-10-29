@@ -15,8 +15,11 @@ namespace EditorSceneIO
     inline const char* PhysicsMixed512Path() { return "Scenes/PhysicsMixed512.json"; }
     inline const char* PhysicsStress10000Path() { return "Scenes/PhysicsStress10000.json"; }
     inline const char* LuaDemoPath() { return "Scenes/LuaDemo.json"; }
+    inline const char* BallFieldPath() { return "Scenes/Games/BallField.json"; }
 
-    void SaveScene(EditorContext& ctx);
+    void SaveScene(EditorContext& ctx); // "Save As" to DefaultSavePath()
+    void SaveScene(EditorContext& ctx, const char* path);
+    void SaveCurrentScene(EditorContext& ctx); // Back into the file the scene was loaded from
     void LoadScene(EditorContext& ctx);
     void LoadScene(EditorContext& ctx, const char* path);
     void BeginPlay(EditorContext& ctx);

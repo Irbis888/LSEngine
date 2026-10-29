@@ -9,6 +9,8 @@ void CameraControllerSystem::Update(entt::registry& reg, const FrameContext& con
 		return;
 
 	const InputState& input = context.input;
+	if (mIsPlaying && mIsPlaying() && !input.mouseButtons[0])
+		return;
 	const float dt = context.timer.DeltaTime();
 	const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
 

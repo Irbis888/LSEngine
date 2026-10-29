@@ -18,6 +18,7 @@ try {
     $process = Start-Process -FilePath (Join-Path $project "x64/$Configuration/Try2.exe") `
         -ArgumentList '--lua-smoke' -WorkingDirectory $output -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $output 'stdout.log') -RedirectStandardError (Join-Path $output 'stderr.log')
+    $null = $process.Handle # Windows PowerShell 5.1 reports no ExitCode unless the handle is opened before exit.
     if (!$process.WaitForExit(45000)) { $process.Kill(); throw 'Actual Lua application smoke timed out.' }
     $process.WaitForExit()
     $stdout = Get-Content -LiteralPath (Join-Path $output 'stdout.log') -Raw

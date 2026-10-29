@@ -38,19 +38,29 @@ fs::path AssetPaths::Resolve(const fs::path& root, const std::string& value)
     const auto path = FromUtf8(value);
     return fs::weakly_canonical(path.is_absolute() ? path : root / path);
 }
-std::string AssetPaths::ScriptPath(const fs::path& root, const std::string& value)
+static std::string ContainedPath(const fs::path& root, const std::string& value, const wchar_t* folder,
+    const wchar_t* extension, const char* kind)
 {
-    const auto scripts = fs::weakly_canonical(root / "Scripts");
-    const auto path = Resolve(root, value);
-    auto scriptPart = scripts.begin(), pathPart = path.begin();
-    for (; scriptPart != scripts.end(); ++scriptPart, ++pathPart)
-        if (pathPart == path.end() || _wcsicmp(scriptPart->c_str(), pathPart->c_str()) != 0)
-            throw std::runtime_error("Lua files must be inside the asset root's Scripts directory");
-    if (pathPart == path.end() || _wcsicmp(path.extension().c_str(), L".lua") != 0)
-        throw std::runtime_error("Expected a .lua file inside Scripts/");
-    fs::path relative = "Scripts";
+    const auto directory = fs::weakly_canonical(root / folder);
+    const auto path = AssetPaths::Resolve(root, value);
+    auto folderPart = directory.begin(), pathPart = path.begin();
+    const auto name = AssetPaths::ToUtf8(folder);
+    for (; folderPart != directory.end(); ++folderPart, ++pathPart)
+        if (pathPart == path.end() || _wcsicmp(folderPart->c_str(), pathPart->c_str()) != 0)
+            throw std::runtime_error(std::string(kind) + " files must be inside the asset root's " + name + " directory");
+    if (pathPart == path.end() || _wcsicmp(path.extension().c_str(), extension) != 0)
+        throw std::runtime_error("Expected a " + AssetPaths::ToUtf8(extension) + " file inside " + name + "/");
+    fs::path relative = folder;
     // Windows path comparison is case-insensitive; lexically_relative is not.
     // Construct the verified suffix instead of emitting ../ for a case change.
     for (; pathPart != path.end(); ++pathPart) relative /= *pathPart;
-    return ToUtf8(relative);
+    return AssetPaths::ToUtf8(relative);
+}
+std::string AssetPaths::ScriptPath(const fs::path& root, const std::string& value)
+{
+    return ContainedPath(root, value, L"Scripts", L".lua", "Lua");
+}
+std::string AssetPaths::PrefabPath(const fs::path& root, const std::string& value)
+{
+    return ContainedPath(root, value, L"Prefabs", L".json", "Prefab");
 }

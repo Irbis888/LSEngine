@@ -11,6 +11,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 static bool captureInput = false;
@@ -85,6 +86,25 @@ int main(int argc, char** argv)
             waitScene();
             std::string error;
             Check(engine.LoadScene("Scenes/LuaDemo.json", error), "Lua demo request rejected"); waitScene();
+            {
+                // Editor save is portable: mesh descriptions instead of session ids, script overrides kept.
+                Check(engine.GetScenePath() == "Scenes/LuaDemo.json", "Loaded scene path was not recorded");
+                auto& registry = engine.GetRegistry();
+                const auto count = [&] { size_t n = 0; for (auto e : registry.view<TagComponent>()) { (void)e; ++n; } return n; };
+                const auto radius = [&] { return std::get<double>(registry.get<ScriptComponent>(Find(registry, "FlyingSphere")).parameters.at("radius")); };
+                const size_t entities = count(); const double flightRadius = radius();
+                size_t runtimeOnly = 99;
+                Check(engine.SaveScene("Scenes/RoundTrip.json", error, false, &runtimeOnly) && runtimeOnly == 0,
+                    "Editor save could not describe every mesh");
+                std::ifstream saved(assets / "Scenes/RoundTrip.json");
+                const std::string text((std::istreambuf_iterator<char>(saved)), {});
+                Check(text.find("\"id\"") == std::string::npos && text.find("\"primitive\"") != std::string::npos,
+                    "Editor save wrote session mesh ids instead of mesh sources");
+                Check(engine.LoadScene("Scenes/RoundTrip.json", error), "Saved scene request rejected"); waitScene();
+                Check(count() == entities && radius() == flightRadius, "Saved scene lost entities or script parameters");
+                Check(engine.GetScenePath() == "Scenes/RoundTrip.json", "Scene path did not follow the loaded file");
+                Check(engine.LoadScene("Scenes/LuaDemo.json", error), "Lua demo reload rejected"); waitScene();
+            }
             auto& reg = engine.GetRegistry();
             const auto slow = Find(reg, "SpinnerSlow"), fast = Find(reg, "SpinnerFast");
             Check(slow != entt::null && fast != entt::null, "Lua demo did not publish entities");
@@ -128,6 +148,7 @@ int main(int argc, char** argv)
             Check(!engine.GetScripts().GetRuntime().Valid(oldSession), "Stop did not invalidate entity references");
             waitScene();
             Check(Find(reg, "DeleteMe") != entt::null, "Stop did not restore deleted entity");
+            Check(engine.GetScenePath() == "Scenes/LuaDemo.json", "Play snapshot restore replaced the scene path");
             Check(reg.get<TransformComponent>(Find(reg, "FlyingSphere")).position == flightStart,
                 "Stop did not restore flying sphere's position");
             const auto restoredSlow = Find(reg, "SpinnerSlow");
@@ -225,6 +246,39 @@ OnUpdate=function(self,dt) if self.old:IsValid() then self.old:Destroy() else se
             const auto raw = Add(engine, "RawDestroy", "Cleanup.lua"); frame();
             reg.destroy(raw);
             Check(reg.get<TransformComponent>(marker).position.x == 3, "Direct EnTT destruction removed API components before OnDestroy");
+            Write(assets / "Prefabs/Spawned.json", R"({"tag":"Spawned","transform":{"scale":[2,2,2]},
+"mesh":{"source":"primitive","primitive":"cube","material":{"color":[1,0,0]}},
+"script":{"path":"Scripts/SpawnedMark.lua","parameters":{"lift":{"type":"number","value":1}}}})");
+            Write(assets / "Scripts/SpawnedMark.lua", R"(return {parameters={lift=0},
+OnInit=function(self) self.entity:SetPosition(self.entity:GetPosition()+Vec3(0,self.params.lift,0)) end})");
+            Write(assets / "Scripts/Spawner.lua", R"(return {OnInit=function(self) self.n=0 end, OnUpdate=function(self,dt)
+self.n=self.n+1
+if self.n==1 then self.a=Entity.Spawn('Prefabs/Spawned.json',Vec3(5,0,0)); Entity.Spawn('Prefabs/Spawned.json',Vec3(6,0,0),{lift=7})
+elseif self.n==3 then assert(self.a:GetScale().x==2); self.a:Destroy() end end})");
+            Write(assets / "Scripts/SpawnEarly.lua", "return {OnInit=function(self) Entity.Spawn('Prefabs/Spawned.json',Vec3()):GetPosition() end}");
+            Write(assets / "Scripts/SpawnOutside.lua", "return {OnInit=function(self) Entity.Spawn('Scenes/LuaDemo.json',Vec3()) end}");
+            const auto spawner = Add(engine, "Spawner", "Spawner.lua");
+            const auto early = Add(engine, "SpawnEarly", "SpawnEarly.lua"), outside = Add(engine, "SpawnOutside", "SpawnOutside.lua");
+            const auto spawned = [&]
+            {
+                std::vector<entt::entity> result;
+                for (auto entity : reg.view<TagComponent>()) if (reg.get<TagComponent>(entity).tag == "Spawned" && reg.get<TransformComponent>(entity).position.x > 4) result.push_back(entity);
+                std::sort(result.begin(), result.end(), [&](auto x, auto y)
+                    { return reg.get<TransformComponent>(x).position.x < reg.get<TransformComponent>(y).position.x; });
+                return result;
+            };
+            frame(); frame();
+            auto copies = spawned();
+            Check(copies.size() == 2, "Entity.Spawn did not create both prefab instances");
+            Check(reg.get<TransformComponent>(copies[0]).position == glm::vec3(5,1,0) &&
+                reg.get<TransformComponent>(copies[1]).position == glm::vec3(6,7,0), "Prefab script defaults/overrides or spawn position wrong");
+            Check(reg.get<MeshComponent>(copies[0]).meshID == reg.get<MeshComponent>(copies[1]).meshID,
+                "Repeated spawns created new mesh resources");
+            frame();
+            Check(engine.GetScripts().GetError(spawner).empty(), engine.GetScripts().GetError(spawner).c_str());
+            Check(spawned().size() == 1, "Destroy on a spawned entity did not remove it");
+            Check(engine.GetScripts().GetError(early).find("next update") != std::string::npos, "Early access to a spawned entity lacked a clear error");
+            Check(engine.GetScripts().GetError(outside).find("Prefabs") != std::string::npos, "Spawn accepted a path outside Prefabs/");
             const auto oldSceneRef = engine.GetScripts().GetRuntime().Reference(b);
             Check(engine.LoadScene("Scenes/LuaDemo.json", error), "Play scene switch was rejected"); waitScene();
             Check(engine.IsPlaying() && !engine.GetScripts().GetRuntime().Valid(oldSceneRef), "Scene swap retained old instances/references");
@@ -236,7 +290,7 @@ OnUpdate=function(self,dt) if self.old:IsValid() then self.old:Destroy() else se
             Check(engine.RestorePlaySnapshot("Scenes/EditorPlaySnapshot.json", error), "Stop could not queue restoration behind pending scene");
             waitScene(); Check(!engine.IsPlaying(), "Queued restore restarted scripts");
             engine.Shutdown(); renderer.FlushCommandQueue();
-            std::cout << "PASS: private globals/locals, optional callbacks, fixed ordering/edges, pause/re-enable, copied/batched events, cleanup, stale handles, syntax/missing/runtime errors, instruction hooks, scene generations, async restoration\n";
+            std::cout << "PASS: private globals/locals, optional callbacks, fixed ordering/edges, pause/re-enable, copied/batched events, cleanup, prefab spawn/overrides/mesh reuse, stale handles, syntax/missing/runtime errors, instruction hooks, scene generations, async restoration\n";
         }
         DestroyWindow(window); UnregisterClassW(cls.lpszClassName, instance);
         return 0;

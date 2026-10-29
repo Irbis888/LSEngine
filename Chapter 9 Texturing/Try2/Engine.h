@@ -70,9 +70,16 @@ public:
     bool RestorePlaySnapshot(const std::string& path, std::string& outError);
     const std::filesystem::path& GetAssetRoot() const { return mAssetRoot; }
 
-	bool SaveScene(const std::string& path, std::string& outError);
+    // keepRuntimeMeshIds is for Play snapshots only; runtimeOnlyMeshes reports meshes
+    // without a source description (saved as session ids, not loadable after restart).
+	bool SaveScene(const std::string& path, std::string& outError, bool keepRuntimeMeshIds = false,
+        size_t* runtimeOnlyMeshes = nullptr);
 	bool LoadScene(const std::string& path, std::string& outError);
+    // File of the last completely loaded scene; Play snapshot restores do not change it.
+    const std::string& GetScenePath() const { return mScenePath; }
 private:
+    bool RequestScene(const std::string& path, std::string& outError, bool restore);
+    std::string mScenePath;
     SceneLoadProgress mSceneProgress;
     SceneLoadingBudget mSceneLoadingBudget;
 };

@@ -32,9 +32,41 @@ void EditorSceneIO::SaveScene(EditorContext& ctx)
         return;
     }
 
+    SaveScene(ctx, DefaultSavePath());
+}
+
+void EditorSceneIO::SaveCurrentScene(EditorContext& ctx)
+{
+    if (!ctx.engine || ctx.engine->GetScenePath().empty())
+    {
+        ctx.statusMessage = "Save failed: no scene file is loaded.";
+        return;
+    }
+    SaveScene(ctx, ctx.engine->GetScenePath().c_str());
+}
+
+void EditorSceneIO::SaveScene(EditorContext& ctx, const char* path)
+{
+    if (!ctx.engine)
+    {
+        ctx.statusMessage = "Save failed: engine not bound.";
+        return;
+    }
+    if (ctx.mode != EditorMode::Edit)
+    {
+        ctx.statusMessage = "Save failed: stop Play first (Play changes are not scene data).";
+        return;
+    }
+
     std::string error;
-    if (ctx.engine->SaveScene(DefaultSavePath(), error))
-        ctx.statusMessage = std::string("Saved to ") + DefaultSavePath();
+    size_t runtimeOnly = 0;
+    if (ctx.engine->SaveScene(path, error, false, &runtimeOnly))
+    {
+        ctx.statusMessage = std::string("Saved to ") + path;
+        if (runtimeOnly)
+            ctx.statusMessage += " (" + std::to_string(runtimeOnly) +
+                " meshes have no source description and are valid only until restart)";
+    }
     else
         ctx.statusMessage = "Save failed: " + error;
 }
@@ -72,7 +104,8 @@ void EditorSceneIO::BeginPlay(EditorContext& ctx)
     }
 
     std::string error;
-    if (!ctx.engine->SaveScene(PlaySnapshotPath(), error))
+    // The snapshot is restored in this session, so it may reuse runtime mesh ids.
+    if (!ctx.engine->SaveScene(PlaySnapshotPath(), error, true))
     {
         ctx.statusMessage = "Play failed (snapshot): " + error;
         return;

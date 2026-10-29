@@ -134,6 +134,9 @@ struct ScriptRuntime::Impl
     int64_t remaining = 0;
     std::deque<Event> events;
     std::vector<EntityRef> destructions;
+    std::vector<SpawnRequest> spawns;
+    // Parsed templates for the current session. Bind clears it, so edited prefab files apply on the next Play.
+    std::map<std::string, std::shared_ptr<SceneSerializer::EntityDescription>> prefabs;
 
     explicit Impl(std::filesystem::path root) : root(std::filesystem::weakly_canonical(root))
     {
@@ -181,7 +184,13 @@ struct ScriptRuntime::Impl
     template<class Component> Component& ComponentOf(entt::entity entity) const
     {
         auto* value = registry->try_get<Component>(entity);
-        if (!value) throw std::runtime_error("Entity is missing the requested component");
+        if (!value)
+        {
+            for (const auto& spawn : spawns)
+                if (spawn.entity.entity == entity)
+                    throw std::runtime_error("Spawned entity receives its components after the current callbacks; use it from the next update");
+            throw std::runtime_error("Entity is missing the requested component");
+        }
         return *value;
     }
     static int MakeVector(lua_State* state)
@@ -267,6 +276,27 @@ struct ScriptRuntime::Impl
         for (auto entity : self.registry->view<TagComponent>())
             if (self.registry->get<TagComponent>(entity).tag == name) { self.PushEntity(self.Ref(entity)); return 1; }
         lua_pushnil(s); return 1;
+    }
+    // Entity.Spawn(path, position[, overrides]): overrides replace the prefab's script parameters.
+    static int SpawnPrefab(lua_State* s)
+    {
+        auto& self = Self(s); self.RequireCallback();
+        const auto path = AssetPaths::PrefabPath(self.root, String(s, 1));
+        const auto position = Vector(s, 2);
+        auto overrides = lua_gettop(s) >= 3 ? ReadParameters(s, 3) : ScriptParameters{};
+        auto& prefab = self.prefabs[path];
+        if (!prefab)
+        {
+            const auto tag = AssetPaths::ToUtf8(AssetPaths::FromUtf8(path).stem());
+            prefab = std::make_shared<SceneSerializer::EntityDescription>(
+                SceneSerializer::ReadPrefab(AssetPaths::Resolve(self.root, path), tag));
+        }
+        if (!overrides.empty() && !prefab->script) throw std::runtime_error(path + " has no script for parameter overrides");
+        if (self.spawns.size() >= 4096) throw std::runtime_error("Deferred spawn queue is full");
+        const auto entity = self.registry->create(); // ID only: no component pool changes inside callbacks.
+        self.spawns.push_back({ self.Ref(entity), path, prefab, position, std::move(overrides) });
+        self.PushEntity(self.Ref(entity));
+        return 1;
     }
     template<int Which, bool Set> static int Transform(lua_State* s)
     {
@@ -403,7 +433,7 @@ struct ScriptRuntime::Impl
         lua_pushvalue(state, env); lua_setfield(state, env, "_G");
         Function("Vec3", Guard<MakeVector>); Function("Log", Guard<Log>); Function("print", Guard<Log>);
         lua_newtable(state);
-        Function("FindByName", Guard<Find>); lua_setfield(state, env, "Entity");
+        Function("FindByName", Guard<Find>); Function("Spawn", Guard<SpawnPrefab>); lua_setfield(state, env, "Entity");
         lua_newtable(state);
         Function("IsKeyDown", Guard<Key<0>>); Function("IsKeyPressed", Guard<Key<1>>); Function("IsKeyReleased", Guard<Key<2>>);
         lua_setfield(state, env, "Input");
@@ -482,7 +512,7 @@ struct ScriptRuntime::Impl
 ScriptRuntime::ScriptRuntime(std::filesystem::path assetRoot) : mImpl(std::make_unique<Impl>(std::move(assetRoot))) {}
 ScriptRuntime::~ScriptRuntime() = default;
 void ScriptRuntime::Bind(entt::registry& registry)
-{ mImpl->CheckThread(); mImpl->registry = &registry; ++mImpl->generation; ClearCommands(); }
+{ mImpl->CheckThread(); mImpl->registry = &registry; ++mImpl->generation; ClearCommands(); mImpl->prefabs.clear(); }
 void ScriptRuntime::Unbind()
 { mImpl->CheckThread(); ClearCommands(); mImpl->registry = nullptr; ++mImpl->generation; }
 void ScriptRuntime::SetInput(const InputState& input, bool captured, bool allowEdges)
@@ -572,11 +602,13 @@ void ScriptRuntime::Release(Instance& instance)
     instance.reference = LUA_NOREF;
 }
 void ScriptRuntime::ClearCommands()
-{ mImpl->CheckThread(); mImpl->events.clear(); mImpl->destructions.clear(); }
+{ mImpl->CheckThread(); mImpl->events.clear(); mImpl->destructions.clear(); mImpl->spawns.clear(); }
 std::deque<ScriptRuntime::Event> ScriptRuntime::TakeEvents()
 { mImpl->CheckThread(); std::deque<Event> events; events.swap(mImpl->events); return events; }
 std::vector<ScriptRuntime::EntityRef> ScriptRuntime::TakeDestructions()
 { mImpl->CheckThread(); std::vector<EntityRef> entities; entities.swap(mImpl->destructions); return entities; }
+std::vector<ScriptRuntime::SpawnRequest> ScriptRuntime::TakeSpawns()
+{ mImpl->CheckThread(); std::vector<SpawnRequest> spawns; spawns.swap(mImpl->spawns); return spawns; }
 bool ScriptRuntime::Valid(EntityRef entity) const { mImpl->CheckThread(); return mImpl->Valid(entity); }
 ScriptRuntime::EntityRef ScriptRuntime::Reference(entt::entity entity) const { mImpl->CheckThread(); return mImpl->Ref(entity); }
 const std::filesystem::path& ScriptRuntime::GetAssetRoot() const { return mImpl->root; }

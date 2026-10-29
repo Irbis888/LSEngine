@@ -3,6 +3,7 @@
 #include <ResourceManager.h>
 #include <Engine.h>
 #include <SceneFactory.h>
+#include <SceneSerializer.h>
 
 #include <Windows.h>
 #include <imgui.h>
@@ -145,6 +146,12 @@ namespace
                 g_PrimitiveCreator.rotation,
                 g_PrimitiveCreator.scale);
 
+            // Keep the description so File > Save writes a mesh that loads after a restart.
+            SceneSerializer::MeshDescription source;
+            source.source = "primitive";
+            source.primitive = type == PrimitiveType::Plane ? "plane" : type == PrimitiveType::Sphere ? "sphere" : "cube";
+            source.material = MaterialDesc{ entityName + " Material", {}, {}, g_PrimitiveCreator.color, g_PrimitiveCreator.roughness };
+            ctx.registry->emplace<MeshSourceComponent>(ctx.selected, MeshSourceComponent{ std::move(source) });
             ctx.statusMessage = "Created " + std::string(PrimitiveTypeName(type)) + ": " + entityName;
             ctx.showPrimitiveCreator = false;
         }
@@ -170,6 +177,11 @@ static void DrawMainMenu(EditorContext& ctx)
 
     if (ImGui::BeginMenu("File"))
     {
+        const std::string currentScene = ctx.engine ? ctx.engine->GetScenePath() : std::string();
+        if (ImGui::MenuItem("Save Scene", nullptr, false, ctx.mode == EditorMode::Edit && !currentScene.empty()))
+            EditorSceneIO::SaveCurrentScene(ctx);
+        ImGui::SetItemTooltip("Overwrites %s with the edited scene (Edit mode only).",
+            currentScene.empty() ? "the loaded scene file" : currentScene.c_str());
         if (ImGui::MenuItem("Save Scene As...", EditorSceneIO::DefaultSavePath()))
             EditorSceneIO::SaveScene(ctx);
         ImGui::SetItemTooltip("Writes %s", EditorSceneIO::DefaultSavePath());
@@ -212,6 +224,9 @@ static void DrawMainMenu(EditorContext& ctx)
         if (ImGui::MenuItem("Lua Scripting Demo", EditorSceneIO::LuaDemoPath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::LuaDemoPath());
         ImGui::SetItemTooltip("Play: arrows move, J/L control body, Space jumps, O opens door, X deletes purple cube.");
+        if (ImGui::MenuItem("Ball Field (2 players)", EditorSceneIO::BallFieldPath(), false, canSwitchScene))
+            EditorSceneIO::LoadScene(ctx, EditorSceneIO::BallFieldPath());
+        ImGui::SetItemTooltip("Lua football: rules in Scripts/Games/FootballMatch.lua, ball/confetti from Prefabs/.");
         if (ImGui::MenuItem("Demo Scene", EditorSceneIO::DemoScenePath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::DemoScenePath());
         ImGui::SetItemTooltip("Load the original engine demonstration scene.");
@@ -303,6 +318,8 @@ static void DrawToolbar(EditorContext& ctx)
 {
     if (ctx.engine && ctx.engine->GetSceneLoadProgress().path.find("LuaDemo") != std::string::npos)
         ImGui::TextWrapped("Lua demo: Arrows = move | J/L = body velocity | Space = impulse | O = door event | X = delete. Click the viewport before using keys.");
+    if (ctx.engine && ctx.engine->GetSceneLoadProgress().path.find("BallField") != std::string::npos)
+        ImGui::TextWrapped("Ball Field: Blue = WASD + Shift | Red = arrows + Enter | R = kickoff. In Play the free camera moves only with the left mouse button held.");
     ImGui::Text("Mode:");
     ImGui::SameLine();
     if (ctx.mode == EditorMode::Edit)

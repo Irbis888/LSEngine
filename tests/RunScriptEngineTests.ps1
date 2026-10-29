@@ -7,6 +7,7 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer
 $installation = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (!$installation) { throw 'Visual Studio C++ tools are required.' }
 $vcvars = Join-Path $installation 'VC\Auxiliary\Build\vcvars64.bat'
+$env:PATH = (Split-Path $vswhere) + ';' + $env:PATH # vcvars64.bat calls vswhere by name.
 $environmentLines = & cmd.exe /d /s /c "call `"$vcvars`" >nul && set"
 if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the C++ compiler environment.' }
 foreach ($line in $environmentLines) {
@@ -39,6 +40,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Script integration tests did not compile.' }
 $env:PATH = (Join-Path $project 'dlls') + ';' + $env:PATH
 Push-Location $project
 try {
+    # Expected script errors go to stderr; Windows PowerShell 5.1 would make them terminating.
+    $ErrorActionPreference = 'Continue'
     & (Join-Path $output 'ScriptEngineTests.exe') $project (Join-Path $output 'fixtures')
     if ($LASTEXITCODE -ne 0) { throw 'Script integration tests failed.' }
 } finally { Pop-Location }

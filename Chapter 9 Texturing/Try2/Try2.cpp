@@ -74,6 +74,8 @@ private:
     int mGameSteps = 0;
     float mBallMaxX = 0;
     bool mGoalSeen = false, mKickoffSeen = false;
+    size_t mConfettiMax = 0;
+    bool mConfettiCleared = false;
     InputState GameSmokeInput() const;
     bool mScriptSmoke = false;
     int mScriptSmokeStage = 0, mScriptSmokeFrames = 0, mScriptSmokeTotalFrames = 0;
@@ -208,9 +210,11 @@ void TestApp::CheckGameSmoke()
         if (!mEngine->IsPlaying()) return;
         if (ImGuiBridge::IsVisible() || ImGuiBridge::IsLicensed()) throw std::runtime_error("Editor enabled in game mode");
         auto& reg = mEngine->GetRegistry();
+        size_t confetti = 0;
         for (auto entity : reg.view<TagComponent, TransformComponent>())
         {
             const auto& tag = reg.get<TagComponent>(entity).tag;
+            if (tag.starts_with("Confetti")) ++confetti;
             const auto& p = reg.get<TransformComponent>(entity).position;
             if (tag == "Ball")
             {
@@ -229,12 +233,16 @@ void TestApp::CheckGameSmoke()
             if (reg.all_of<ScriptComponent>(entity) && !mEngine->GetScripts().GetError(entity).empty())
                 throw std::runtime_error(mEngine->GetScripts().GetError(entity));
         }
+        // Goal confetti is spawned from Prefabs/ and removes itself after its lifetime.
+        mConfettiMax = (std::max)(mConfettiMax, confetti);
+        if (mConfettiMax > 0 && confetti == 0) mConfettiCleared = true;
         if (mGameSteps >= 840)
         {
             if (mBallMaxX < 3) throw std::runtime_error("Player did not physically push the ball");
             if (!mGoalSeen) throw std::runtime_error("Ball never entered the east goal");
             if (!mKickoffSeen) throw std::runtime_error("No kickoff after the goal");
-            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, two players, ball pushed into goal, kickoff, static field/borders/goals; max_ball_x=" << mBallMaxX << std::endl;
+            if (mConfettiMax == 0 || !mConfettiCleared) throw std::runtime_error("Goal confetti was not spawned and removed");
+            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, two players, ball pushed into goal, kickoff, prefab spawn/destroy, static field/borders/goals; max_ball_x=" << mBallMaxX << " confetti=" << mConfettiMax << std::endl;
             mGameSmoke = false; PostQuitMessage(0);
         }
     }
