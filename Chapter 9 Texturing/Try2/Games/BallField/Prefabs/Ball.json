@@ -62,7 +62,7 @@
     ]
   },
   "script": {
-    "path": "Scripts/Games/BallRoll.lua",
+    "path": "Games/BallField/Scripts/BallRoll.lua",
     "enabled": true,
     "parameters": {
       "radius": {

@@ -53,6 +53,55 @@ int main(int argc, char** argv)
         auto variedCase = AssetPaths::ToUtf8(assets / "Scripts/Rotate.lua");
         for (auto& c : variedCase) if (c >= 'A' && c <= 'Z') c = char(c + 'a' - 'A');
         Check(AssetPaths::ScriptPath(assets, variedCase).starts_with("Scripts/"), "Windows path case broke relative script paths");
+        {
+            // A burst initializes all instances within one clock tick. Their default RNGs
+            // must differ even though the Lua script and spawn position are identical.
+            entt::registry particles;
+            ScriptRuntime runtime(project); runtime.Bind(particles);
+            std::vector<ScriptRuntime::Instance> instances;
+            std::vector<glm::vec3> positions;
+            for (int i = 0; i < 24; ++i)
+            {
+                const auto entity = particles.create();
+                particles.emplace<TransformComponent>(entity, glm::vec3(13,1.2f,0), glm::vec3(0), glm::vec3(1));
+                ScriptComponent script;
+                script.path = "Games/BallField/Scripts/Confetti.lua";
+                instances.push_back(runtime.Create(entity, script));
+                auto& instance = instances.back();
+                Check(!instance.failed && runtime.Call(instance, "OnInit") && runtime.Call(instance, "OnUpdate", .05f),
+                    "Confetti script failed");
+                const auto position = particles.get<TransformComponent>(entity).position;
+                Check(std::find(positions.begin(), positions.end(), position) == positions.end(),
+                    "Confetti instances overlap: default Lua RNG streams are identical");
+                positions.push_back(position);
+            }
+            for (auto& instance : instances) runtime.Release(instance);
+            runtime.Unbind();
+            std::cout << "PASS: 24 confetti instances follow distinct trajectories without explicit randomseed\n";
+        }
+        Check(AssetPaths::ScriptPath(assets, "Games/Test/Scripts/Package.lua") == "Games/Test/Scripts/Package.lua",
+            "Game-local script directory rejected");
+        Check(AssetPaths::PrefabPath(assets, "Games/Test/Prefabs/Item.json") == "Games/Test/Prefabs/Item.json",
+            "Game-local prefab directory rejected");
+        for (const auto* path : { "Games/Test/Package.lua", "Games/Scripts/Package.lua",
+            "Games/Test/Scripts/../../Other/Package.lua", "Scripts/../Outside.lua" })
+        {
+            bool rejected = false;
+            try { AssetPaths::ScriptPath(assets, path); } catch (const std::exception&) { rejected = true; }
+            Check(rejected, "Script outside an allowed directory accepted");
+        }
+        bool rejected = false;
+        try { AssetPaths::ScriptPath(assets, AssetPaths::ToUtf8(fixtures / "Scripts/Outside.lua")); }
+        catch (const std::exception&) { rejected = true; }
+        Check(rejected, "Script outside the asset root accepted");
+        Write(assets / "Games/Test/Scripts/Package.lua", R"(return {OnInit=function(self)
+Entity.Spawn('Games/Test/Prefabs/Item.json',Vec3(2,3,4)) end})");
+        Write(assets / "Games/Test/Scripts/Mark.lua", R"(return {OnInit=function(self)
+self.entity:SetPosition(self.entity:GetPosition()+Vec3(0,2,0)) end})");
+        Write(assets / "Games/Test/Prefabs/Item.json", R"({"tag":"PackageItem",
+"script":{"path":"Games/Test/Scripts/Mark.lua"}})");
+        Write(assets / "Games/Test/Scenes/Package.json", R"({"version":1,"entities":[{"tag":"Package",
+"script":{"path":"Games/Test/Scripts/Package.lua"}}]})");
         fs::current_path(project); // Shader paths belong to the real renderer.
         const auto instance = GetModuleHandleW(nullptr);
         WNDCLASSW cls{}; cls.hInstance = instance; cls.lpfnWndProc = DefWindowProcW; cls.lpszClassName = L"LuaEngineTests";
@@ -85,6 +134,16 @@ int main(int argc, char** argv)
             };
             waitScene();
             std::string error;
+            Check(engine.LoadScene("Games/Test/Scenes/Package.json", error), "Game-local scene request rejected"); waitScene();
+            Check(engine.SaveScene("Games/Test/Scenes/RoundTrip.json", error), "Game-local script paths could not be saved");
+            Check(engine.LoadScene("Games/Test/Scenes/RoundTrip.json", error), "Saved game scene request rejected"); waitScene();
+            Check(engine.BeginPlay(error), "Game-local scripts could not start");
+            frame(); frame();
+            const auto packageItem = Find(engine.GetRegistry(), "PackageItem");
+            Check(packageItem != entt::null && engine.GetScripts().GetError(packageItem).empty() &&
+                engine.GetRegistry().get<TransformComponent>(packageItem).position == glm::vec3(2,5,4),
+                "Game-local prefab or its script failed after scene round-trip");
+            engine.EndPlay();
             Check(engine.LoadScene("Scenes/LuaDemo.json", error), "Lua demo request rejected"); waitScene();
             {
                 // Editor save is portable: mesh descriptions instead of session ids, script overrides kept.

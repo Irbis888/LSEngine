@@ -49,6 +49,56 @@
     <Filter Include="Editor\ThirdParty\ImGuizmo">
       <UniqueIdentifier>{164088A5-09C3-4E70-BAD0-38560AD16AE5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Games">
+      <UniqueIdentifier>{86944D2A-23AE-45B3-BC88-2099656BD50C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Games\BallField">
+      <UniqueIdentifier>{C232CAED-A190-431A-B11D-F00CB78EDDA5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Games\BallField\Scripts">
+      <UniqueIdentifier>{93296509-3BD3-4F87-BF5C-E2538C752F30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Games\BallField\Scenes">
+      <UniqueIdentifier>{5A67CA20-046B-4723-ACD3-7FC1C476B3A0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Games\BallField\Prefabs">
+      <UniqueIdentifier>{F05375EE-E4E6-4278-9F44-BE88A0907EA7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Games\BallField\Scripts\FieldPlayer.lua">
+      <Filter>Games\BallField\Scripts</Filter>
+    </None>
+    <None Include="Games\BallField\Scripts\FootballMatch.lua">
+      <Filter>Games\BallField\Scripts</Filter>
+    </None>
+    <None Include="Games\BallField\Scripts\BallRoll.lua">
+      <Filter>Games\BallField\Scripts</Filter>
+    </None>
+    <None Include="Games\BallField\Scripts\Confetti.lua">
+      <Filter>Games\BallField\Scripts</Filter>
+    </None>
+    <None Include="Games\BallField\Scenes\BallField.json">
+      <Filter>Games\BallField\Scenes</Filter>
+    </None>
+    <None Include="Games\BallField\Prefabs\Ball.json">
+      <Filter>Games\BallField\Prefabs</Filter>
+    </None>
+    <None Include="Games\BallField\Prefabs\ConfettiBlue.json">
+      <Filter>Games\BallField\Prefabs</Filter>
+    </None>
+    <None Include="Games\BallField\Prefabs\ConfettiRed.json">
+      <Filter>Games\BallField\Prefabs</Filter>
+    </None>
+    <None Include="Games\BallField\game.json">
+      <Filter>Games\BallField</Filter>
+    </None>
+    <None Include="Games\BallField\Play.cmd">
+      <Filter>Games\BallField</Filter>
+    </None>
+    <None Include="Games\BallField\README.md">
+      <Filter>Games\BallField</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorContext.cpp">

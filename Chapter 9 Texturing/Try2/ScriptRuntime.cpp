@@ -131,6 +131,8 @@ struct ScriptRuntime::Impl
     entt::entity current = entt::null;
     InputState input{};
     uint32_t instructionLimit = 200000;
+    lua_Integer randomSeed = 0;
+    lua_Unsigned nextEnvironmentSeed = 0;
     int64_t remaining = 0;
     std::deque<Event> events;
     std::vector<EntityRef> destructions;
@@ -142,6 +144,7 @@ struct ScriptRuntime::Impl
     {
         state = luaL_newstate();
         if (!state) throw std::runtime_error("Could not create Lua interpreter");
+        randomSeed = static_cast<lua_Integer>(luaL_makeseed(state));
         *static_cast<Impl**>(lua_getextraspace(state)) = this;
         luaL_requiref(state, "_G", luaopen_base, 1); lua_pop(state, 1);
         luaL_requiref(state, "math", luaopen_math, 1); lua_pop(state, 1);
@@ -412,6 +415,13 @@ struct ScriptRuntime::Impl
                 // math.random/randomseed capture mutable RNG userdata. A shallow
                 // table copy would accidentally share that state between scripts.
                 luaopen_math(state);
+                // Lua's automatic seed uses seconds and a stack address, both of
+                // which can be identical for every instance in a spawn burst.
+                // Keep RNGs private, but give each environment a distinct seed pair.
+                lua_getfield(state, -1, "randomseed");
+                lua_pushinteger(state, randomSeed);
+                lua_pushinteger(state, static_cast<lua_Integer>(++nextEnvironmentSeed));
+                lua_call(state, 2, 0);
                 lua_setfield(state, env, library);
                 continue;
             }

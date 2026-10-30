@@ -31,7 +31,7 @@
     }
   },
   "script": {
-    "path": "Scripts/Games/Confetti.lua",
+    "path": "Games/BallField/Scripts/Confetti.lua",
     "enabled": true,
     "parameters": {
       "lifetime": {

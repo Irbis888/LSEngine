@@ -27,9 +27,9 @@ return {
         goalPause = 1.5,      -- seconds the ball stays in the net before kickoff
         winPause = 4.0,
         confettiCount = 24,   -- pieces spawned in the goal after each score
-        ballPrefab = "Prefabs/Football/Ball.json",
-        blueConfettiPrefab = "Prefabs/Football/ConfettiBlue.json",
-        redConfettiPrefab = "Prefabs/Football/ConfettiRed.json"
+        ballPrefab = "Games/BallField/Prefabs/Ball.json",
+        blueConfettiPrefab = "Games/BallField/Prefabs/ConfettiBlue.json",
+        redConfettiPrefab = "Games/BallField/Prefabs/ConfettiRed.json"
     },
     OnInit = function(self)
         self.ball = Entity.Spawn(self.params.ballPrefab, KICKOFF_SPOT)

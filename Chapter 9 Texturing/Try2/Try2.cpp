@@ -75,6 +75,7 @@ private:
     float mBallMaxX = 0;
     bool mGoalSeen = false, mKickoffSeen = false;
     size_t mConfettiMax = 0;
+    float mConfettiSpread = 0;
     bool mConfettiCleared = false;
     InputState GameSmokeInput() const;
     bool mScriptSmoke = false;
@@ -211,11 +212,16 @@ void TestApp::CheckGameSmoke()
         if (ImGuiBridge::IsVisible() || ImGuiBridge::IsLicensed()) throw std::runtime_error("Editor enabled in game mode");
         auto& reg = mEngine->GetRegistry();
         size_t confetti = 0;
+        glm::vec3 firstConfetti{};
         for (auto entity : reg.view<TagComponent, TransformComponent>())
         {
             const auto& tag = reg.get<TagComponent>(entity).tag;
-            if (tag.starts_with("Confetti")) ++confetti;
             const auto& p = reg.get<TransformComponent>(entity).position;
+            if (tag.starts_with("Confetti"))
+            {
+                if (confetti++ == 0) firstConfetti = p;
+                else mConfettiSpread = (std::max)(mConfettiSpread, glm::length(p - firstConfetti));
+            }
             if (tag == "Ball")
             {
                 mBallMaxX = (std::max)(mBallMaxX, p.x);
@@ -242,7 +248,8 @@ void TestApp::CheckGameSmoke()
             if (!mGoalSeen) throw std::runtime_error("Ball never entered the east goal");
             if (!mKickoffSeen) throw std::runtime_error("No kickoff after the goal");
             if (mConfettiMax == 0 || !mConfettiCleared) throw std::runtime_error("Goal confetti was not spawned and removed");
-            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, two players, ball pushed into goal, kickoff, prefab spawn/destroy, static field/borders/goals; max_ball_x=" << mBallMaxX << " confetti=" << mConfettiMax << std::endl;
+            if (mConfettiSpread < .5f) throw std::runtime_error("Confetti did not spread: particles share the same trajectory");
+            std::cout << "GAME_SMOKE_PASS: standalone, Lua controls, two players, ball pushed into goal, kickoff, prefab spawn/destroy, static field/borders/goals; max_ball_x=" << mBallMaxX << " confetti=" << mConfettiMax << " confetti_spread=" << mConfettiSpread << std::endl;
             mGameSmoke = false; PostQuitMessage(0);
         }
     }

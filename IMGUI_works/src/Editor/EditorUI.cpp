@@ -226,7 +226,7 @@ static void DrawMainMenu(EditorContext& ctx)
         ImGui::SetItemTooltip("Play: arrows move, J/L control body, Space jumps, O opens door, X deletes purple cube.");
         if (ImGui::MenuItem("Ball Field (2 players)", EditorSceneIO::BallFieldPath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::BallFieldPath());
-        ImGui::SetItemTooltip("Lua football: rules in Scripts/Games/FootballMatch.lua, ball/confetti from Prefabs/.");
+        ImGui::SetItemTooltip("Lua football: rules in Games/BallField/Scripts/FootballMatch.lua, ball/confetti from Prefabs/.");
         if (ImGui::MenuItem("Demo Scene", EditorSceneIO::DemoScenePath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::DemoScenePath());
         ImGui::SetItemTooltip("Load the original engine demonstration scene.");

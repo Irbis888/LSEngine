@@ -1,4 +1,4 @@
--- One confetti piece, spawned from Prefabs/Football/Confetti*.json by FootballMatch.lua.
+-- One confetti piece, spawned from Games/BallField/Prefabs/Confetti*.json by FootballMatch.lua.
 -- Flies out of the goal, falls, bounces on the grass and removes itself. No rigidbody:
 -- the pieces never push the ball or the players.
 return {

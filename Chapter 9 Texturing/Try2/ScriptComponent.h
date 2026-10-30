@@ -11,7 +11,7 @@ using ScriptParameters = std::map<std::string, ScriptValue>;
 
 struct ScriptComponent
 {
-    std::string path; // UTF-8, relative to the asset root, inside Scripts/.
+    std::string path; // UTF-8, relative to the asset root: Scripts/ or Games/<name>/Scripts/.
     bool enabled = true;
     ScriptParameters parameters;
 };

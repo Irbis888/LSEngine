@@ -38,29 +38,64 @@ fs::path AssetPaths::Resolve(const fs::path& root, const std::string& value)
     const auto path = FromUtf8(value);
     return fs::weakly_canonical(path.is_absolute() ? path : root / path);
 }
-static std::string ContainedPath(const fs::path& root, const std::string& value, const wchar_t* folder,
+static std::string ContainedPath(const fs::path& root, const std::string& value,
     const wchar_t* extension, const char* kind)
 {
-    const auto directory = fs::weakly_canonical(root / folder);
+    const auto directory = fs::weakly_canonical(root);
     const auto path = AssetPaths::Resolve(root, value);
     auto folderPart = directory.begin(), pathPart = path.begin();
-    const auto name = AssetPaths::ToUtf8(folder);
     for (; folderPart != directory.end(); ++folderPart, ++pathPart)
         if (pathPart == path.end() || _wcsicmp(folderPart->c_str(), pathPart->c_str()) != 0)
-            throw std::runtime_error(std::string(kind) + " files must be inside the asset root's " + name + " directory");
+            throw std::runtime_error(std::string(kind) + " files must be inside the asset root");
     if (pathPart == path.end() || _wcsicmp(path.extension().c_str(), extension) != 0)
-        throw std::runtime_error("Expected a " + AssetPaths::ToUtf8(extension) + " file inside " + name + "/");
-    fs::path relative = folder;
+        throw std::runtime_error("Expected a " + AssetPaths::ToUtf8(extension) + " file inside the asset root");
+    fs::path relative;
     // Windows path comparison is case-insensitive; lexically_relative is not.
     // Construct the verified suffix instead of emitting ../ for a case change.
     for (; pathPart != path.end(); ++pathPart) relative /= *pathPart;
     return AssetPaths::ToUtf8(relative);
 }
+static std::string RelativeAssetPath(const std::string& value, const wchar_t* folder,
+    const wchar_t* extension)
+{
+    const auto path = AssetPaths::FromUtf8(value).lexically_normal();
+    const auto invalid = [&]
+    {
+        return std::runtime_error("Expected a relative " + AssetPaths::ToUtf8(extension) +
+            " path inside " + AssetPaths::ToUtf8(folder) + "/ or Games/<name>/" +
+            AssetPaths::ToUtf8(folder) + "/");
+    };
+    if (value.empty() || value.size() > 4096 || value.find('\0') != std::string::npos ||
+        path.has_root_path() || _wcsicmp(path.extension().c_str(), extension) != 0)
+        throw invalid();
+    auto part = path.begin();
+    fs::path relative;
+    if (part != path.end() && _wcsicmp(part->c_str(), L"Games") == 0)
+    {
+        relative = L"Games";
+        if (++part == path.end() || *part == L"..") throw invalid();
+        relative /= *part;
+        ++part;
+    }
+    if (part == path.end() || _wcsicmp(part->c_str(), folder) != 0) throw invalid();
+    relative /= folder;
+    if (++part == path.end()) throw invalid();
+    for (; part != path.end(); ++part)
+    {
+        if (*part == L"..") throw invalid();
+        relative /= *part;
+    }
+    return AssetPaths::ToUtf8(relative);
+}
+std::string AssetPaths::NormalizeScriptPath(const std::string& value)
+{
+    return RelativeAssetPath(value, L"Scripts", L".lua");
+}
 std::string AssetPaths::ScriptPath(const fs::path& root, const std::string& value)
 {
-    return ContainedPath(root, value, L"Scripts", L".lua", "Lua");
+    return NormalizeScriptPath(ContainedPath(root, value, L".lua", "Lua"));
 }
 std::string AssetPaths::PrefabPath(const fs::path& root, const std::string& value)
 {
-    return ContainedPath(root, value, L"Prefabs", L".json", "Prefab");
+    return RelativeAssetPath(ContainedPath(root, value, L".json", "Prefab"), L"Prefabs", L".json");
 }

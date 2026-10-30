@@ -8,8 +8,10 @@ namespace AssetPaths
     std::string ToUtf8(const std::filesystem::path& value);
     std::filesystem::path FindRoot();
     std::filesystem::path Resolve(const std::filesystem::path& root, const std::string& value);
-    // Returns a canonical relative script path; rejects paths outside Scripts/.
+    // Validates a relative script path in Scripts/ or Games/<name>/Scripts/ without file I/O.
+    std::string NormalizeScriptPath(const std::string& value);
+    // Returns a canonical relative path in one of the allowed script directories.
     std::string ScriptPath(const std::filesystem::path& root, const std::string& value);
-    // Same containment rule for entity templates: a .json file inside Prefabs/.
+    // Entity templates live in Prefabs/ or Games/<name>/Prefabs/.
     std::string PrefabPath(const std::filesystem::path& root, const std::string& value);
 }

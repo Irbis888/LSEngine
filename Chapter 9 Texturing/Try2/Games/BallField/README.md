@@ -13,7 +13,7 @@ spawned in the centre; after a win the score resets. The score is shown on the b
 the north border and printed to the console.
 
 The ball and the confetti are not scene entities: `FootballMatch.lua` spawns them with
-`Entity.Spawn` from `Prefabs/Football/*.json`, whose script parameters (ball radius,
+`Entity.Spawn` from `Games/BallField/Prefabs/*.json`, whose script parameters (ball radius,
 confetti lifetime/speed/gravity) are the balance data.
 
 **Changing the rules live (editor).** Run Try2.exe without `--game`, choose
@@ -32,15 +32,15 @@ posts and crossbars are visual only.
 The current solver supports linear dynamics; BallRoll.lua adds visual rolling based on
 physical displacement, without claiming angular momentum/friction simulation.
 
-Game files:
+Game files (all physically inside `Games/BallField/`):
 - `Games/BallField/game.json`: title, control hint, startup scene.
-- `Scenes/Games/BallField.json`: field, two humanoids, ball mark, borders, goals, scoreboard, camera and light.
-- `Scripts/Games/FieldPlayer.lua`: input (`controls` = wasd/arrows, `runKey`), body velocity,
+- `Games/BallField/Scenes/BallField.json`: field, two humanoids, ball mark, borders, goals, scoreboard, camera and light.
+- `Games/BallField/Scripts/FieldPlayer.lua`: input (`controls` = wasd/arrows, `runKey`), body velocity,
   visual limbs, Kickoff/Freeze events.
-- `Scripts/Games/FootballMatch.lua`: goal detection, score, kickoff, seven-segment scoreboard, spawning.
-- `Scripts/Games/Confetti.lua`: one confetti piece: flight, bounce, self-destruction.
-- `Prefabs/Football/Ball.json`, `ConfettiBlue.json`, `ConfettiRed.json`: spawn templates.
-- `Scripts/Games/BallRoll.lua`: ball's visual orientation/mark.
+- `Games/BallField/Scripts/FootballMatch.lua`: goal detection, score, kickoff, seven-segment scoreboard, spawning.
+- `Games/BallField/Scripts/Confetti.lua`: one confetti piece: flight, bounce, self-destruction.
+- `Games/BallField/Prefabs/Ball.json`, `ConfettiBlue.json`, `ConfettiRed.json`: spawn templates.
+- `Games/BallField/Scripts/BallRoll.lua`: ball's visual orientation/mark.
 
 To run another authored game, create a manifest with `title`, optional `controls`, and
 `scene` (relative to the engine asset root), then run:

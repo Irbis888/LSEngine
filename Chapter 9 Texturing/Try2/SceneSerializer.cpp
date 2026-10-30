@@ -339,12 +339,7 @@ namespace
     {
         if (!value.is_object()) throw std::runtime_error("Script must be an object");
         ScriptComponent result;
-        result.path = value.at("path").get<std::string>();
-        const auto path = AssetPaths::FromUtf8(result.path).lexically_normal();
-        if (result.path.empty() || result.path.size() > 4096 || result.path.find('\0') != std::string::npos ||
-            path.is_absolute() || path.begin() == path.end() || *path.begin() != "Scripts")
-            throw std::runtime_error("Script path must be relative to the asset root, inside Scripts/");
-        result.path = AssetPaths::ToUtf8(path);
+        result.path = AssetPaths::NormalizeScriptPath(value.at("path").get<std::string>());
         result.enabled = value.value("enabled", true);
         const auto parameters = value.value("parameters", json::object());
         if (!parameters.is_object() || parameters.size() > 64) throw std::runtime_error("Script parameters must contain at most 64 named values");

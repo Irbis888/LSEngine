@@ -37,7 +37,8 @@ Stop calls OnDestroy and restores the snapshot, including the deleted purple cub
 
 ## File format and attaching a script
 
-Create a UTF-8 text file under the asset root's `Scripts/` folder. UTF-8 BOM is accepted.
+Create a UTF-8 text file under the asset root's `Scripts/` or `Games/<name>/Scripts/`
+folder. UTF-8 BOM is accepted.
 Each file returns one table; callbacks are optional:
 
 ```lua
@@ -80,7 +81,7 @@ shows current state and the latest protected runtime/metadata error. An invalid 
 name/type is reported; **Reset parameter overrides** clears obsolete overrides explicitly.
 
 Edits apply at the next Play. **File → Save Scene** (Edit mode) writes them back into the
-scene file that was loaded, e.g. `Scenes/Games/BallField.json`; **Save Scene As...** writes
+scene file that was loaded, e.g. `Games/BallField/Scenes/BallField.json`; **Save Scene As...** writes
 `Scenes/EditorSave.json`. Saved meshes are their source description (primitive or model path
 plus material), so the file loads again after a restart. Only meshes created by code without
 a description (C++ demo builders) fall back to a session mesh id; the status bar reports them.
@@ -101,7 +102,10 @@ to JobSystem. Public runtime operations reject calls from a different thread.
 
 Each entity loads its file separately into a fresh `_ENV` and receives a fresh returned
 instance table. Standard-library tables are private; math also gets its own random-generator
-userdata so randomseed in one instance cannot change another's sequence. The instance
+userdata so randomseed in one instance cannot change another's sequence. Default seeds
+combine a runtime seed with a unique environment counter, so bursts of newly spawned
+instances get different random sequences. Explicit `math.randomseed(42)` still produces
+the same repeatable sequence in each instance that selects it. The instance
 receives `self.entity` and `self.params`; arbitrary fields such as `self.elapsed` are private
 runtime state. Internal Lua registry references/functions are never scene data.
 
@@ -218,7 +222,8 @@ For C++ callers, prefer `ScriptSystem::DestroyEntity` when explicitly removing a
 
 ## Prefabs and spawning
 
-A prefab is one JSON entity object under the asset root's `Prefabs/` folder, in exactly the
+A prefab is one JSON entity object under the asset root's `Prefabs/` or
+`Games/<name>/Prefabs/` folder, in exactly the
 scene-entity format: `tag` (defaults to the file name), `transform`, `mesh`, `rigidbody`,
 `collider`, lights and `script` with typed parameter values. Runtime mesh ids and cameras
 are rejected. Balance values belong in the template's script parameters, not in Lua code:
@@ -229,19 +234,19 @@ are rejected. Balance values belong in the template's script parameters, not in 
   "transform": { "scale": [0.18, 0.04, 0.12] },
   "mesh": { "source": "primitive", "primitive": "cube", "material": { "color": [0.15, 0.4, 0.95] } },
   "script": {
-    "path": "Scripts/Games/Confetti.lua",
+    "path": "Games/BallField/Scripts/Confetti.lua",
     "parameters": { "lifetime": { "type": "number", "value": 1.6 } }
   }
 }
 ```
 
 ```lua
-local ball = Entity.Spawn("Prefabs/Football/Ball.json", Vec3(0, 0.66, 0))
-Entity.Spawn("Prefabs/Football/ConfettiRed.json", goal, { lifetime = 3.0 }) -- override parameters
+local ball = Entity.Spawn("Games/BallField/Prefabs/Ball.json", Vec3(0, 0.66, 0))
+Entity.Spawn("Games/BallField/Prefabs/ConfettiRed.json", goal, { lifetime = 3.0 }) -- override parameters
 ```
 
 `Entity.Spawn(path, position[, overrides])` is available in callbacks only. It validates the
-path (a `.json` inside `Prefabs/`, same containment rules as scripts), parses the file on the
+path (a `.json` inside `Prefabs/` or `Games/<name>/Prefabs/`, same containment rules as scripts), parses the file on the
 first use in a Play session and returns a safe Entity reference at once. Like Destroy, it
 never changes component storage inside a callback: only the ECS id is reserved, and the
 components are added at the next boundary (after the fixed-update or update callbacks and
@@ -278,8 +283,11 @@ without script entries load unchanged. Runtime fields, closures and IDs are not 
 The asset root is the existing project directory containing Scenes and Shaders. AssetPaths
 finds it relative to the executable (walking ancestors/project candidates), or Engine accepts
 an explicit root for embedding/tests. Engine stores that root; later CWD changes do not affect
-scene/script resolution. All script paths are canonical relative UTF-8 paths inside Scripts/,
-including Windows Unicode filenames. Traversal/symlink paths outside that directory are rejected.
+scene/script resolution. All script paths are canonical relative UTF-8 paths inside
+`Scripts/` or `Games/<name>/Scripts/`, including Windows Unicode filenames.
+Traversal/symlink paths resolving outside the asset root or these layouts are rejected.
+Each game can keep its manifest, scene, scripts and prefabs together under `Games/<name>/`;
+scene and prefab references remain relative to the engine asset root.
 Files are opened through std::filesystem's native Windows paths; Lua compiles the loaded bytes
 with the canonical UTF-8 source name for diagnostics. The loader accepts text only.
 
