@@ -20,7 +20,17 @@ confetti lifetime/speed/gravity) are the balance data.
 **Scenes → Ball Field (2 players)**, select `Match` in the hierarchy and edit its parameters
 (`winScore`, `goalPause`, `confettiCount`, `goalHalfWidth`, ...) or the Lua/prefab files,
 then press **Play**. Every Play re-reads scripts and prefabs; no restart or rebuild. After
-Stop, **File → Save Scene** stores the edited parameters back into `BallField.json`. In Play
+Stop, **File → Save Scene** stores the edited parameters back into `BallField.json`.
+
+**Changing the rules during Play (hot reload).** With **Hot reload** on (toolbar, default),
+just save the file while the match runs. Saving `FootballMatch.lua` (e.g. `winScore = 2`,
+`goalHalfWidth = 4.0`, or the goal condition) restarts the match script: its old ball is
+destroyed in OnDestroy, the score resets and a new ball is spawned with the new rules.
+Saving `FieldPlayer.lua` (e.g. `speed = 9.0`) puts both players back on their start spots
+with the new behaviour. Saving `Prefabs/Confetti*.json` or `Ball.json` changes the next
+spawned piece/ball. A syntax error is rejected with `file:line` in the console and status bar;
+the running version continues. Note that overrides saved in the scene take precedence
+over the defaults in the Lua file. In Play
 the free camera moves only with the left mouse button held, so WASD drives the blue player.
 
 The character has a dynamic Rigidbody and a full-height AABB hitbox; its head/limbs follow

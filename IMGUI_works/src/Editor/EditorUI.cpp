@@ -4,6 +4,7 @@
 #include <Engine.h>
 #include <SceneFactory.h>
 #include <SceneSerializer.h>
+#include <ScriptSystem.h>
 
 #include <Windows.h>
 #include <imgui.h>
@@ -344,6 +345,14 @@ static void DrawToolbar(EditorContext& ctx)
             EditorSceneIO::RestorePlaySnapshot(ctx);
         ImGui::SetItemTooltip("Stop Play and restore %s.", EditorSceneIO::PlaySnapshotPath());
     }
+    if (ctx.engine)
+    {
+        auto& scripts = ctx.engine->GetScripts();
+        bool hotReload = scripts.IsHotReloadEnabled();
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Hot reload##toolbar", &hotReload)) scripts.SetHotReload(hotReload);
+        ImGui::SetItemTooltip("Watch Lua scripts and prefabs on a JobSystem worker. In Play, a saved script restarts its instances (reset state); a saved prefab applies to the next spawn.");
+    }
 
     ImGui::SameLine();
     ImGui::Text("| Gizmo:");
@@ -395,6 +404,8 @@ void Editor_BeginFrame(const FrameContext& context)
         ctx.statusMessage = scene.error.empty() ? "Loaded from " + scene.path : "Load failed: " + scene.error;
     }
     wasLoading = loading;
+    if (ctx.engine)
+        if (auto notice = ctx.engine->GetScripts().TakeHotReloadNotice(); !notice.empty()) ctx.statusMessage = std::move(notice);
     ImGuizmo::BeginFrame();
     DrawMainMenu(ctx);
     DrawToolbar(ctx);

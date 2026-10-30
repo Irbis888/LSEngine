@@ -68,6 +68,7 @@ void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool sta
     mScripts = scriptSystem;
     mScripts->Bind(world.registry);
     mScripts->SetResources(&mResourceManager);
+    mScripts->SetJobs(&mJobs);
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
 	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
 
@@ -92,6 +93,7 @@ Engine::~Engine()
 void Engine::Shutdown()
 {
     EndPlay(); // OnDestroy runs while the world and resources still exist.
+    if (mScripts) mScripts->StopHotReload(); // Its watcher task runs on mJobs.
 	mResourceManager.ShutdownLoading();
 	mJobs.Shutdown();
     mPendingScene.reset();
@@ -103,6 +105,8 @@ void Engine::Shutdown()
 void Engine::Update(const FrameContext& context)
 {
     PumpSceneLoading();
+    // Before the systems run, so a restarted script instance initializes in this frame's Sync.
+    if (mScripts && !IsSceneLoading()) mScripts->PumpHotReload();
 	if (context.input.keysPressed[VK_F5])
 	{
 		mRenderAdapter->ReloadShaders();

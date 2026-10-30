@@ -92,13 +92,50 @@ Reading metadata executes the file's top-level chunk with an instruction limit a
 environment without scene access. It does not call OnInit/Update/FixedUpdate/Destroy/Event.
 Keep top-level code declarative; scene access belongs in callbacks.
 
+## Hot reload (file watcher on JobSystem)
+
+Saving a watched file is enough; no button, Stop or restart. Toggle: toolbar **Hot reload**
+(on by default; it also works in `--game` mode). Watched: every script referenced by a
+ScriptComponent in the scene or shown in the inspector, and every prefab spawned in this Play.
+
+1. Every 250 ms `ScriptSystem::PumpHotReload` submits **one low-priority JobSystem task**
+   (Tracy zone `ScriptHotReloadScan`) with a copy of the watched paths and their last stamps
+   (write time + size). The worker stats them; for a changed Lua file it reads the text and
+   compiles it in a **private temporary `lua_State`** (`ScriptRuntime::CheckSyntax`) — the
+   engine interpreter is never touched off the main thread. A changed prefab is parsed with
+   `SceneSerializer::ReadPrefab` (plain data). The first sighting of a file only records its stamp.
+2. The main thread polls the handle without blocking; when complete, results are applied in
+   `Engine::Update` before the systems run (zone `ScriptHotReloadApply`), outside callbacks and
+   never while a scene is loading.
+3. Applying a script: the validated text replaces the session source cache, then the top-level
+   chunk is evaluated (`Describe`, no scene access). On any compile/top-level error the edit is
+   **rejected**: the previous text is restored, running instances continue, and the console plus
+   the editor status bar show `path:line: message`. In Edit mode the inspector description is
+   refreshed (new defaults/fields appear without **Reload description**) and the error is shown there.
+4. **L1 reset in Play**: every instance of the changed file gets OnDestroy and is released
+   (all `self` fields, upvalues and globals of the old instance are dropped), its object returns
+   to the transform it had when its script first started in this Play (scene or spawn position)
+   with zero rigidbody velocity, and Sync creates a new instance from the new text with current
+   parameter overrides and calls OnInit in the same frame. Instances that had faulted restart too,
+   so fixing a broken script during Play brings it back. Objects spawned by the new OnInit are
+   materialized before its first OnUpdate.
+5. A changed prefab replaces the session template: it applies to the **next** `Entity.Spawn`;
+   already spawned objects keep their data (template semantics).
+
+Script text is cached per Play session by canonical path, so spawn bursts no longer re-read and
+re-compile the file from disk for every instance; Play/Stop (`Bind`) and **Reload description**
+drop the cache, so every Play still starts from the files on disk. Field-by-field state transfer
+(L2) is not implemented: a reload deliberately restarts the instance.
+
 ## Ownership, lifecycle and frame order
 
 `ScriptComponent.h` contains only `path`, `enabled` and a typed parameter map.
 `ScriptSystem.h/.cpp` is a genuine `ISystem`, owned by Engine's update-system list.
 `ScriptRuntime.h/.cpp` owns exactly one interpreter for that engine and provides loading,
-API registration, protected calls, metadata and command queues. No Lua work is submitted
-to JobSystem. Public runtime operations reject calls from a different thread.
+API registration, protected calls, metadata and command queues. No callback and no work on
+the engine interpreter is submitted to JobSystem; only the hot reload watcher (file stats,
+reads and syntax checks in a private temporary state) runs there. Public runtime operations
+reject calls from a different thread.
 
 Each entity loads its file separately into a fresh `_ENV` and receives a fresh returned
 instance table. Standard-library tables are private; math also gets its own random-generator
@@ -199,6 +236,9 @@ API inputs must be finite and fit the relevant C++ representation.
 Constants: A–Z, Space, Enter, Left/Right/Up/Down, Delete, Shift and Escape.
 `Log(...)`/`print(...)` write prefixed messages to the application's log/console.
 
+Objects spawned by an OnInit that ran inside an update or fixed step (lazy enable, hot reload)
+receive their components right after that synchronization, before the frame's OnUpdate.
+
 ## Events and destruction
 
 ```lua
@@ -295,8 +335,9 @@ with the canonical UTF-8 source name for diagnostics. The loader accepts text on
 
 Protected calls report file, entity name/ID, callback and Lua traceback when available.
 One fault disables that runtime instance until the next Play; it does not change serialized
-enabled or stop other instances. Errors do not repeat every frame. Reload outside Play or
-fix parameters, then start a new Play session. The inspector displays metadata/runtime errors.
+enabled or stop other instances. Errors do not repeat every frame. Save a fixed file (hot
+reload restarts the faulted instance), or fix parameters and start a new Play session.
+The inspector displays metadata/runtime errors.
 
 Each file evaluation and callback has a **200,000 Lua-instruction** budget, checked every
 100 instructions. `ScriptRuntime::SetInstructionLimit(100..10000000)` changes it. The hook
@@ -312,12 +353,14 @@ exposed. This deliberately restricted API is **not a security sandbox** for host
   real D3D12 frames and actual EditorSceneIO Play/Stop handlers. Checks isolation, parameters,
   dt, fixed ordering and one-shot input, capture policy, events/copies, deletion/cleanup, prefab spawn/overrides/mesh reuse,
   stale references, static/dynamic impulse behavior, Unicode, syntax/missing/runtime errors,
-  instruction hooks and asynchronous scene restoration.
+  instruction hooks and asynchronous scene restoration; hot reload: edited script restarts its
+  instance in Play with new defaults and Play-start transform, a broken edit is rejected with
+  `file:line` while the old version keeps running, Edit-mode edits refresh the description.
 * `tests/RunLuaApplicationSmoke.ps1 -Configuration Debug` (or Release): launches the
   **ordinary Try2.exe** with `--lua-smoke`. Exercises Application's normal frame loop,
   actual editor initialization, renderer, Lua demo and Play/Stop/Play/Stop, starting from
   an unrelated directory. It restores the user's snapshot/ImGui settings after the run.
   `--lua-smoke` is opt-in validation; normal launches do not execute the driver.
 * Existing physics, resources and JobSystem checks remain independent of Lua callbacks;
-  no script is dispatched to a worker and no physics formulas were changed.
+  no script callback is dispatched to a worker and no physics formulas were changed.
 

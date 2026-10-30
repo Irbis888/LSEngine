@@ -47,6 +47,10 @@ return {
         self:UpdateBoard()
         Log("Match: first to " .. self.winScore .. " goals. Blue: WASD + Shift, Red: arrows + Enter")
     end,
+    -- Hot reload restarts this instance: remove the ball it owns, OnInit spawns a fresh one.
+    OnDestroy = function(self)
+        if self.ball and self.ball:IsValid() then self.ball:Destroy() end
+    end,
     UpdateBoard = function(self)
         ShowDigit(self.segments.blue, self.score.blue)
         ShowDigit(self.segments.red, self.score.red)

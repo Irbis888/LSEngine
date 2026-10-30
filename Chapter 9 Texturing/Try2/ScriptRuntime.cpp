@@ -139,6 +139,9 @@ struct ScriptRuntime::Impl
     std::vector<SpawnRequest> spawns;
     // Parsed templates for the current session. Bind clears it, so edited prefab files apply on the next Play.
     std::map<std::string, std::shared_ptr<SceneSerializer::EntityDescription>> prefabs;
+    // Script text of the current session by canonical path. Spawns reuse it instead of re-reading
+    // the disk; hot reload replaces an entry only after the new text has compiled.
+    std::map<std::string, std::string> sources;
 
     explicit Impl(std::filesystem::path root) : root(std::filesystem::weakly_canonical(root))
     {
@@ -489,12 +492,16 @@ struct ScriptRuntime::Impl
     void Load(const std::string& path)
     {
         const auto canonical = AssetPaths::ScriptPath(root, path);
-        const auto filename = AssetPaths::Resolve(root, canonical);
-        std::ifstream file(filename, std::ios::binary);
-        if (!file) throw std::runtime_error("Cannot open Lua file: " + canonical);
-        if (std::filesystem::file_size(filename) > 1024 * 1024) throw std::runtime_error("Lua file exceeds 1 MiB");
-        std::string source((std::istreambuf_iterator<char>(file)), {});
-        if (source.starts_with("\xEF\xBB\xBF")) source.erase(0, 3); // UTF-8 BOM from Windows editors.
+        auto cached = sources.find(canonical);
+        if (cached == sources.end())
+        {
+            const auto filename = AssetPaths::Resolve(root, canonical);
+            std::ifstream file(filename, std::ios::binary);
+            if (!file) throw std::runtime_error("Cannot open Lua file: " + canonical);
+            if (std::filesystem::file_size(filename) > 1024 * 1024) throw std::runtime_error("Lua file exceeds 1 MiB");
+            cached = sources.emplace(canonical, StripBom({ std::istreambuf_iterator<char>(file), {} })).first;
+        }
+        const auto& source = cached->second;
         const auto chunk = "@" + canonical;
         if (luaL_loadbufferx(state, source.data(), source.size(), chunk.c_str(), "t") != LUA_OK)
             throw std::runtime_error(lua_tostring(state, -1));
@@ -522,7 +529,7 @@ struct ScriptRuntime::Impl
 ScriptRuntime::ScriptRuntime(std::filesystem::path assetRoot) : mImpl(std::make_unique<Impl>(std::move(assetRoot))) {}
 ScriptRuntime::~ScriptRuntime() = default;
 void ScriptRuntime::Bind(entt::registry& registry)
-{ mImpl->CheckThread(); mImpl->registry = &registry; ++mImpl->generation; ClearCommands(); mImpl->prefabs.clear(); }
+{ mImpl->CheckThread(); mImpl->registry = &registry; ++mImpl->generation; ClearCommands(); mImpl->prefabs.clear(); mImpl->sources.clear(); }
 void ScriptRuntime::Unbind()
 { mImpl->CheckThread(); ClearCommands(); mImpl->registry = nullptr; ++mImpl->generation; }
 void ScriptRuntime::SetInput(const InputState& input, bool captured, bool allowEdges)
@@ -627,4 +634,50 @@ void ScriptRuntime::SetInstructionLimit(uint32_t limit)
     mImpl->CheckThread();
     if (limit < 100 || limit > 10000000) throw std::invalid_argument("Lua instruction limit must be in [100,10000000]");
     mImpl->instructionLimit = limit;
+}
+std::optional<std::string> ScriptRuntime::SetSource(const std::string& path, std::optional<std::string> source)
+{
+    auto& impl = *mImpl; impl.CheckThread();
+    const auto canonical = AssetPaths::ScriptPath(impl.root, path);
+    std::optional<std::string> previous;
+    if (const auto it = impl.sources.find(canonical); it != impl.sources.end())
+    { previous = std::move(it->second); impl.sources.erase(it); }
+    if (source) impl.sources.emplace(canonical, StripBom(std::move(*source)));
+    return previous;
+}
+void ScriptRuntime::ForgetSource(const std::string& path)
+{
+    mImpl->CheckThread();
+    try { mImpl->sources.erase(AssetPaths::ScriptPath(mImpl->root, path)); }
+    catch (const std::exception&) {} // An invalid path has no cached text; Load reports it.
+}
+std::string ScriptRuntime::CheckSyntax(std::string_view source, const std::string& path)
+{
+    // A separate state: lua_State objects share nothing, so a worker can compile while the
+    // engine's interpreter keeps running on the main thread.
+    lua_State* state = luaL_newstate();
+    if (!state) return "Could not create Lua interpreter for validation";
+    const auto chunk = "@" + path;
+    std::string error;
+    if (luaL_loadbufferx(state, source.data(), source.size(), chunk.c_str(), "t") != LUA_OK)
+    { const char* message = lua_tostring(state, -1); error = message ? message : "Lua syntax error"; }
+    lua_close(state);
+    return error;
+}
+std::string ScriptRuntime::StripBom(std::string source)
+{
+    if (source.starts_with("\xEF\xBB\xBF")) source.erase(0, 3); // UTF-8 BOM from Windows editors.
+    return source;
+}
+std::vector<std::string> ScriptRuntime::GetPrefabPaths() const
+{
+    mImpl->CheckThread();
+    std::vector<std::string> paths;
+    for (const auto& [path, prefab] : mImpl->prefabs) if (prefab) paths.push_back(path);
+    return paths;
+}
+void ScriptRuntime::SetPrefab(const std::string& path, std::shared_ptr<SceneSerializer::EntityDescription> prefab)
+{
+    mImpl->CheckThread();
+    mImpl->prefabs[AssetPaths::PrefabPath(mImpl->root, path)] = std::move(prefab);
 }

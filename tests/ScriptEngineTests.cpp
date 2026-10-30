@@ -348,6 +348,60 @@ elseif self.n==3 then assert(self.a:GetScale().x==2); self.a:Destroy() end end})
             Check(!engine.BeginPlay(error), "Play started on a partial scene");
             Check(engine.RestorePlaySnapshot("Scenes/EditorPlaySnapshot.json", error), "Stop could not queue restoration behind pending scene");
             waitScene(); Check(!engine.IsPlaying(), "Queued restore restarted scripts");
+            {
+                // Hot reload: the watcher runs as a JobSystem task, results apply on the main thread.
+                auto& scripts = engine.GetScripts();
+                const auto pumpFor = [&](std::chrono::milliseconds duration)
+                {
+                    const auto end = std::chrono::steady_clock::now() + duration;
+                    while (std::chrono::steady_clock::now() < end) frame();
+                };
+                const auto pumpUntil = [&](const auto& condition, const char* message)
+                {
+                    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                    while (!condition() && std::chrono::steady_clock::now() < deadline) frame();
+                    Check(condition(), message);
+                };
+                Write(assets / "Scripts/Hot.lua", R"(return {parameters={step=1},
+OnInit=function(self) self.n=0; self.entity:SetScale(Vec3(self.params.step,1,1)) end,
+OnUpdate=function(self,dt) self.n=self.n+1; self.entity:SetPosition(Vec3(self.n,0,0)) end})");
+                const auto hot = Add(engine, "Hot", "Hot.lua");
+                reg.get<TransformComponent>(hot).rotation = glm::vec3(0.5f, 0, 0);
+                Check(engine.BeginPlay(error), "Hot reload Play failed");
+                pumpFor(std::chrono::milliseconds(700)); // The watcher records the file's first stamp.
+                Check(reg.get<TransformComponent>(hot).position.x > 20, "Hot reload fixture did not run");
+                const auto reloads = scripts.GetHotReloadCount();
+                reg.get<TransformComponent>(hot).rotation = glm::vec3(2, 0, 0);
+                Write(assets / "Scripts/Hot.lua", R"(return {parameters={step=3},
+OnInit=function(self) self.n=0; self.entity:SetScale(Vec3(self.params.step,1,1)) end,
+OnUpdate=function(self,dt) self.n=self.n+1; self.entity:SetPosition(Vec3(-self.n,0,0)) end})");
+                pumpUntil([&] { return scripts.GetHotReloadCount() > reloads; }, "Edited script was not hot-reloaded in Play");
+                frame();
+                const auto& reset = reg.get<TransformComponent>(hot);
+                Check(reset.scale.x == 3 && reset.position.x < 0 && reset.position.x > -5,
+                    "Hot reload did not restart the instance with fresh state and new defaults");
+                Check(reset.rotation == glm::vec3(0.5f, 0, 0), "Hot reload did not reset the object to its Play-start transform");
+                Check(engine.IsPlaying() && scripts.GetStatus(hot) == "Running", "Hot reload stopped Play");
+                (void)scripts.TakeHotReloadNotice();
+                Write(assets / "Scripts/Hot.lua", "return { OnUpdate = this is not Lua }");
+                std::string notice;
+                pumpUntil([&] { if (notice.empty()) notice = scripts.TakeHotReloadNotice(); return !notice.empty(); },
+                    "Broken script edit produced no hot reload notice");
+                Check(notice.find("rejected") != std::string::npos && notice.find("Scripts/Hot.lua:1:") != std::string::npos,
+                    "Rejected hot reload lacks file:line");
+                const float before = reg.get<TransformComponent>(hot).position.x;
+                frame(); frame();
+                Check(scripts.GetError(hot).empty() && reg.get<TransformComponent>(hot).position.x < before,
+                    "A rejected edit disturbed the running version");
+                engine.EndPlay();
+                Check(!scripts.Describe("Scripts/Hot.lua").error.empty(), "Broken script described without an error");
+                Write(assets / "Scripts/Hot.lua", "return {parameters={step=5, label='edited'}}");
+                pumpUntil([&] { const auto& d = scripts.Describe("Scripts/Hot.lua"); return d.error.empty() && d.defaults.contains("label"); },
+                    "Edit-mode change did not refresh the inspector description");
+                Check(std::get<double>(scripts.Describe("Scripts/Hot.lua").defaults.at("step")) == 5, "Refreshed defaults are wrong");
+                scripts.DestroyEntity(hot);
+                std::cout << "PASS: hot reload via JobSystem watcher, L1 reset in Play, rejected broken edit, Edit-mode refresh\n";
+            }
             engine.Shutdown(); renderer.FlushCommandQueue();
             std::cout << "PASS: private globals/locals, optional callbacks, fixed ordering/edges, pause/re-enable, copied/batched events, cleanup, prefab spawn/overrides/mesh reuse, stale handles, syntax/missing/runtime errors, instruction hooks, scene generations, async restoration\n";
         }

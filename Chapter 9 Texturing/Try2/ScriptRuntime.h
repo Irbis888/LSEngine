@@ -5,6 +5,8 @@
 #include <deque>
 #include <filesystem>
 #include <functional>
+#include <optional>
+#include <string_view>
 #include <thread>
 
 // One interpreter per Engine. All methods must run on its creating thread.
@@ -57,6 +59,17 @@ public:
     EntityRef Reference(entt::entity entity) const;
     const std::filesystem::path& GetAssetRoot() const;
     void SetInstructionLimit(uint32_t limit);
+    // Script text is read once per session and cached by canonical path; Bind clears the cache,
+    // so every Play re-reads files. Hot reload installs validated text; the previous text is returned
+    // (empty optional if none was cached) so a rejected version can be rolled back.
+    std::optional<std::string> SetSource(const std::string& path, std::optional<std::string> source);
+    void ForgetSource(const std::string& path);
+    // Any thread: compiles text in a private temporary interpreter. Empty result = valid syntax.
+    static std::string CheckSyntax(std::string_view source, const std::string& path);
+    static std::string StripBom(std::string source);
+    // Session prefab cache. Replacing an entry affects only later Entity.Spawn calls.
+    std::vector<std::string> GetPrefabPaths() const;
+    void SetPrefab(const std::string& path, std::shared_ptr<SceneSerializer::EntityDescription> prefab);
 private:
     struct Impl;
     std::unique_ptr<Impl> mImpl;
