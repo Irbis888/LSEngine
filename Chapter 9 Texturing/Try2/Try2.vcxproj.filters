@@ -13,11 +13,40 @@
     <ClInclude Include="..\..\Common\ThirdParty\stb\stb_image.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClCompile Include="..\TexColumns\CustomBuffer.cpp" />
+    <ClCompile Include="..\TexColumns\CustomBuffer.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetPaths.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="AssetPaths.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClCompile Include="ScriptRuntime.cpp">
+      <Filter>Engine\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptSystem.cpp">
+      <Filter>Engine\Scripting</Filter>
+    </ClCompile>
+    <ClInclude Include="ScriptComponent.h">
+      <Filter>Engine\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptRuntime.h">
+      <Filter>Engine\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptSystem.h">
+      <Filter>Engine\Scripting</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Engine">
       <UniqueIdentifier>{8DBB2F73-23DA-44F7-9187-92BE9CFF6211}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Scripting">
+      <UniqueIdentifier>{1F33025E-8386-4C5C-9A9F-175336F84217}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scripts">
+      <UniqueIdentifier>{6161047D-685E-44F5-B4BB-D2FEA3D11E63}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics">
       <UniqueIdentifier>{74DFBA39-62F2-4D41-84A8-7C61D425060C}</UniqueIdentifier>
@@ -66,6 +95,36 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Scripts\DeleteOnKey.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\Door.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\DoorController.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\FlyInCircle.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\KeyboardMove.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\PhysicsMover.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="Scripts\Rotate.lua">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="SCRIPTING.md">
+      <Filter>Engine\Scripting</Filter>
+    </None>
+    <None Include="Scenes\LuaDemo.json">
+      <Filter>Serializer\Scenes</Filter>
+    </None>
+    <None Include="Scenes\PhysicsStress10000.json">
+      <Filter>Serializer\Scenes</Filter>
+    </None>
     <None Include="Games\BallField\Scripts\FieldPlayer.lua">
       <Filter>Games\BallField\Scripts</Filter>
     </None>
