@@ -2,13 +2,14 @@
 #include "Commons.h"
 #include "ResourceManager.h"
 #include "World.h"
+#include "TerrainSystem.h"
 
 
 class RenderSystem : public ISystem
 {
 public:
-    RenderSystem(IRenderAdapter* adapter)
-        : mAdapter(adapter) {
+    RenderSystem(IRenderAdapter* adapter, TerrainSystem* terrain = nullptr)
+        : mAdapter(adapter), mTerrain(terrain) {
     }
     void Update(entt::registry& reg, const FrameContext& context) override
     {
@@ -65,9 +66,11 @@ public:
                 mAdapter->SetTransform(transform);
 				mAdapter->DrawMesh(mesh.meshID);
             });
+        if(mTerrain)mTerrain->Draw(reg);
     }
 private:
     IRenderAdapter* mAdapter;
+    TerrainSystem* mTerrain;
     ResourceManager* mResourceManager;
 };
 

@@ -54,6 +54,7 @@ return {
         end
     end,
     OnUpdate = function(self, dt)
+        --while true do end
         self.time = self.time + dt
         local p = self.entity:GetPosition()
         local yaw = self.entity:GetRotation().y

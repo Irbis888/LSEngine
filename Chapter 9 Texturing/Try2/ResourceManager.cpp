@@ -391,6 +391,8 @@ struct ResourceManager::LoadingState
     }
 };
 
+ImageData ResourceManager::DecodeImage(const std::filesystem::path& file) { return LoadImage(file.wstring()); }
+
 ResourceManager::ResourceManager()
 {
     // Available before starting any jobs; no file access or decoder required.

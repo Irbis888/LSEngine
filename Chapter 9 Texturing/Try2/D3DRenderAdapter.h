@@ -48,6 +48,12 @@ public:
 
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
+    bool PrepareTerrain(const std::shared_ptr<const TerrainResource>&) override;
+    void DrawTerrain(const TerrainResource&,const TransformComponent&,const TerrainComponent&,
+        const std::vector<TerrainDrawChunk>&) override;
+    bool TerrainVisible(const glm::vec3&,const glm::vec3&) const override;
+    glm::vec3 TerrainCameraPosition() const override;
+    size_t TerrainGpuBytes() const override;
 
     // Dispose completed mesh and texture upload buffers after the GPU fence.
     void CleanupMeshUploadBuffers();
@@ -75,6 +81,22 @@ public:
     Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
+    struct TerrainGPU
+    {
+        std::weak_ptr<const TerrainResource> owner;
+        std::vector<ComPtr<ID3D12Resource>> textures, vertices, indices, staging;
+        std::vector<UINT> indexCounts, vertexBytes;
+        UINT descriptors = 0, nextImage = 0;
+        UINT64 fence = 0, retireFence = 0;
+        size_t bytes = 0;
+        bool ready = false;
+    };
+    std::unordered_map<const TerrainResource*, std::unique_ptr<TerrainGPU>> mTerrainGPU;
+    std::vector<UINT> mFreeTerrainDescriptors;
+    void BuildTerrainPipeline();
+    void CollectTerrainResources();
+    size_t mTerrainUploadBytes = 0;
+    double mTerrainUploadMs = 0;
     void PumpResourceUploads();
     void EnsureDefaultTextures();
     UploadBudget mUploadBudget;

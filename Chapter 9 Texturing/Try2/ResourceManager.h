@@ -2,6 +2,7 @@
 #include "Commons.h"
 #include "ImageData.h"
 #include <deque>
+#include <filesystem>
 
 class JobSystem;
 enum class ResourceState { Loading, CpuReady, Ready, Failed };
@@ -101,6 +102,8 @@ struct Texture
 class ResourceManager
 {
 public:
+    // CPU-only decoder shared by specialized assets; no resource IDs or GPU work.
+    static ImageData DecodeImage(const std::filesystem::path& file);
     ResourceManager();
     ~ResourceManager();
     ResourceManager(const ResourceManager&) = delete;

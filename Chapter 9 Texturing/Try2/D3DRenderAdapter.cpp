@@ -107,6 +107,9 @@ void D3DRenderAdapter::PumpResourceUploads()
         uploadedBytes += bytes;
         textureTurn = !uploadTexture;
     }
+    // Specialized terrain assets share this frame's soft upload budget.
+    mTerrainUploadBytes=uploadedBytes;
+    mTerrainUploadMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
     TracyPlot("Texture uploads this frame", int64_t(textures));
     TracyPlot("Mesh uploads this frame", int64_t(meshes));
     TracyPlot("GPU upload bytes this frame", int64_t(uploadedBytes));
@@ -347,6 +350,9 @@ void D3DRenderAdapter::BeginFrame()
     // Reset command allocator for this frame
     ThrowIfFailed(mCurrFrameResource->CmdListAlloc->Reset());
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
+    ID3D12DescriptorHeap* frameHeaps[]={mCbvSrvUavHeap.Get()};
+    mCommandList->SetDescriptorHeaps(1,frameHeaps);
+    CollectTerrainResources();
     PumpResourceUploads();
 
     // Update pass constants for this frame
@@ -716,6 +722,7 @@ void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
     if (!mCurrFrameResource) return;
 
     mCurrentObjectCBIndex = mNextObjectCBIndex++;
+    if(mCurrentObjectCBIndex>=16384) throw std::runtime_error("Frame ObjectCB capacity (16384) exceeded");
 
     // Build world matrix from transform component (TRS composition)
     ObjectConstants objConstants;
@@ -899,6 +906,7 @@ void D3DRenderAdapter::SetMaterial(MaterialID material) {
     matConstants.MatTransform = matGPU->MatTransform;
 
     const UINT materialCBIndex = mNextMaterialCBIndex++;
+    if(materialCBIndex>=16384) throw std::runtime_error("Frame MaterialCB capacity (16384) exceeded");
     mCurrFrameResource->MaterialCB->CopyData(materialCBIndex, matConstants);
 
     D3D12_GPU_VIRTUAL_ADDRESS matCBAddress =
@@ -1035,6 +1043,7 @@ void D3DRenderAdapter::BuildPSOs()
     opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
+    BuildTerrainPipeline();
 }
 
 // -------------------------------------------------------------
@@ -1217,6 +1226,8 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
 
 void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
 {
+    ID3D12DescriptorHeap* heaps[]={mCbvSrvUavHeap.Get()};
+    mCommandList->SetDescriptorHeaps(1,heaps);
     MeshGPU* meshGPU = GetMeshGPU(meshId);
     if (!meshGPU || submeshIndex >= meshGPU->submeshes.size())
     {

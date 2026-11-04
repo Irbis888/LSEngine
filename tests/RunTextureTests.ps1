@@ -21,7 +21,7 @@ $compilerArgs = @('/nologo', '/MP2', '/std:c++20', '/permissive', '/EHsc', '/MDd
     "/I$project", "/I$(Join-Path $repo 'external/lua/lua-5.5.1/src')", "/I$(Join-Path $repo 'IMGUI_works\src')", "/I$(Join-Path $repo 'external\enkiTS\src')", "/I$(Join-Path $repo 'Common')", "/I$(Join-Path $repo 'external\tracy\public')",
     "/Fo$output\", "/Fd$output\", "/Fe$output\TextureLoadingTests.exe",
     (Join-Path $PSScriptRoot 'TextureLoadingTests.cpp'), (Join-Path $PSScriptRoot 'ResourceStreamingTests.cpp'), (Join-Path $PSScriptRoot 'SceneSwitchStreamingTests.cpp'),
-    (Join-Path $project 'Engine.cpp'), (Join-Path $project 'AssetPaths.cpp'), (Join-Path $project 'ScriptRuntime.cpp'), (Join-Path $project 'ScriptSystem.cpp'), (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'CameraControllerSystem.cpp'),
+    (Join-Path $project 'Engine.cpp'), (Join-Path $project 'AssetPaths.cpp'), (Join-Path $project 'ScriptRuntime.cpp'), (Join-Path $project 'ScriptSystem.cpp'), (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'Terrain.cpp'), (Join-Path $project 'TerrainSystem.cpp'), (Join-Path $project 'D3DTerrain.cpp'), (Join-Path $project 'CameraControllerSystem.cpp'),
     (Join-Path $project 'PhysicsSystem.cpp'), (Join-Path $project 'SceneFactory.cpp'), (Join-Path $project 'DemoScene.cpp'),
     (Join-Path $repo 'Common\GameTimer.cpp'),
     (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'JobSystem.cpp'), (Join-Path $project 'D3DRenderAdapter.cpp'),

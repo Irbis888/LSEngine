@@ -221,6 +221,8 @@ static void DrawMainMenu(EditorContext& ctx)
 
     if (ImGui::BeginMenu("Scenes"))
     {
+        if(ImGui::MenuItem("Large Terrain", "Scenes/TerrainDemo.json",false,Editor_CanEditComponents()))
+            EditorSceneIO::LoadScene(ctx,"Scenes/TerrainDemo.json");
         const bool canSwitchScene = ctx.mode == EditorMode::Edit && ctx.engine;
         if (ImGui::MenuItem("Lua Scripting Demo", EditorSceneIO::LuaDemoPath(), false, canSwitchScene))
             EditorSceneIO::LoadScene(ctx, EditorSceneIO::LuaDemoPath());

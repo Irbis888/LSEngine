@@ -7,7 +7,8 @@
 class PhysicsSystem : public ISystem
 {
 public:
-    explicit PhysicsSystem(JobSystem& jobs) : mJobs(jobs) {}
+    explicit PhysicsSystem(JobSystem& jobs, std::function<void(entt::registry&)> staticContacts = {})
+        : mJobs(jobs), mStaticContacts(std::move(staticContacts)) {}
     struct SchedulingSettings
     {
         bool parallel = true;
@@ -32,6 +33,7 @@ private:
         RigidbodyComponent* body;
     };
     JobSystem& mJobs;
+    std::function<void(entt::registry&)> mStaticContacts;
     SchedulingSettings mScheduling;
     PhysicsStats::StepTimings mTimings;
     std::vector<BodyWork> mBodies;

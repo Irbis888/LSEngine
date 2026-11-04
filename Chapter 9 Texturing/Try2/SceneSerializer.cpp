@@ -383,6 +383,11 @@ namespace
         if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
         if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
         if (value.contains("script")) entity.script = ScriptFromJson(value.at("script"));
+        if (value.contains("terrain"))
+        {
+            entity.terrain=Terrain::FromJson(value.at("terrain"));
+            if(!Terrain::ValidTransform(entity.transform))throw std::runtime_error("Terrain requires translation and positive scale; rotation is unsupported");
+        }
         return entity;
     }
 }
@@ -449,6 +454,7 @@ size_t SceneSerializer::Save(const World& world, const std::string& path, const 
         }
         if (const auto* script = world.registry.try_get<ScriptComponent>(entity))
             serializedEntity["script"] = ScriptToJson(*script, assetRoot.empty() ? AssetPaths::FindRoot() : assetRoot);
+        if(const auto* terrain=world.registry.try_get<TerrainComponent>(entity))serializedEntity["terrain"]=Terrain::ToJson(*terrain);
 
         scene["entities"].push_back(serializedEntity);
     }
@@ -527,6 +533,7 @@ void SceneSerializer::Instantiate(entt::registry& registry, entt::entity entity,
     if (description.rigidbody) registry.emplace<RigidbodyComponent>(entity, *description.rigidbody);
     if (description.collider) registry.emplace<ColliderComponent>(entity, *description.collider);
     if (description.script) registry.emplace<ScriptComponent>(entity, *description.script);
+    if (description.terrain) registry.emplace<TerrainComponent>(entity, *description.terrain);
 }
 
 void SceneSerializer::CreateEntity(World& world, ResourceManager& resources, const EntityDescription& description)

@@ -39,6 +39,7 @@ void PhysicsSystem::Update(entt::registry& reg, const FrameContext& context)
             [this, dt](uint32_t begin, uint32_t end) { IntegrateRange(begin, end, dt); });
         mTimings.integrateMs = ElapsedMs(phase);
     }
+    if(mStaticContacts)mStaticContacts(reg);
     {
         ZoneScopedN("PhysicsInitialAABB");
         const auto phase = Clock::now();
@@ -54,6 +55,7 @@ void PhysicsSystem::Update(entt::registry& reg, const FrameContext& context)
     }
     const auto solver = Clock::now();
     ResolveCollisions();
+    if(mStaticContacts)mStaticContacts(reg);
     mTimings.solverMs = ElapsedMs(solver);
     mTimings.totalMs = ElapsedMs(start);
     PhysicsStats::Timings() = mTimings;

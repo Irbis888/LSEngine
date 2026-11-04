@@ -6,6 +6,7 @@
 #include "ResourceManager.h"
 #include "World.h"
 #include "ScriptComponent.h"
+#include "Terrain.h"
 #include <filesystem>
 
 class SceneSerializer
@@ -31,6 +32,7 @@ public:
         std::optional<RigidbodyComponent> rigidbody;
         std::optional<ColliderComponent> collider;
         std::optional<ScriptComponent> script;
+        std::optional<TerrainComponent> terrain;
     };
     struct SceneData { std::vector<EntityDescription> entities; };
 

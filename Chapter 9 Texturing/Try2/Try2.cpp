@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <shellapi.h>
+#include "../../tests/TerrainValidation.h"
 #pragma comment(lib, "Shell32.lib")
 
 #include <string>
@@ -60,7 +61,7 @@ class TestApp : public Application
 {
 public:
     TestApp(HINSTANCE hInstance, bool scriptSmoke = false, const std::string& gameScene = {},
-        const std::wstring& title = L"LS Engine", bool gameSmoke = false);
+        const std::wstring& title = L"LS Engine", bool gameSmoke = false, bool terrainSmoke = false);
     /*TestApp(const TestApp& rhs) = delete;
     TestApp& operator=(const TestApp& rhs) = delete;
     ~TestApp();*/
@@ -68,6 +69,7 @@ public:
     //virtual bool Initialize()override;
 
 private:
+    std::unique_ptr<TerrainValidation> mTerrainValidation;
     void CheckScriptSmoke();
     void CheckGameSmoke();
     bool mGameSmoke = false;
@@ -87,11 +89,12 @@ private:
 };
 
 TestApp::TestApp(HINSTANCE hInstance, bool scriptSmoke, const std::string& gameScene,
-    const std::wstring& title, bool gameSmoke)
+    const std::wstring& title, bool gameSmoke, bool terrainSmoke)
     : Application(hInstance), mScriptSmoke(scriptSmoke), mGameSmoke(gameSmoke)
 {
     mGameScene = gameScene;
-    mStandalone = !gameScene.empty();
+    mStandalone = !gameScene.empty() && !terrainSmoke;
+    if(terrainSmoke)mTerrainValidation=std::make_unique<TerrainValidation>();
     mMainWndCaption = title;
     ImGuiBridge::SetRuntimeMode(mStandalone);
 }
@@ -121,7 +124,7 @@ void TestApp::PhysicsUpdate(const FrameContext& context)
 void TestApp::Update(const FrameContext& context)
 {
 	ZoneScopedN("Update");
-    if (mScriptSmoke || mGameSmoke) mTimer.Start(); // Hidden validation still needs a ticking clock.
+    if (mScriptSmoke || mGameSmoke || mTerrainValidation) mTimer.Start(); // Hidden validation still needs a ticking clock.
     if (mGameSmoke)
     {
         auto scripted = context;
@@ -131,12 +134,22 @@ void TestApp::Update(const FrameContext& context)
     else mEngine->Update(context);
     if (mScriptSmoke) CheckScriptSmoke();
     if (mGameSmoke) CheckGameSmoke();
+    if(mTerrainValidation)
+    {
+        try
+        {
+            if(mTerrainValidation->Tick(*mEngine,context,*static_cast<D3DRenderAdapter*>(mRenderAdapter.get())))
+            {mTerrainValidation.reset();PostQuitMessage(0);}
+        }
+        catch(const std::exception& e){std::cerr<<"TERRAIN_SMOKE_FAIL: "<<e.what()<<std::endl;mTerrainValidation.reset();PostQuitMessage(2);}
+    }
     if (mStandalone && context.input.keysPressed[VK_ESCAPE]) PostQuitMessage(0);
 }
 void TestApp::Draw(const FrameContext& context)
 {
 	ZoneScopedN("Draw");
 	mEngine->Draw(context);
+    if(mTerrainValidation)mTerrainValidation->AfterDraw(*static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
 }
 
 
@@ -284,12 +297,13 @@ int main(int argc, char** argv)
             title = AssetPaths::FromUtf8(data.value("title", "LS Engine Game") + (controls.empty() ? "" : " | " + controls)).native();
         }
         HINSTANCE hInstance = GetModuleHandle(nullptr);
-        TestApp theApp(hInstance, argc == 2 && std::string_view(argv[1]) == "--lua-smoke", gameScene, title, gameSmoke);
+        const bool terrainSmoke=options.size()==2&&options[1]==L"--terrain-smoke";
+        TestApp theApp(hInstance, argc == 2 && std::string_view(argv[1]) == "--lua-smoke", gameScene, title, gameSmoke,terrainSmoke);
         if (!theApp.Initialize())
             return 0;
 
         ImGuiBridge::SetEngine(theApp.GetEngine());
-        if (argc == 2 && std::string_view(argv[1]) == "--lua-smoke")
+        if (argc == 2 && (std::string_view(argv[1]) == "--lua-smoke" || terrainSmoke))
         {
             // Exercise the real editor initialization/toggle path too.
             InputState toggle{};
@@ -301,11 +315,13 @@ int main(int argc, char** argv)
     }
     catch (DxException& e)
     {
+        if(argc==2&&std::string_view(argv[1])=="--terrain-smoke"){std::cerr<<"Terrain startup D3D failure: HRESULT "<<e.ErrorCode<<std::endl;return EXIT_FAILURE;}
         MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
         return EXIT_FAILURE;
     }
     catch (const std::exception& e)
     {
+        if(argc==2&&std::string_view(argv[1])=="--terrain-smoke"){std::cerr<<e.what()<<std::endl;return EXIT_FAILURE;}
         MessageBoxA(nullptr, e.what(), "Startup failed", MB_OK | MB_ICONERROR);
         return EXIT_FAILURE;
     }

@@ -8,6 +8,7 @@
 
 class PhysicsSystem;
 class ScriptSystem;
+class TerrainSystem;
 
 class Engine
 {
@@ -31,7 +32,9 @@ private:
     IRenderAdapter* mRenderAdapter;
 	JobSystem mJobs; // Must outlive ResourceManager's submitted work.
 	ResourceManager mResourceManager;
+    std::unique_ptr<TerrainSystem> mTerrain;
 public:
+    static constexpr const char* DefaultScenePath = "Scenes/TerrainDemo.json";
     Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot = {});
     ~Engine();
     void Shutdown();
@@ -64,6 +67,7 @@ public:
 	ResourceManager& GetResources() { return mResourceManager; }
     PhysicsSystem& GetPhysics(); // Available after Init, before Shutdown.
     ScriptSystem& GetScripts();
+    TerrainSystem& GetTerrain();
     bool BeginPlay(std::string& outError);
     void EndPlay();
     bool IsPlaying() const;

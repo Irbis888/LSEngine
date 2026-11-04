@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <string>
 #include <vector>
+#include <Terrain.h>
 
 static std::string EntityLabel(entt::registry& reg, entt::entity entity)
 {
@@ -81,6 +82,12 @@ static void DrawHierarchyPanel(EditorContext& ctx)
     if (ImGui::Button("+ Create Primitive..."))
         ctx.showPrimitiveCreator = true;
     ImGui::SetItemTooltip("Create a plane, cube, or sphere mesh.");
+    if(ImGui::Button("+ Create Terrain"))
+    {
+        auto e=ctx.registry->create();ctx.registry->emplace<TagComponent>(e,"Terrain");
+        ctx.registry->emplace<TransformComponent>(e,glm::vec3(0),glm::vec3(0),glm::vec3(1));
+        ctx.registry->emplace<TerrainComponent>(e);ctx.selected=e;
+    }
     if (!canCreatePrimitive)
         ImGui::EndDisabled();
 

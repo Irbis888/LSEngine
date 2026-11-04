@@ -26,7 +26,7 @@ return {
         winScore = 5,
         goalPause = 1.5,      -- seconds the ball stays in the net before kickoff
         winPause = 4.0,
-        confettiCount = 24,   -- pieces spawned in the goal after each score
+        confettiCount = 240,   -- pieces spawned in the goal after each score
         ballPrefab = "Games/BallField/Prefabs/Ball.json",
         blueConfettiPrefab = "Games/BallField/Prefabs/ConfettiBlue.json",
         redConfettiPrefab = "Games/BallField/Prefabs/ConfettiRed.json"

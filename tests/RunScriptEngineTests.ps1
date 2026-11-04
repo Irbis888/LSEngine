@@ -24,7 +24,7 @@ $compilerArgs = @('/nologo', '/MP2', '/std:c++20', '/permissive', '/EHsc', '/W3'
     "/Fo$output\", "/Fd$output\", "/Fe$output\ScriptEngineTests.exe",
     (Join-Path $PSScriptRoot 'ScriptEngineTests.cpp'), (Join-Path $repo 'IMGUI_works/src/Editor/EditorSceneIO.cpp'),
     (Join-Path $project 'ScriptRuntime.cpp'), (Join-Path $project 'ScriptSystem.cpp'), (Join-Path $project 'AssetPaths.cpp'),
-    (Join-Path $project 'Engine.cpp'), (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'CameraControllerSystem.cpp'),
+    (Join-Path $project 'Engine.cpp'), (Join-Path $project 'SceneSerializer.cpp'), (Join-Path $project 'Terrain.cpp'), (Join-Path $project 'TerrainSystem.cpp'), (Join-Path $project 'D3DTerrain.cpp'), (Join-Path $project 'CameraControllerSystem.cpp'),
     (Join-Path $project 'PhysicsSystem.cpp'), (Join-Path $project 'SceneFactory.cpp'), (Join-Path $project 'DemoScene.cpp'),
     (Join-Path $repo 'Common\GameTimer.cpp'),
     (Join-Path $project 'ResourceManager.cpp'), (Join-Path $project 'JobSystem.cpp'), (Join-Path $project 'D3DRenderAdapter.cpp'),

@@ -285,6 +285,22 @@
     <None Include="Scenes\EditorPlaySnapshot.json" />
     <None Include="Scenes\TextureStreaming1000.json" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\tests\TerrainValidation.cpp" />
+    <ClInclude Include="..\..\tests\TerrainValidation.h" />
+    <ClCompile Include="Terrain.cpp" />
+    <ClCompile Include="TerrainSystem.cpp" />
+    <ClCompile Include="D3DTerrain.cpp" />
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\TerrainPanel.cpp" />
+    <ClInclude Include="Terrain.h" />
+    <ClInclude Include="TerrainSystem.h" />
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\TerrainPanel.h" />
+    <Text Include="Shaders\Terrain.hlsl" />
+    <None Include="Scenes\TerrainDemo.json" />
+    <None Include="TERRAIN.md" />
+    <None Include="..\..\tests\fixtures\Terrain16.png" />
+    <None Include="..\..\tests\RunTerrainTests.ps1" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="EnableEditor" AfterTargets="Build">
     <Touch Files="$(TargetDir).imgui_on" AlwaysCreate="true" />

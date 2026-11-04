@@ -7,6 +7,8 @@
 #include <ScriptSystem.h>
 #include <AssetPaths.h>
 #include <cmath>
+#include "TerrainPanel.h"
+#include <Terrain.h>
 
 static void DrawScriptEditor(EditorContext& ctx, entt::entity entity)
 {
@@ -156,7 +158,17 @@ static void DrawInspectorPanel(EditorContext& ctx)
     if (ctx.registry->all_of<TransformComponent>(entity))
     {
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
-            DrawTransformEditor(ctx.registry->get<TransformComponent>(entity));
+        {
+            auto& t=ctx.registry->get<TransformComponent>(entity);
+            if(ctx.registry->all_of<TerrainComponent>(entity))
+            {
+                ImGui::DragFloat3("Position",&t.position.x,.1f);
+                ImGui::DragFloat3("Scale",&t.scale.x,.01f,.001f,100);
+                ImGui::TextDisabled("Terrain rotation is unsupported.");
+                if(t.rotation!=glm::vec3(0)&&ImGui::Button("Reset terrain rotation"))t.rotation={0,0,0};
+            }
+            else DrawTransformEditor(t);
+        }
     }
 
     if (ctx.registry->all_of<MeshComponent>(entity))
@@ -225,6 +237,7 @@ static void DrawInspectorPanel(EditorContext& ctx)
         }
     }
 
+    Editor_DrawTerrainInspector(ctx,entity);
     if (!Editor_CanEditComponents())
     {
         ImGui::EndDisabled();

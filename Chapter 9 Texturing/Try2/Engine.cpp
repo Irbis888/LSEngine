@@ -8,6 +8,7 @@
 #include "SceneSerializer.h"
 #include "ScriptSystem.h"
 #include "AssetPaths.h"
+#include "TerrainSystem.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -17,25 +18,23 @@
 
 namespace
 {
-	const std::filesystem::path* FindScenePath()
+	std::filesystem::path FindScenePath(const std::filesystem::path& root)
 	{
-		static const std::filesystem::path candidates[] =
+		const char* candidates[] =
 		{
-			"Scenes/DemoScene.json",
-			"../Scenes/DemoScene.json",
-			"../../Scenes/DemoScene.json",
-			"Chapter 9 Texturing/Try2/Scenes/DemoScene.json"
+            Engine::DefaultScenePath,
+            "Scenes/DemoScene.json"
 		};
 
 		for (const auto& candidate : candidates)
 		{
-			if (std::filesystem::exists(candidate))
+			if (std::filesystem::is_regular_file(root / candidate))
 			{
-				return &candidate;
+				return root / candidate;
 			}
 		}
 
-		return nullptr;
+		return {};
 	}
 }
 
@@ -69,19 +68,20 @@ void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool sta
     mScripts->Bind(world.registry);
     mScripts->SetResources(&mResourceManager);
     mScripts->SetJobs(&mJobs);
-	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs));
-	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter));
+    mTerrain=std::make_unique<TerrainSystem>(mJobs,*mRenderAdapter,mAssetRoot);
+	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs,[this](auto& reg){mTerrain->ResolveContacts(reg);}));
+	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter,mTerrain.get()));
 
     if (!startupScene.empty())
     {
         std::string error;
         if (!LoadScene(startupScene, error)) throw std::runtime_error(error);
     }
-	else if (const std::filesystem::path* scenePath = FindScenePath())
+	else if (const auto scenePath = FindScenePath(mAssetRoot); !scenePath.empty())
 	{
         std::string error;
         mStartupScene = true;
-        LoadScene(AssetPaths::ToUtf8(std::filesystem::absolute(*scenePath)), error);
+        LoadScene(AssetPaths::ToUtf8(scenePath), error);
 	}
 	else { DemoScene::Build(world, mResourceManager); mScripts->SceneReady(); }
 }
@@ -95,6 +95,7 @@ void Engine::Shutdown()
     EndPlay(); // OnDestroy runs while the world and resources still exist.
     if (mScripts) mScripts->StopHotReload(); // Its watcher task runs on mJobs.
 	mResourceManager.ShutdownLoading();
+    if(mTerrain)mTerrain->Shutdown();
 	mJobs.Shutdown();
     mPendingScene.reset();
     mSceneProgress.active = false;
@@ -105,6 +106,7 @@ void Engine::Shutdown()
 void Engine::Update(const FrameContext& context)
 {
     PumpSceneLoading();
+    if(mTerrain)mTerrain->Update(world.registry,context);
     // Before the systems run, so a restarted script instance initializes in this frame's Sync.
     if (mScripts && !IsSceneLoading()) mScripts->PumpHotReload();
 	if (context.input.keysPressed[VK_F5])
@@ -124,6 +126,9 @@ void Engine::PhysicsUpdate(const FrameContext& context)
 		return;
 
     if (mScripts) mScripts->FixedUpdate(context);
+    // Do not let bodies fall through terrain which has not been published yet.
+    for(auto e:world.registry.view<TerrainComponent>())
+        if(world.registry.get<TerrainComponent>(e).collision&&!mTerrain->GetResource(e))return;
 	for (auto& system : physicsSystems)
 	{
 		system->Update(world.registry, context);
@@ -141,6 +146,7 @@ ScriptSystem& Engine::GetScripts()
     if (!mScripts) throw std::logic_error("Scripting is not initialized");
     return *mScripts;
 }
+TerrainSystem& Engine::GetTerrain() { if(!mTerrain)throw std::logic_error("Terrain is not initialized");return *mTerrain; }
 bool Engine::BeginPlay(std::string& outError)
 {
     if (!mScripts || IsSceneLoading()) { outError = "Wait for the complete scene before Play"; return false; }
@@ -271,6 +277,7 @@ void Engine::PumpSceneLoading()
         if (mRetiredWorld) return;
         mRetiredWorld = std::make_unique<World>();
         mScripts->BeforeSceneChange();
+        mTerrain->Reset();
         world.registry.swap(mRetiredWorld->registry);
         mScripts->Bind(world.registry);
         mSceneProgress.total = pending.result->data.entities.size();
