@@ -59,9 +59,9 @@
         ]
       },
       "terrain": {
-        "source": "procedural",
-        "samplesX": 2049,
-        "samplesZ": 2049,
+        "source": "heightmap",
+        "samplesX": 1024,
+        "samplesZ": 1024,
         "sizeX": 2048,
         "sizeZ": 2048,
         "heightScale": 200,
@@ -73,39 +73,17 @@
         "layers": [
           {
             "color": [
-              0.35,
-              0.6,
-              0.2
-            ],
-            "tileSize": 24,
-            "albedo": "../../Textures/textures/terrain_diffuse.dds",
-            "normal": "../../Textures/textures/terrain_nm.dds"
-          },
-          {
-            "color": [
-              0.55,
-              0.38,
-              0.18
-            ],
-            "tileSize": 20
-          },
-          {
-            "color": [
-              0.46,
-              0.48,
-              0.5
-            ],
-            "tileSize": 32
-          },
-          {
-            "color": [
-              0.94,
-              0.95,
+              1,
+              1,
               1
             ],
-            "tileSize": 20
+            "tileSize": 2048,
+            "albedo": "../../Textures/textures/terrain_diffuse.dds",
+            "normal": "../../Textures/textures/terrain_nm.dds"
           }
-        ]
+        ],
+        "heightmap": "../../Textures/textures/terrain_hm.dds",
+        "layerCount": 1
       }
     },
     {

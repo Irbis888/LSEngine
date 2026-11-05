@@ -132,12 +132,14 @@ the user's editor snapshot and imgui.ini. Logs are in tests/.build/terrain-appli
 The same run tests height/normal transforms, outside queries, full box footprints,
 16-bit grayscale PNG through a Unicode path, deterministic seeds, indices, bounds,
 hysteresis and cancellation. It writes real GPU readback images (`large-terrain.bmp`,
-`lod-wire-bounds.bmp`) to its own logged temporary directory. Initial 2049x2049 frame
+`lod-wire-bounds.bmp`) to its own logged temporary directory. Initial demo frame
 timings, build time, CPU/committed GPU bytes and peak process working set are printed.
 The final small-scene timings are labelled separately. Driver allocations and allocator
 caches are part of process memory; a short lifecycle test is not proof of no possible leak.
 
-Measured in the real 800x600 application on this workstation (2026-11-04), 60 steady large-scene frames:
+The default demo now uses the existing `../../Textures/textures/terrain_hm.dds` (1024x1024 R32_FLOAT), `terrain_diffuse.dds` and `terrain_nm.dds`. One white material layer covers the full 2048x2048 metre terrain once (`tileSize=2048`), without procedural height or tint/weight blending.
+
+Historical measurements below used the earlier **procedural 2049x2049** demo, before the source-map change; they do not describe the current demo. Measured in the real 800x600 application on this workstation (2026-11-04), 60 steady large-scene frames:
 
 | Build | CPU preparation | Mean frame | Longest steady frame | Longest loading frame |
 | --- | ---: | ---: | ---: | ---: |

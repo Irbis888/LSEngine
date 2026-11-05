@@ -79,13 +79,13 @@ bool TerrainValidation::Tick(Engine& engine,const FrameContext& context,D3DRende
     {
         terrain=Find(reg,"Large Terrain");Check(terrain!=entt::null,"Terrain demo entity missing");
         if(!system.GetResource(terrain)){loadingMax=std::max(loadingMax,context.timer.DeltaTime()*1000.);return false;}
-        const auto stats=system.GetStats(terrain);Check(stats.visible>0&&stats.culled>0&&stats.visible+stats.culled==1024,"Large terrain culling is incorrect");
+        const auto stats=system.GetStats(terrain);Check(stats.visible>0&&stats.culled>0&&stats.visible+stats.culled==system.GetResource(terrain)->chunks.size(),"Large terrain culling is incorrect");
         const auto cam=Find(reg,"Camera");const auto& transform=reg.get<TransformComponent>(cam);
         const glm::vec3 forward(0,-std::sin(transform.rotation.x),std::cos(transform.rotation.x));
         const auto front=transform.position+forward*50.f,back=transform.position-forward*50.f;
         Check(renderer.TerrainVisible(front-glm::vec3(1),front+glm::vec3(1))&&!renderer.TerrainVisible(back-glm::vec3(1),back+glm::vec3(1)),"Frustum front/back planes are incorrect");
         Check(renderer.TerrainVisible(transform.position-glm::vec3(1),transform.position+glm::vec3(1)),"Frustum incorrectly culled a near-plane straddling box");
-        Check(stats.triangles<size_t(2048)*2048*2,"Geometric LOD did not reduce rendered triangle count");
+        Check(stats.triangles<size_t(system.GetResource(terrain)->settings.samplesX-1)*(system.GetResource(terrain)->settings.samplesZ-1)*2,"Geometric LOD did not reduce rendered triangle count");
         const auto ms=context.timer.DeltaTime()*1000.;largeTotal+=ms;largeMax=std::max(largeMax,ms);
         if(++largeFrames<60)return false;
         std::cout<<"TERRAIN_INITIAL build_ms="<<stats.buildMs<<" cpu_bytes="<<stats.cpuBytes<<" gpu_bytes="<<renderer.TerrainGpuBytes()<<" visible="<<stats.visible<<" culled="<<stats.culled<<" triangles="<<stats.triangles<<" large_mean_frame_ms="<<largeTotal/largeFrames<<" large_max_frame_ms="<<largeMax<<" loading_max_frame_ms="<<loadingMax<<std::endl;
@@ -93,14 +93,14 @@ bool TerrainValidation::Tick(Engine& engine,const FrameContext& context,D3DRende
     }
     if(stage==1)
     {
-        if(++frames<3)return false;Check(system.GetStats(terrain).visible==1024,"Culling toggle failed");
+        if(++frames<3)return false;Check(system.GetStats(terrain).visible==system.GetResource(terrain)->chunks.size(),"Culling toggle failed");
         auto& c=reg.get<TerrainComponent>(terrain);c.culling=true;c.showBounds=true;c.showLod=true;c.wireframe=true;stage=2;frames=0;return false;
     }
     if(stage==2)
     {
         if(++frames<5)return false;auto& c=reg.get<TerrainComponent>(terrain);c.showBounds=c.showLod=c.wireframe=false;
         if(!engine.SaveScene(AssetPaths::ToUtf8(output/"LargeScene.json"),error))throw std::runtime_error(error);
-        previous=system.GetResource(terrain);c.samplesX=c.samplesZ=257;c.seed++;++c.revision;stage=3;return false;
+        previous=system.GetResource(terrain);c.source="procedural";c.samplesX=c.samplesZ=257;c.seed++;++c.revision;stage=3;return false;
     }
     if(stage==3)
     {
@@ -125,7 +125,7 @@ bool TerrainValidation::Tick(Engine& engine,const FrameContext& context,D3DRende
     if(stage==7)
     {
         terrain=Find(reg,"Large Terrain");if(terrain==entt::null||!system.GetResource(terrain)||system.IsBusy())return false;
-        auto& c=reg.get<TerrainComponent>(terrain);c.samplesX=c.samplesZ=257;c.seed++;++c.revision;stage=8;return false;
+        auto& c=reg.get<TerrainComponent>(terrain);c.source="procedural";c.samplesX=c.samplesZ=257;c.seed++;++c.revision;stage=8;return false;
     }
     if(stage==8)
     {
