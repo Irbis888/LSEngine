@@ -48,8 +48,10 @@ public:
     // Meshes are written as their source description (portable between runs). keepRuntimeMeshIds
     // also writes the session mesh id, which Play snapshots use to avoid re-creating resources.
     // Returns how many meshes had no source and could only be written as a session id.
+    // portableOnly omits such meshes instead (scene files read by another process).
+    // Paths of files inside assetRoot (the project folder) are written relative to it.
     static size_t Save(const World& world, const std::string& path, const std::filesystem::path& assetRoot = {},
-        bool keepRuntimeMeshIds = false);
+        bool keepRuntimeMeshIds = false, bool portableOnly = false);
     static void Load(World& world, const std::string& path);
     static void Load(World& world, ResourceManager& resources, const std::string& path);
 };

@@ -12,10 +12,8 @@
 #include <mutex>
 #include <chrono>
 #include <stdexcept>
-#include "DDSTextureLoader.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "ThirdParty/stb/stb_image.h"
+#include "ImageIO.h"
+#include "AssetPaths.h"
 
 //--------------------------------------------------------------
 // ID генераторы
@@ -45,56 +43,21 @@ namespace
         return result;
     }
 
-    std::wstring ResolveTexturePath(const std::wstring& filename)
+    // Relative names resolve against the asset root first, then the project's texture
+    // search folders. A missing file still resolves (under the root) and fails on load.
+    std::wstring ResolveTexturePath(const std::wstring& filename, const ResourceManager::AssetSearch& search)
     {
         namespace fs = std::filesystem;
         fs::path path(filename);
-        if (!path.is_absolute() && !fs::exists(path))
+        if (path.is_absolute()) return path.lexically_normal().wstring();
+        const fs::path root = search.root.empty() ? fs::current_path() : search.root;
+        if (fs::exists(root / path)) return fs::absolute(root / path).lexically_normal().wstring();
+        for (const auto& directory : search.textureDirectories)
         {
-            auto firstPart = path.begin();
-            if (firstPart != path.end() && firstPart->wstring() != L"..")
-                path = fs::path(L"../../Textures") / path;
+            const auto candidate = (directory.is_absolute() ? directory : root / directory) / path;
+            if (fs::exists(candidate)) return fs::absolute(candidate).lexically_normal().wstring();
         }
-        return fs::absolute(path).lexically_normal().wstring();
-    }
-
-    ImageData LoadImage(const std::wstring& filename)
-    {
-        ZoneScopedN("Texture CPU read and decode");
-        ImageData image;
-        std::wstring extension = std::filesystem::path(filename).extension().wstring();
-        std::transform(extension.begin(), extension.end(), extension.begin(),
-            [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
-        if (extension == L".dds")
-        {
-            const HRESULT hr = DirectX::LoadDDSImageFromFile(filename.c_str(), image);
-            if (FAILED(hr))
-                throw std::runtime_error("Failed to load DDS texture: " + WideToUtf8(filename) +
-                    " (HRESULT " + std::to_string(static_cast<uint32_t>(hr)) + ")");
-            return image;
-        }
-
-        FILE* handle = nullptr;
-        if (_wfopen_s(&handle, filename.c_str(), L"rb") != 0)
-            throw std::runtime_error("Failed to open texture: " + WideToUtf8(filename));
-        std::unique_ptr<FILE, decltype(&std::fclose)> file(handle, &std::fclose);
-        int width = 0;
-        int height = 0;
-        int channels = 0;
-        std::unique_ptr<stbi_uc, decltype(&stbi_image_free)> pixels(
-            stbi_load_from_file(file.get(), &width, &height, &channels, STBI_rgb_alpha),
-            &stbi_image_free);
-        if (!pixels)
-            throw std::runtime_error("Failed to decode texture: " + WideToUtf8(filename) +
-                " (" + stbi_failure_reason() + ")");
-        image.width = static_cast<uint32_t>(width);
-        image.height = static_cast<uint32_t>(height);
-        image.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        const size_t rowPitch = static_cast<size_t>(width) * 4;
-        const size_t slicePitch = rowPitch * static_cast<size_t>(height);
-        image.pixels.assign(pixels.get(), pixels.get() + slicePitch);
-        image.subresources.push_back({ 0, rowPitch, slicePitch });
-        return image;
+        return fs::absolute(root / path).lexically_normal().wstring();
     }
 }
 
@@ -106,7 +69,7 @@ namespace
         std::vector<MaterialDesc> materials;
     };
 
-    DecodedModel DecodeModel(const std::string& path)
+    DecodedModel DecodeModel(const std::string& path, const ResourceManager::AssetSearch& search)
     {
         ZoneScopedN("Model CPU read and decode");
         Assimp::Importer importer;
@@ -134,7 +97,7 @@ namespace
             const auto relativePath = std::filesystem::path(std::u8string(
                 reinterpret_cast<const char8_t*>(texturePath.C_Str()), texturePath.length));
             const auto modelPath = modelDirectory / relativePath;
-            return ResolveTexturePath((std::filesystem::exists(modelPath) ? modelPath : relativePath).wstring());
+            return ResolveTexturePath((std::filesystem::exists(modelPath) ? modelPath : relativePath).wstring(), search);
         };
 
         for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
@@ -255,6 +218,7 @@ struct ResourceManager::LoadingState
         uint32_t id;
         std::string modelPath;
         std::wstring texturePath;
+        std::shared_ptr<const AssetSearch> search; // Model material textures.
     };
     struct Result
     {
@@ -306,8 +270,8 @@ struct ResourceManager::LoadingState
             result.request = std::move(request);
             try
             {
-                if (result.request.texture) result.image = LoadImage(result.request.texturePath);
-                else result.model = DecodeModel(result.request.modelPath);
+                if (result.request.texture) result.image = ImageIO::Load(result.request.texturePath);
+                else result.model = DecodeModel(result.request.modelPath, *result.request.search);
             }
             catch (const std::exception& error) { result.error = error.what(); }
             catch (...) { result.error = "Unknown CPU resource loading error"; }
@@ -391,7 +355,17 @@ struct ResourceManager::LoadingState
     }
 };
 
-ImageData ResourceManager::DecodeImage(const std::filesystem::path& file) { return LoadImage(file.wstring()); }
+ImageData ResourceManager::DecodeImage(const std::filesystem::path& file) { return ImageIO::Load(file); }
+
+void ResourceManager::SaveImage(const std::filesystem::path& file, const ImageData& image) { ImageIO::Save(file, image); }
+
+void ResourceManager::SaveTexture(TextureID id, const std::filesystem::path& file)
+{
+    const Texture& texture = GetTexture(id);
+    if (texture.state == ResourceState::Loading || texture.state == ResourceState::Failed || texture.imageData.pixels.empty())
+        throw std::runtime_error("Texture " + texture.name + " has no CPU pixels to save (still loading, failed, or already released)");
+    ImageIO::Save(file, texture.imageData);
+}
 
 ResourceManager::ResourceManager()
 {
@@ -636,6 +610,29 @@ MeshID ResourceManager::CreateMesh(Mesh mesh)
     return id;
 }
 
+void ResourceManager::SetAssetRoot(const std::filesystem::path& root, const std::vector<std::filesystem::path>& textureDirectories)
+{
+    auto search = std::make_shared<AssetSearch>();
+    search->root = root.empty() ? std::filesystem::path() : std::filesystem::weakly_canonical(root);
+    for (const auto& directory : textureDirectories)
+        search->textureDirectories.push_back(directory.is_absolute() || search->root.empty() ?
+            directory : (search->root / directory).lexically_normal());
+    mSearch = std::move(search);
+}
+
+std::filesystem::path ResourceManager::ResolveAssetPath(const std::string& path) const
+{
+    const auto value = AssetPaths::FromUtf8(path);
+    if (value.is_absolute()) return value.lexically_normal();
+    const auto root = mSearch->root.empty() ? std::filesystem::current_path() : mSearch->root;
+    return std::filesystem::absolute(root / value).lexically_normal();
+}
+
+std::wstring ResourceManager::ResolveTexture(const std::wstring& filename) const
+{
+    return ResolveTexturePath(filename, *mSearch);
+}
+
 MeshID ResourceManager::LoadMesh(const std::string& path)
 {
     if (mLoading)
@@ -644,10 +641,10 @@ MeshID ResourceManager::LoadMesh(const std::string& path)
         Mesh mesh;
         mesh.state = ResourceState::Loading;
         const MeshID id = CreateMesh(std::move(mesh));
-        mLoading->Enqueue({ false, id, std::filesystem::absolute(path).string(), {} });
+        mLoading->Enqueue({ false, id, AssetPaths::ToUtf8(ResolveAssetPath(path)), {}, mSearch });
         return id;
     }
-    auto decoded = DecodeModel(path);
+    auto decoded = DecodeModel(AssetPaths::ToUtf8(ResolveAssetPath(path)), *mSearch);
     std::vector<MaterialID> materials;
     for (const auto& desc : decoded.materials) materials.push_back(CreateTexturedMaterial(desc));
     for (auto& submesh : decoded.mesh.submeshes) submesh.material = materials.at(submesh.material);
@@ -907,7 +904,7 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 {
     if (filename.empty())
         throw std::invalid_argument("Texture filename is empty");
-    const std::wstring resolvedFilename = ResolveTexturePath(filename);
+    const std::wstring resolvedFilename = ResolveTexturePath(filename, *mSearch);
     auto cached = mTextureIDsByFilename.find(resolvedFilename);
     if (cached != mTextureIDsByFilename.end())
     {
@@ -922,7 +919,7 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
         if (mLoading->stopped) throw std::logic_error("Resource loading has stopped");
         tex.state = ResourceState::Loading;
     }
-    else tex.imageData = LoadImage(resolvedFilename);
+    else tex.imageData = ImageIO::Load(resolvedFilename);
 
     // имя можно вытащить из пути (пока просто копия)
     tex.name = WideToUtf8(filename);
@@ -930,7 +927,7 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
     TextureID id = gNextTextureID++;
     mTextures[id] = std::move(tex);
     mTextureIDsByFilename[resolvedFilename] = id;
-    if (mLoading) mLoading->Enqueue({ true, id, {}, resolvedFilename });
+    if (mLoading) mLoading->Enqueue({ true, id, {}, resolvedFilename, {} });
     else mTextureUploads.push_back(id);
 
     return id;

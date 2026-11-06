@@ -8,7 +8,76 @@
 #include <AssetPaths.h>
 #include <cmath>
 #include "TerrainPanel.h"
+#include "EditorProject.h"
 #include <Terrain.h>
+#include <ResourceManager.h>
+#include <SceneSerializer.h>
+
+// Texture slot of a mesh material. Returns true when the path changed (Browse, Enter, Clear).
+static bool DrawTexturePath(EditorContext& ctx, const char* label, std::wstring& texture)
+{
+    bool changed = false;
+    ImGui::PushID(label);
+    char text[4097]{};
+    strncpy_s(text, AssetPaths::ToUtf8(texture).c_str(), sizeof(text) - 1);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
+    if (ImGui::InputText(label, text, sizeof(text), ImGuiInputTextFlags_EnterReturnsTrue))
+    {
+        texture = AssetPaths::FromUtf8(text).wstring();
+        changed = true;
+    }
+    ImGui::SetItemTooltip("Project-relative image path (PNG, TGA, DDS...). Press Enter to apply.");
+    ImGui::SameLine();
+    if (ImGui::Button("Browse..."))
+    {
+        const auto file = EditorProject::PickOpenFile(L"Choose texture", ctx.engine->GetAssetRoot() / L"Assets" / L"Textures",
+            L"Images (*.png;*.tga;*.dds;*.jpg;*.bmp)", L"*.png;*.tga;*.dds;*.jpg;*.jpeg;*.bmp");
+        if (!file.empty())
+        {
+            try
+            {
+                texture = AssetPaths::FromUtf8(EditorProject::ImportTexture(ctx, file)).wstring();
+                changed = true;
+            }
+            catch (const std::exception& error) { ctx.statusMessage = std::string("Texture import failed: ") + error.what(); }
+        }
+    }
+    ImGui::SetItemTooltip("Files outside the project are copied into Assets/Textures.");
+    ImGui::SameLine();
+    if (ImGui::Button("Clear") && !texture.empty()) { texture.clear(); changed = true; }
+    ImGui::PopID();
+    return changed;
+}
+
+static void DrawMaterialEditor(EditorContext& ctx, entt::entity entity)
+{
+    auto* mesh = ctx.registry->try_get<MeshComponent>(entity);
+    auto* source = ctx.registry->try_get<MeshSourceComponent>(entity);
+    if (!mesh || !source || !ctx.resources || !ctx.engine) return;
+    if (!ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) return;
+    auto& stored = source->mesh.material;
+    MaterialDesc material = stored ? *stored : MaterialDesc{};
+    if (!stored)
+    {
+        const auto* tag = ctx.registry->try_get<TagComponent>(entity);
+        material.name = (tag ? tag->tag : std::string("Entity")) + " Material";
+        ImGui::TextDisabled("Model materials are used. Changes override every submesh.");
+    }
+    bool changed = false;
+    ImGui::ColorEdit3("Color", &material.color.x);
+    changed |= ImGui::IsItemDeactivatedAfterEdit();
+    ImGui::SliderFloat("Roughness", &material.roughness, 0.0f, 1.0f);
+    changed |= ImGui::IsItemDeactivatedAfterEdit();
+    changed |= DrawTexturePath(ctx, "Albedo", material.albedoTexture);
+    changed |= DrawTexturePath(ctx, "Normal", material.normalTexture);
+    if (stored && !changed)
+    {
+        // Keep the live drag preview in the description; the GPU material updates on release.
+        stored->color = material.color;
+        stored->roughness = material.roughness;
+    }
+    if (changed) EditorProject::ApplyMaterial(ctx, entity, material);
+}
 
 static void DrawScriptEditor(EditorContext& ctx, entt::entity entity)
 {
@@ -180,6 +249,7 @@ static void DrawInspectorPanel(EditorContext& ctx)
             ImGui::InputInt("Mesh ID", &id, 0, 0, ImGuiInputTextFlags_ReadOnly);
             ImGui::TextDisabled("Mesh picker: [PLACEHOLDER]");
         }
+        DrawMaterialEditor(ctx, entity);
     }
 
     if (ctx.registry->all_of<DirectionalLightComponent>(entity))

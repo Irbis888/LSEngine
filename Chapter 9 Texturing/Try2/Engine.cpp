@@ -9,6 +9,7 @@
 #include "ScriptSystem.h"
 #include "AssetPaths.h"
 #include "TerrainSystem.h"
+#include "Project.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -52,15 +53,31 @@ struct Engine::PendingScene
 };
 
 Engine::Engine(IRenderAdapter* renderer, std::filesystem::path assetRoot)
-    : mRenderAdapter(renderer), mAssetRoot(assetRoot.empty() ? AssetPaths::FindRoot() : std::filesystem::weakly_canonical(assetRoot)) {}
+    : mRenderAdapter(renderer), mAssetRoot(assetRoot.empty() ? AssetPaths::FindRoot() : std::filesystem::weakly_canonical(assetRoot))
+{
+    // Project settings for this asset root: the active project, or a .lsproject in the folder.
+    // A folder without a project file (test fixtures) works with default settings.
+    if (const auto* active = Project::Active(); active && std::filesystem::equivalent(active->root, mAssetRoot))
+        mProject = *active;
+    else if (const auto file = Project::FindFile(mAssetRoot); !file.empty())
+        mProject = Project::Open(file);
+    else
+    {
+        mProject.root = mAssetRoot;
+        mProject.name = AssetPaths::ToUtf8(mAssetRoot.filename());
+    }
+    std::vector<std::filesystem::path> textureDirectories;
+    for (const auto& path : mProject.textureSearchPaths) textureDirectories.push_back(AssetPaths::FromUtf8(path));
+    mResourceManager.SetAssetRoot(mAssetRoot, textureDirectories);
+}
 
-void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool standalone) {
+void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool standalone, bool freeCamera) {
     mStandalone = standalone;
 	const uint32_t hardwareThreads = std::thread::hardware_concurrency();
 	mJobs.Init(std::min<uint32_t>(15, hardwareThreads > 1 ? hardwareThreads - 1 : 1));
 	mResourceManager.InitLoading(mJobs);
 	mRenderAdapter->SetResourceManager(&mResourceManager);
-	if (!mStandalone) updateSystems.push_back(std::make_unique<CameraControllerSystem>([this] { return IsPlaying(); }));
+	if (!mStandalone || freeCamera) updateSystems.push_back(std::make_unique<CameraControllerSystem>([this] { return IsPlaying(); }));
     auto scripts = std::make_unique<ScriptSystem>(mAssetRoot);
     auto* scriptSystem = scripts.get();
     updateSystems.push_back(std::move(scripts));
@@ -77,13 +94,21 @@ void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool sta
         std::string error;
         if (!LoadScene(startupScene, error)) throw std::runtime_error(error);
     }
+    else if (!mProject.startupScene.empty() && std::filesystem::is_regular_file(mAssetRoot / AssetPaths::FromUtf8(mProject.startupScene)))
+    {
+        std::string error;
+        mStartupScene = true;
+        LoadScene(mProject.startupScene, error);
+    }
 	else if (const auto scenePath = FindScenePath(mAssetRoot); !scenePath.empty())
 	{
         std::string error;
         mStartupScene = true;
-        LoadScene(AssetPaths::ToUtf8(scenePath), error);
+        LoadScene(AssetPaths::MakeProjectRelative(mAssetRoot, AssetPaths::ToUtf8(scenePath)), error);
 	}
-	else { DemoScene::Build(world, mResourceManager); mScripts->SceneReady(); }
+    // The code-built demo uses the engine's sample models; other projects start empty.
+	else if (mProject.file.empty() || mAssetRoot == AssetPaths::EngineRoot()) { DemoScene::Build(world, mResourceManager); mScripts->SceneReady(); }
+    else mScripts->SceneReady();
 }
 
 Engine::~Engine()
@@ -178,13 +203,16 @@ void Engine::Draw(const FrameContext& context)
 	}
 }
 
-bool Engine::SaveScene(const std::string& path, std::string& outError, bool keepRuntimeMeshIds, size_t* runtimeOnlyMeshes)
+bool Engine::SaveScene(const std::string& path, std::string& outError, bool keepRuntimeMeshIds, size_t* runtimeOnlyMeshes,
+    bool portableOnly)
 {
     if (IsSceneLoading()) { outError = "Scene is still loading"; return false; }
 	try
 	{
-		const size_t runtimeOnly = SceneSerializer::Save(world, AssetPaths::ToUtf8(AssetPaths::Resolve(mAssetRoot, path)),
-            mAssetRoot, keepRuntimeMeshIds);
+        const auto file = AssetPaths::Resolve(mAssetRoot, path);
+        std::filesystem::create_directories(file.parent_path());
+		const size_t runtimeOnly = SceneSerializer::Save(world, AssetPaths::ToUtf8(file),
+            mAssetRoot, keepRuntimeMeshIds, portableOnly);
         if (runtimeOnlyMeshes) *runtimeOnlyMeshes = runtimeOnly;
 		outError.clear();
 		return true;
@@ -218,7 +246,9 @@ bool Engine::RequestScene(const std::string& path, std::string& outError, bool r
             catch (...) { result->error = "Unknown scene loading error"; }
         }, JobSystem::Priority::Low);
         mPendingScene = std::move(pending);
-        mSceneProgress = { true, 0, 0, path, {} };
+        // Scenes inside the project are reported (and later saved back) by their project path.
+        mSceneProgress = { true, 0, 0, AssetPaths::MakeProjectRelative(mAssetRoot, filename), {} };
+        if (!AssetPaths::IsInside(mAssetRoot, AssetPaths::FromUtf8(filename))) mSceneProgress.path = path;
         TextureBenchmark::Begin(path);
         outError.clear();
         return true; // Accepted: completion/errors arrive through SceneLoadProgress.

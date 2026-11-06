@@ -95,5 +95,6 @@ protected:
 	RenderAPI mRenderAPI = RenderAPI::DX12;
     std::string mGameScene;
     bool mStandalone = false;
+    bool mFreeCamera = false; // Editor Play window: fly camera with the left mouse button.
 };
 

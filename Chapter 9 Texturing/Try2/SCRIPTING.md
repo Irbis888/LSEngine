@@ -171,7 +171,10 @@ in self during OnUpdate and consume it in OnFixedUpdate, as PhysicsMover.lua doe
 the application's fixed steps precede Update, that intent applies on the next fixed step.
 dt is seconds; normal Update dt and fixed dt intentionally have different semantics.
 
-Play begins only after the editor successfully saves `Scenes/EditorPlaySnapshot.json`.
+The editor's **Play** button runs scripts in a separate game process (see PROJECTS.md);
+the game window has its own Lua state and the editor scene is never modified. The lifecycle
+below describes the in-process **Debug > Simulate in Editor** mode used by the tests.
+Simulation begins only after the editor successfully saves `Scenes/EditorPlaySnapshot.json`.
 Stop halts callbacks, performs cleanup with the old world intact, clears commands/events
 and restores the snapshot asynchronously. The old optional "keep changes on Stop" debug
 mode was removed to meet this lifecycle contract. BeginPlay is rejected during restoration.

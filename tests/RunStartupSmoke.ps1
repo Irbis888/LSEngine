@@ -6,6 +6,9 @@ $exePath = Join-Path $projectPath "x64/$Configuration/Try2.exe"
 $logPath = Join-Path $PSScriptRoot ".build/startup-$Configuration"
 New-Item -ItemType Directory -Force -Path $logPath | Out-Null
 if (!(Test-Path -LiteralPath $exePath)) { throw "Build $Configuration x64 first." }
+# Without --project the editor opens the engine's sample project and its startup scene.
+$sample = Get-Content -LiteralPath (Join-Path $projectPath 'Samples.lsproject') -Raw | ConvertFrom-Json
+$startupPattern = 'Loaded scene from ' + [regex]::Escape($sample.startupScene)
 Add-Type @'
 using System;
 using System.Text;
@@ -33,6 +36,7 @@ try {
         $process = Start-Process -FilePath $exePath -WorkingDirectory $case.Directory -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput (Join-Path $logPath "$($case.Name).out.log") `
             -RedirectStandardError (Join-Path $logPath "$($case.Name).err.log")
+        $null = $process.Handle # Windows PowerShell 5.1 reports no ExitCode unless the handle is opened before exit.
         try {
             if ($process.WaitForExit(2000)) { throw "$($case.Name): exited prematurely with code $($process.ExitCode)." }
             $windows = [System.Collections.Generic.List[object]]::new()
@@ -46,13 +50,13 @@ try {
             }, [IntPtr]::Zero) | Out-Null
             $failed = @($windows | Where-Object Title -in @('HR Failed','Startup failed'))
             if ($failed.Count) { throw "$($case.Name): startup error dialog." }
-            $mainWindow = @($windows | Where-Object Title -eq 'LS Engine')
+            $mainWindow = @($windows | Where-Object { $_.Title -like "LS Engine | $($sample.name)" })
             if (!$mainWindow.Count) { throw "$($case.Name): engine window was not created." }
             [void][StartupWindows]::PostMessage($mainWindow[0].Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
             if (!$process.WaitForExit(5000)) { throw "$($case.Name): normal shutdown did not finish." }
             if ($process.ExitCode -ne 0) { throw "$($case.Name): shutdown code $($process.ExitCode)." }
             $log = Get-Content -LiteralPath (Join-Path $logPath "$($case.Name).out.log") -Raw
-            if ($log -notmatch 'Loaded scene from Scenes[/\\]DemoScene.json') {
+            if ($log -notmatch $startupPattern) {
                 throw "$($case.Name): startup scene did not load. See $logPath."
             }
             Write-Output "PASS: $Configuration $($case.Name), shaders/scene loaded, normal shutdown"

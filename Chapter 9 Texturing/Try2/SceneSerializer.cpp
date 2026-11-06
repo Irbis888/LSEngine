@@ -81,20 +81,38 @@ namespace
         return mesh;
     }
 
-    json MaterialToJson(const MaterialDesc& material)
+    // Files inside the project are written relative to it, so the project folder can move.
+    std::string ProjectPath(const std::filesystem::path& root, const std::string& path)
+    {
+        return AssetPaths::MakeProjectRelative(root, path);
+    }
+
+    json MaterialToJson(const MaterialDesc& material, const std::filesystem::path& root)
     {
         json value{ { "name", material.name }, { "color", Vec3ToJson(material.color) }, { "roughness", material.roughness } };
-        if (!material.albedoTexture.empty()) value["albedo"] = AssetPaths::ToUtf8(material.albedoTexture);
-        if (!material.normalTexture.empty()) value["normal"] = AssetPaths::ToUtf8(material.normalTexture);
+        if (!material.albedoTexture.empty()) value["albedo"] = ProjectPath(root, AssetPaths::ToUtf8(material.albedoTexture));
+        if (!material.normalTexture.empty()) value["normal"] = ProjectPath(root, AssetPaths::ToUtf8(material.normalTexture));
         return value;
     }
 
-    json MeshToJson(const SceneSerializer::MeshDescription& mesh)
+    json MeshToJson(const SceneSerializer::MeshDescription& mesh, const std::filesystem::path& root)
     {
         json value{ { "source", mesh.source } };
-        if (mesh.source == "model") value["path"] = mesh.path;
+        if (mesh.source == "model") value["path"] = ProjectPath(root, mesh.path);
         else value["primitive"] = mesh.primitive;
-        if (mesh.material) value["material"] = MaterialToJson(*mesh.material);
+        if (mesh.material) value["material"] = MaterialToJson(*mesh.material, root);
+        return value;
+    }
+
+    json TerrainToJson(const TerrainComponent& terrain, const std::filesystem::path& root)
+    {
+        json value = Terrain::ToJson(terrain);
+        for (const char* key : { "heightmap", "weightmap" })
+            if (value.contains(key) && value[key].is_string()) value[key] = ProjectPath(root, value[key].get<std::string>());
+        if (value.contains("layers"))
+            for (auto& layer : value["layers"])
+                for (const char* key : { "albedo", "normal" })
+                    if (layer.contains(key) && layer[key].is_string()) layer[key] = ProjectPath(root, layer[key].get<std::string>());
         return value;
     }
 
@@ -393,8 +411,9 @@ namespace
 }
 
 size_t SceneSerializer::Save(const World& world, const std::string& path, const std::filesystem::path& assetRoot,
-    bool keepRuntimeMeshIds)
+    bool keepRuntimeMeshIds, bool portableOnly)
 {
+    const auto root = assetRoot.empty() ? AssetPaths::FindRoot() : assetRoot;
     json scene;
     scene["version"] = 1;
     scene["name"] = AssetPaths::ToUtf8(AssetPaths::FromUtf8(path).stem());
@@ -417,10 +436,14 @@ size_t SceneSerializer::Save(const World& world, const std::string& path, const 
         if (const auto* mesh = world.registry.try_get<MeshComponent>(entity))
         {
             const auto* source = world.registry.try_get<MeshSourceComponent>(entity);
-            json value = source ? MeshToJson(source->mesh) : json::object();
             if (!source) ++runtimeOnlyMeshes;
-            if (!source || keepRuntimeMeshIds) value["id"] = mesh->meshID;
-            serializedEntity["mesh"] = std::move(value);
+            // Session ids mean nothing in another process: portable files omit such meshes.
+            if (source || !portableOnly)
+            {
+                json value = source ? MeshToJson(source->mesh, root) : json::object();
+                if (!source || keepRuntimeMeshIds) value["id"] = mesh->meshID;
+                serializedEntity["mesh"] = std::move(value);
+            }
         }
 
         if (const auto* camera = world.registry.try_get<CameraComponent>(entity))
@@ -453,8 +476,8 @@ size_t SceneSerializer::Save(const World& world, const std::string& path, const 
             serializedEntity["collider"] = ColliderToJson(*collider);
         }
         if (const auto* script = world.registry.try_get<ScriptComponent>(entity))
-            serializedEntity["script"] = ScriptToJson(*script, assetRoot.empty() ? AssetPaths::FindRoot() : assetRoot);
-        if(const auto* terrain=world.registry.try_get<TerrainComponent>(entity))serializedEntity["terrain"]=Terrain::ToJson(*terrain);
+            serializedEntity["script"] = ScriptToJson(*script, root);
+        if(const auto* terrain=world.registry.try_get<TerrainComponent>(entity))serializedEntity["terrain"]=TerrainToJson(*terrain, root);
 
         scene["entities"].push_back(serializedEntity);
     }

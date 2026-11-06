@@ -1,5 +1,8 @@
 #include "EditorContext.h"
 #include "EditorSceneIO.h"
+#include "EditorProject.h"
+#include "EditorPlayWindow.h"
+#include <AssetPaths.h>
 #include <ResourceManager.h>
 #include <Engine.h>
 #include <SceneFactory.h>
@@ -176,20 +179,34 @@ static void DrawMainMenu(EditorContext& ctx)
     if (!ImGui::BeginMainMenuBar())
         return;
 
+    const bool canSwitchScene = Editor_CanEditComponents() && ctx.engine;
     if (ImGui::BeginMenu("File"))
     {
+        if (ImGui::MenuItem("New Project..."))
+            EditorProject::OpenNewProjectDialog(ctx);
+        ImGui::SetItemTooltip("Create a project folder anywhere on disk and open it.");
+        if (ImGui::MenuItem("Open Project..."))
+            EditorProject::OpenProjectWithDialog(ctx);
+        ImGui::SetItemTooltip("Choose a folder with a .lsproject file. The editor restarts with it.");
+        ImGui::Separator();
+
         const std::string currentScene = ctx.engine ? ctx.engine->GetScenePath() : std::string();
-        if (ImGui::MenuItem("Save Scene", nullptr, false, ctx.mode == EditorMode::Edit && !currentScene.empty()))
+        if (ImGui::MenuItem("New Scene...", nullptr, false, canSwitchScene))
+            EditorProject::NewScene(ctx);
+        ImGui::SetItemTooltip("Create a scene with a camera, a sun and a ground plane in the project.");
+        if (ImGui::MenuItem("Open Scene...", nullptr, false, canSwitchScene))
+            EditorProject::OpenSceneWithDialog(ctx);
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, ctx.mode == EditorMode::Edit && !currentScene.empty()))
             EditorSceneIO::SaveCurrentScene(ctx);
         ImGui::SetItemTooltip("Overwrites %s with the edited scene (Edit mode only).",
             currentScene.empty() ? "the loaded scene file" : currentScene.c_str());
-        if (ImGui::MenuItem("Save Scene As...", EditorSceneIO::DefaultSavePath()))
-            EditorSceneIO::SaveScene(ctx);
-        ImGui::SetItemTooltip("Writes %s", EditorSceneIO::DefaultSavePath());
-
-        if (ImGui::MenuItem("Load Scene From...", EditorSceneIO::DefaultSavePath()))
-            EditorSceneIO::LoadScene(ctx);
-        ImGui::SetItemTooltip("Loads %s and replaces the current level.", EditorSceneIO::DefaultSavePath());
+        if (ImGui::MenuItem("Save Scene As...", nullptr, false, ctx.mode == EditorMode::Edit && ctx.engine))
+            EditorProject::SaveSceneAsWithDialog(ctx);
+        ImGui::SetItemTooltip("Write the scene to a new file inside the project; later saves go there.");
+        const bool hasProject = ctx.engine && !ctx.engine->GetProject().file.empty();
+        if (ImGui::MenuItem("Set as Startup Scene", nullptr, false, hasProject && !currentScene.empty()))
+            EditorProject::SetCurrentSceneAsStartup(ctx);
+        ImGui::SetItemTooltip("Store the current scene as startupScene in the .lsproject file.");
         ImGui::Separator();
         if (ImGui::MenuItem("Exit"))
             PostQuitMessage(0);
@@ -221,57 +238,21 @@ static void DrawMainMenu(EditorContext& ctx)
 
     if (ImGui::BeginMenu("Scenes"))
     {
-        if(ImGui::MenuItem("Large Terrain", "Scenes/TerrainDemo.json",false,Editor_CanEditComponents()))
-            EditorSceneIO::LoadScene(ctx,"Scenes/TerrainDemo.json");
-        const bool canSwitchScene = ctx.mode == EditorMode::Edit && ctx.engine;
-        if (ImGui::MenuItem("Lua Scripting Demo", EditorSceneIO::LuaDemoPath(), false, canSwitchScene))
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::LuaDemoPath());
-        ImGui::SetItemTooltip("Play: arrows move, J/L control body, Space jumps, O opens door, X deletes purple cube.");
-        if (ImGui::MenuItem("Ball Field (2 players)", EditorSceneIO::BallFieldPath(), false, canSwitchScene))
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::BallFieldPath());
-        ImGui::SetItemTooltip("Lua football: rules in Games/BallField/Scripts/FootballMatch.lua, ball/confetti from Prefabs/.");
-        if (ImGui::MenuItem("Demo Scene", EditorSceneIO::DemoScenePath(), false, canSwitchScene))
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::DemoScenePath());
-        ImGui::SetItemTooltip("Load the original engine demonstration scene.");
-
-        if (ImGui::MenuItem(
-                "Character Showcase",
-                EditorSceneIO::CharacterShowcasePath(),
-                false,
-                canSwitchScene))
+        // Every scene file of the project; the sample project lists the engine demos.
+        const auto scenes = EditorProject::ListScenes(ctx);
+        const std::string current = ctx.engine ? ctx.engine->GetScenePath() : std::string();
+        for (const auto& scene : scenes)
         {
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::CharacterShowcasePath());
+            if (ImGui::MenuItem(scene.c_str(), nullptr, scene == current, canSwitchScene))
+                EditorSceneIO::LoadScene(ctx, scene.c_str());
+            if (scene.find("LuaDemo") != std::string::npos)
+                ImGui::SetItemTooltip("Play: arrows move, J/L control body, Space jumps, O opens door, X deletes purple cube.");
+            else if (scene.find("BallField") != std::string::npos)
+                ImGui::SetItemTooltip("Lua football: rules in Games/BallField/Scripts/FootballMatch.lua, ball/confetti from Prefabs/.");
+            else if (scene.find("PhysicsStress10000") != std::string::npos)
+                ImGui::SetItemTooltip("10,000 falling cubes above a large floor. Press Play to run physics.");
         }
-        ImGui::SetItemTooltip("Load the plane with three portraits and three Diablo models.");
-
-        if (ImGui::MenuItem(
-                "Physics Stress (256 Bodies)",
-                EditorSceneIO::PhysicsStress256Path(),
-                false,
-                canSwitchScene))
-        {
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsStress256Path());
-        }
-        ImGui::SetItemTooltip("Load a physics stress scene with 256 falling rigid bodies.");
-
-        if (ImGui::MenuItem(
-                "Physics Mixed (256 Cubes + 256 Spheres)",
-                EditorSceneIO::PhysicsMixed512Path(),
-                false,
-                canSwitchScene))
-        {
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsMixed512Path());
-        }
-        ImGui::SetItemTooltip("Load 256 orange cubes and 256 blue spheres, mixed above a large floor.");
-
-        if (ImGui::MenuItem("Physics Stress (10,000 Bodies)", EditorSceneIO::PhysicsStress10000Path(),
-                false, canSwitchScene))
-            EditorSceneIO::LoadScene(ctx, EditorSceneIO::PhysicsStress10000Path());
-        ImGui::SetItemTooltip("10,000 falling cubes above a large floor. Press Play to run physics.");
-
-        if (ImGui::MenuItem("Texture Streaming (1000 Textures)", nullptr, false, canSwitchScene))
-            EditorSceneIO::LoadScene(ctx, "Scenes/TextureStreaming1000.json");
-        ImGui::SetItemTooltip("1000 unique textures; synchronous baseline loader.");
+        if (scenes.empty()) ImGui::TextDisabled("No scenes in Scenes/ yet.");
 
         if (!canSwitchScene)
         {
@@ -295,9 +276,13 @@ static void DrawMainMenu(EditorContext& ctx)
 
     if (ImGui::BeginMenu("Debug"))
     {
-        ImGui::TextDisabled("Stop always restores the Play snapshot.");
+        if (ImGui::MenuItem("Simulate in Editor", nullptr, false, ctx.mode == EditorMode::Edit && !EditorPlayWindow::IsRunning()))
+            EditorSceneIO::BeginPlay(ctx);
+        ImGui::SetItemTooltip("Old in-process Play: scripts and physics run on the editor scene, Stop restores %s.",
+            EditorSceneIO::PlaySnapshotPath());
+        ImGui::TextDisabled("Stop always restores the simulation snapshot.");
 
-        if (ImGui::MenuItem("Restore Play Snapshot Now", EditorSceneIO::PlaySnapshotPath()))
+        if (ImGui::MenuItem("Restore Simulation Snapshot Now", EditorSceneIO::PlaySnapshotPath()))
             EditorSceneIO::RestorePlaySnapshot(ctx);
         ImGui::SetItemTooltip("Loads %s in the background (works in Play or Edit).", EditorSceneIO::PlaySnapshotPath());
 
@@ -322,30 +307,55 @@ static void DrawToolbar(EditorContext& ctx)
     if (ctx.engine && ctx.engine->GetSceneLoadProgress().path.find("LuaDemo") != std::string::npos)
         ImGui::TextWrapped("Lua demo: Arrows = move | J/L = body velocity | Space = impulse | O = door event | X = delete. Click the viewport before using keys.");
     if (ctx.engine && ctx.engine->GetSceneLoadProgress().path.find("BallField") != std::string::npos)
-        ImGui::TextWrapped("Ball Field: Blue = WASD + Shift | Red = arrows + Enter | R = kickoff. In Play the free camera moves only with the left mouse button held.");
+        ImGui::TextWrapped("Ball Field: Blue = WASD + Shift | Red = arrows + Enter | R = kickoff. In the game window the free camera moves only with the left mouse button held.");
+    if (ctx.engine)
+    {
+        ImGui::TextDisabled("Project: %s", ctx.engine->GetProject().name.c_str());
+        ImGui::SetItemTooltip("%s", AssetPaths::ToUtf8(ctx.engine->GetProject().file.empty() ?
+            ctx.engine->GetAssetRoot() : ctx.engine->GetProject().file).c_str());
+        ImGui::SameLine();
+    }
     ImGui::Text("Mode:");
     ImGui::SameLine();
-    if (ctx.mode == EditorMode::Edit)
+    if (ctx.mode == EditorMode::Play)
     {
-        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "Edit");
-        ImGui::SameLine();
-        if (ImGui::Button("Play##toolbar"))
-            EditorSceneIO::BeginPlay(ctx);
-        ImGui::SetItemTooltip("Save snapshot and run scripts and physics (Play mode).");
-    }
-    else
-    {
-        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Play");
+        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Simulate (in editor)");
         ImGui::SameLine();
         if (ImGui::Button("Stop##toolbar"))
             EditorSceneIO::EndPlay(ctx);
         ImGui::SetItemTooltip(
-            "Stop scripts and physics, call OnDestroy and restore the Play snapshot.");
+            "Stop scripts and physics, call OnDestroy and restore the simulation snapshot.");
 
         ImGui::SameLine();
         if (ImGui::Button("Restore Snapshot##toolbar"))
             EditorSceneIO::RestorePlaySnapshot(ctx);
-        ImGui::SetItemTooltip("Stop Play and restore %s.", EditorSceneIO::PlaySnapshotPath());
+        ImGui::SetItemTooltip("Stop and restore %s.", EditorSceneIO::PlaySnapshotPath());
+    }
+    else if (EditorPlayWindow::IsRunning())
+    {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "Edit");
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "| Playing in a separate window");
+        ImGui::SameLine();
+        if (ImGui::Button("Stop##toolbar"))
+            EditorPlayWindow::Stop(ctx);
+        ImGui::SetItemTooltip("Close the game window. The editor scene was never changed by Play.");
+        ImGui::SameLine();
+        if (ImGui::Button("Show Game##toolbar"))
+            EditorPlayWindow::Focus();
+        ImGui::SetItemTooltip("Bring the game window to the front (pid %lu).", EditorPlayWindow::ProcessId());
+    }
+    else
+    {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "Edit");
+        ImGui::SameLine();
+        const bool canPlay = ctx.engine && !ctx.engine->IsSceneLoading();
+        ImGui::BeginDisabled(!canPlay);
+        if (ImGui::Button("Play##toolbar"))
+            EditorPlayWindow::Start(ctx);
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Run the edited scene in a separate game window. "
+            "Stop or closing that window returns here; the editor scene stays as it is.");
     }
     if (ctx.engine)
     {
@@ -408,6 +418,10 @@ void Editor_BeginFrame(const FrameContext& context)
     wasLoading = loading;
     if (ctx.engine)
         if (auto notice = ctx.engine->GetScripts().TakeHotReloadNotice(); !notice.empty()) ctx.statusMessage = std::move(notice);
+    EditorPlayWindow::Update(ctx);
+    if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false) && ctx.mode == EditorMode::Edit &&
+        ctx.engine && !ctx.engine->GetScenePath().empty())
+        EditorSceneIO::SaveCurrentScene(ctx);
     ImGuizmo::BeginFrame();
     DrawMainMenu(ctx);
     DrawToolbar(ctx);
@@ -418,6 +432,7 @@ void Editor_RenderUI(const FrameContext& context)
     EditorContext& ctx = *Editor_GetContext();
 
     DrawPrimitiveCreator(ctx);
+    EditorProject::DrawProjectDialogs(ctx);
     Editor_DrawHierarchy(ctx);
     Editor_DrawInspector(ctx);
     Editor_DrawViewport(ctx);

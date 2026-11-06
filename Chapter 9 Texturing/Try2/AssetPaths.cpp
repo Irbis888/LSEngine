@@ -12,7 +12,47 @@ std::string AssetPaths::ToUtf8(const fs::path& value)
     const auto text = value.generic_u8string();
     return { reinterpret_cast<const char*>(text.data()), text.size() };
 }
+namespace
+{
+    fs::path g_ProjectRoot;
+}
+void AssetPaths::SetProjectRoot(const fs::path& root)
+{
+    g_ProjectRoot = root.empty() ? fs::path() : fs::weakly_canonical(root);
+}
+const fs::path& AssetPaths::ProjectRoot() { return g_ProjectRoot; }
 fs::path AssetPaths::FindRoot()
+{
+    return g_ProjectRoot.empty() ? EngineRoot() : g_ProjectRoot;
+}
+bool AssetPaths::IsInside(const fs::path& root, const fs::path& value)
+{
+    if (root.empty()) return false;
+    const auto directory = fs::weakly_canonical(root);
+    const auto path = fs::weakly_canonical(value.is_absolute() ? value : directory / value);
+    auto folderPart = directory.begin(), pathPart = path.begin();
+    for (; folderPart != directory.end(); ++folderPart, ++pathPart)
+    {
+        if (folderPart->empty()) { --pathPart; continue; } // trailing separator
+        if (pathPart == path.end() || _wcsicmp(folderPart->c_str(), pathPart->c_str()) != 0) return false;
+    }
+    return pathPart != path.end();
+}
+std::string AssetPaths::MakeProjectRelative(const fs::path& root, const std::string& value)
+{
+    if (value.empty() || root.empty()) return value;
+    const auto path = FromUtf8(value);
+    if (!path.is_absolute() || !IsInside(root, path)) return value;
+    const auto directory = fs::weakly_canonical(root);
+    const auto full = fs::weakly_canonical(path);
+    auto pathPart = full.begin();
+    for (auto folderPart = directory.begin(); folderPart != directory.end(); ++folderPart)
+        if (!folderPart->empty()) ++pathPart;
+    fs::path relative;
+    for (; pathPart != full.end(); ++pathPart) relative /= *pathPart;
+    return ToUtf8(relative);
+}
+fs::path AssetPaths::EngineRoot()
 {
     const auto valid = [](const fs::path& path)
     { return fs::is_directory(path / "Scenes") && fs::is_regular_file(path / "Shaders/Default.hlsl"); };
@@ -30,7 +70,7 @@ fs::path AssetPaths::FindRoot()
         directory = parent;
     }
     if (valid(fs::current_path())) return fs::weakly_canonical(fs::current_path());
-    throw std::runtime_error("Cannot find asset root (Scenes and Shaders/Default.hlsl)");
+    throw std::runtime_error("Cannot find engine root (Scenes and Shaders/Default.hlsl)");
 }
 fs::path AssetPaths::Resolve(const fs::path& root, const std::string& value)
 {

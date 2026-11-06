@@ -1,0 +1,8 @@
+{
+  "formatVersion": 1,
+  "name": "LSEngine Samples",
+  "startupScene": "Scenes/TerrainDemo.json",
+  "textureSearchPaths": [
+    "../../Textures"
+  ]
+}

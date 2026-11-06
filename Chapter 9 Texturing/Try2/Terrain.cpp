@@ -223,7 +223,7 @@ std::shared_ptr<TerrainResource> Terrain::Build(const TerrainComponent& s,const 
                     "Terrain layer exceeds 32 MiB decoded RGBA budget or has an invalid header");
             }
             auto image=ResourceManager::DecodeImage(path);
-            Check(image.dimension==ImageDimension::Texture2D&&image.arraySize==1&&!image.isCubeMap&&image.pixels.size()<=32*1024*1024,"Terrain layer must be one 2D texture, at most 32 MiB decoded");
+            Check(image.dimension==ImageDimension::Texture2D&&image.arraySize==1&&!image.isCubeMap&&image.subresources.at(0).slicePitch<=32*1024*1024,"Terrain layer must be one 2D texture, at most 32 MiB decoded (top mip)");
             if(type==1) // Normal vectors are linear data even if the DDS was tagged sRGB.
             {
                 switch(image.format)

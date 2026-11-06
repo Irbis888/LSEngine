@@ -103,9 +103,26 @@ class ResourceManager
 {
 public:
     // CPU-only decoder shared by specialized assets; no resource IDs or GPU work.
+    // DDS, PNG and TGA (plus other stb formats); PNG/TGA get a generated mip chain.
     static ImageData DecodeImage(const std::filesystem::path& file);
+    // Writes the top mip of a 2D image as PNG or TGA, chosen by extension.
+    static void SaveImage(const std::filesystem::path& file, const ImageData& image);
+    // Saves a loaded texture's CPU pixels (state CpuReady or Ready) as PNG or TGA.
+    void SaveTexture(TextureID id, const std::filesystem::path& file);
     ResourceManager();
     ~ResourceManager();
+    // Where relative model/texture paths point: the project folder, then (textures only)
+    // the project's texture search folders. Without a root, paths are relative to the
+    // current directory. Call before loading resources.
+    struct AssetSearch
+    {
+        std::filesystem::path root;
+        std::vector<std::filesystem::path> textureDirectories;
+    };
+    void SetAssetRoot(const std::filesystem::path& root, const std::vector<std::filesystem::path>& textureDirectories = {});
+    const AssetSearch& GetAssetSearch() const { return *mSearch; }
+    std::filesystem::path ResolveAssetPath(const std::string& path) const;
+    std::wstring ResolveTexture(const std::wstring& filename) const;
     ResourceManager(const ResourceManager&) = delete;
     ResourceManager& operator=(const ResourceManager&) = delete;
 
@@ -169,6 +186,7 @@ public:
 private:
     struct LoadingState;
     std::unique_ptr<LoadingState> mLoading;
+    std::shared_ptr<const AssetSearch> mSearch = std::make_shared<AssetSearch>();
     std::unordered_map<TextureID, size_t> mPendingTextureBytes;
     std::unordered_map<MeshID, size_t> mPendingMeshBytes;
     MeshID CreatePrimitive(std::shared_ptr<const MeshGeometry> geometry, MaterialID material);

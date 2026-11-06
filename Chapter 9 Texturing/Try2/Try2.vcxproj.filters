@@ -19,6 +19,12 @@
     <ClCompile Include="AssetPaths.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Project.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="Project.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
     <ClInclude Include="AssetPaths.h">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -169,6 +175,18 @@
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorProject.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorProject.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorPlayWindow.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorPlayWindow.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
     <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorSceneIO.h">
       <Filter>Editor</Filter>
     </ClInclude>
@@ -274,6 +292,12 @@
     <None Include="RESOURCE_MANAGER.md">
       <Filter>Engine</Filter>
     </None>
+    <ClCompile Include="ImageIO.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClInclude Include="ImageIO.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
     <ClCompile Include="ResourceManager.cpp">
       <Filter>Engine</Filter>
     </ClCompile>

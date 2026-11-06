@@ -10,6 +10,7 @@
 namespace fs = std::filesystem;
 void RunResourceStreamingTests(const fs::path& repo, const fs::path& fixtures);
 void RunSceneSwitchStreamingTests(const fs::path& repo, const fs::path& fixtures);
+void RunImageIOTests(const fs::path& fixtures);
 
 static void Check(bool condition, const char* message)
 {
@@ -164,12 +165,14 @@ int main(int argc, char** argv)
         const fs::path tga = fixtures / L"\u0442\u0435\u043a\u0441\u0442\u0443\u0440\u0430.TGA";
         std::vector<uint8_t> tgaBytes(18);
         tgaBytes[2] = 2; tgaBytes[12] = 2; tgaBytes[14] = 1; tgaBytes[16] = 32; tgaBytes[17] = 0x28;
-        tgaBytes.insert(tgaBytes.end(), { 0, 0, 255, 128, 0, 255, 0, 255 });
+        tgaBytes.insert(tgaBytes.end(), { 0, 0, 255, 127, 0, 255, 0, 255 });
         Write(tga, tgaBytes);
         const TextureID tgaID = resources.LoadTexture(tga.wstring());
         const ImageData& image = resources.GetTexture(tgaID).imageData;
         Check(image.width == 2 && image.height == 1 && image.format == DXGI_FORMAT_R8G8B8A8_UNORM &&
-            image.pixels == std::vector<uint8_t>({ 255, 0, 0, 128, 0, 255, 0, 255 }), "stb RGBA decode failed");
+            image.mipLevels == 2 && image.subresources.size() == 2 &&
+            image.pixels == std::vector<uint8_t>({ 255, 0, 0, 127, 0, 255, 0, 255, 128, 128, 0, 191 }),
+            "stb RGBA decode or generated mip failed");
         Check(resources.LoadTexture((fixtures / L"." / tga.filename()).wstring()) == tgaID, "CPU cache did not reuse TextureID");
         std::vector<TextureID> ids{ tgaID };
         for (const auto& fixture : { std::pair{ "mips.DDS", DDS() },
@@ -197,9 +200,10 @@ int main(int argc, char** argv)
         ids.push_back(resources.LoadTexture((repo / "Textures/textures/Head_Texture.png").wstring()));
         ids.push_back(resources.LoadTexture((repo / "Textures/white1x1.dds").wstring()));
         VerifyUploads(resources, ids);
+        RunImageIOTests(fixtures);
         RunResourceStreamingTests(repo, fixtures);
         RunSceneSwitchStreamingTests(repo, fixtures);
-        std::cout << "PASS: stb RGBA/PNG/Unicode; DDS mips/arrays/cubes/1D/3D; cache; invalid-file retry; GPU readback without source files\n";
+        std::cout << "PASS: stb RGBA/PNG/Unicode; PNG/TGA mips and export; DDS mips/arrays/cubes/1D/3D; cache; invalid-file retry; GPU readback without source files\n";
         return 0;
     }
     catch (const std::exception& error) { std::cerr << "FAIL: " << error.what() << '\n'; }

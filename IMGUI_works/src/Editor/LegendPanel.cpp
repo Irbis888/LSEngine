@@ -39,20 +39,17 @@ static void DrawLegendPanel(EditorContext& ctx)
 
     if (ImGui::CollapsingHeader("Edit vs Play", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        DrawBullet("Edit mode (green in Viewport)",
+        DrawBullet("Edit mode",
             "Physics is OFF. You can move objects with the gizmo or Inspector fields. "
-            "Use toolbar: Play.");
-        DrawBullet("Play mode (yellow in Viewport)",
-            "Physics is ON (same as running the game). Inspector editing is disabled.");
-        DrawBullet("Play snapshot",
-            "Pressing Play saves Scenes/EditorPlaySnapshot.json.");
-        DrawBullet("Stop",
-            "Returns to Edit mode. Restores snapshot only if Debug > Restore scene on Stop "
-            "is checked (toolbar checkbox in Play mode).");
-        DrawBullet("Restore Snapshot (button)",
-            "Toolbar or Debug menu — reloads snapshot immediately; can use while still in Play.");
-        DrawBullet("Restore scene on Stop (Debug)",
-            "Checkbox in Debug menu or Play toolbar. Default OFF — enable to auto-restore on Stop.");
+            "The editor always stays in Edit mode while a game window runs.");
+        DrawBullet("Play (toolbar)",
+            "Runs the edited scene in a separate game window (Try2.exe --play): own input, camera, "
+            "physics and Lua. The current scene, saved or not, goes to Temp/Play/<Scene>.json in the project.");
+        DrawBullet("Stop / closing the game window / Esc in it",
+            "Ends Play. The editor scene was never changed, so nothing has to be restored.");
+        DrawBullet("Debug > Simulate in Editor",
+            "Old in-process Play on the editor scene (Inspector locked). Stop restores "
+            "Scenes/EditorPlaySnapshot.json; Restore Snapshot reloads it immediately.");
     }
 
     if (ImGui::CollapsingHeader("Windows (View menu)", ImGuiTreeNodeFlags_DefaultOpen))
@@ -100,15 +97,17 @@ static void DrawLegendPanel(EditorContext& ctx)
 
     if (ImGui::CollapsingHeader("File menu", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::Text("Paths are relative to the working directory (often the exe folder when launched from VS).");
-        DrawBullet("Save Scene",
-            "Writes to Scenes/EditorSave.json via SceneSerializer.");
-        DrawBullet("Load Scene",
-            "Clears ECS and loads Scenes/EditorSave.json. Unsaved edits are lost.");
+        ImGui::TextWrapped("Paths are relative to the project folder (the folder of the .lsproject file).");
+        DrawBullet("New Project / Open Project",
+            "Create a project anywhere on disk or open a folder with a .lsproject file; the editor restarts with it.");
+        DrawBullet("New / Open / Save / Save As Scene",
+            "Scene files inside the project (native dialogs). Ctrl+S saves the current scene.");
+        DrawBullet("Set as Startup Scene",
+            "Stores the current scene as startupScene in the project file.");
         DrawBullet("Exit",
             "Closes the application.");
         DrawBullet("Scenes menu",
-            "Switch between Demo Scene and Character Showcase while in Edit mode.");
+            "Every scene file of the project; switching is available in Edit mode.");
     }
 
     if (ImGui::CollapsingHeader("Abbreviations & terms", ImGuiTreeNodeFlags_DefaultOpen))
@@ -142,9 +141,10 @@ static void DrawLegendPanel(EditorContext& ctx)
             row("VK_OEM_3", "Virtual-key code for ~ on US keyboards.");
             row("PLACEHOLDER", "Feature planned but not implemented yet.");
             row("Edit", "Editor mode — design time, no physics.");
-            row("Play", "Run mode — physics and simulation active.");
-            row("Restore on Stop", "Debug option — reload snapshot when Stop is pressed.");
-            row("Restore Snapshot", "Manual reload of EditorPlaySnapshot.json.");
+            row("Play", "Game in a separate window; physics and scripts run there.");
+            row("Simulate", "Debug: in-process Play on the editor scene.");
+            row("Restore Snapshot", "Manual reload of EditorPlaySnapshot.json (Simulate).");
+            row(".lsproject", "Project file: name, format version, startup scene.");
             row("Licensed", "Internal term: .imgui_on file present; editor allowed to run.");
 
             ImGui::EndTable();

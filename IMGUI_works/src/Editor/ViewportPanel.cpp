@@ -1,4 +1,5 @@
 #include "EditorContext.h"
+#include "EditorPlayWindow.h"
 
 #include <imgui.h>
 
@@ -20,7 +21,10 @@ static void DrawViewportPanel(EditorContext& ctx)
     if (ctx.mode == EditorMode::Edit)
         ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "Editor mode: Edit (physics off, editing on)");
     else
-        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Editor mode: Play (physics on, inspector locked)");
+        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Editor mode: Simulate in editor (physics on, inspector locked)");
+    if (EditorPlayWindow::IsRunning())
+        ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Game is running in a separate Play window (pid %lu).",
+            EditorPlayWindow::ProcessId());
 
     ImGui::End();
 }

@@ -240,7 +240,7 @@ std::wstring filename;
 ImageData imageData;
 ```
 
-`ResourceManager::LoadTexture` регистрирует запрос; worker получает `ImageData` без GPU-ресурсов. Без `InitLoading` чтение выполняется сразу. Для `.dds` (без учёта регистра) используется CPU-часть `DDSTextureLoader`; остальные форматы декодируются через `stb_image` в RGBA8. `ImageData` владеет пикселями или сжатыми DDS-блоками, хранит формат, размеры, mip-уровни, массивы и offsets/rowPitch/slicePitch каждого subresource. Offsets остаются корректными при копировании и перемещении данных. Загрузка в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::UploadTexture`.
+`ResourceManager::LoadTexture` регистрирует запрос; worker получает `ImageData` без GPU-ресурсов. Без `InitLoading` чтение выполняется сразу. Декодирование выполняет `ImageIO::Load` (`ImageIO.h/.cpp`): для `.dds` (без учёта регистра) используется CPU-часть `DDSTextureLoader`; PNG, TGA и остальные форматы `stb_image` декодируются в RGBA8 с автоматически построенной mip-цепочкой. `ImageData` владеет пикселями или сжатыми DDS-блоками, хранит формат, размеры, mip-уровни, массивы и offsets/rowPitch/slicePitch каждого subresource. Offsets остаются корректными при копировании и перемещении данных. Загрузка в `ID3D12Resource` происходит позже, в `D3DRenderAdapter::UploadTexture`.
 
 ## Создание mesh
 
@@ -385,9 +385,13 @@ TextureID ResourceManager::LoadTexture(const std::wstring& filename)
 
 Метод резолвит путь, возвращает `TextureID` и ставит запрос в CPU-очередь. Изображение появляется в `Texture::imageData` при публикации результата. Без `InitLoading` оно читается сразу. GPU-ресурсы здесь не создаются.
 
-Кеш использует абсолютный нормализованный путь, поэтому повторная загрузка возвращает прежний ID без повторного чтения. Путь ищется напрямую, затем в `../../Textures`, как раньше в renderer. Исходный filename сохраняется в `Texture`.
+Кеш использует абсолютный нормализованный путь, поэтому повторная загрузка возвращает прежний ID без повторного чтения. Относительный путь ищется от корня проекта (`SetAssetRoot`, папка `.lsproject`), затем в `textureSearchPaths` проекта; у проекта-примера `Samples.lsproject` это `../../Textures` (см. PROJECTS.md). Без корня путь считается от текущей папки. Исходный filename сохраняется в `Texture`.
 
-Для DDS `DirectX::LoadDDSImageFromFile` проверяет заголовок и объём данных, сохраняя сжатие и mip-цепочку. Остальные изображения читает `stb_image`; результат — RGBA8 с одним mip-уровнем. Unicode filenames поддерживаются через открытие файла по wide-пути.
+Для DDS `DirectX::LoadDDSImageFromFile` проверяет заголовок и объём данных, сохраняя сжатие и mip-цепочку. PNG (8/16 бит, палитра, grayscale, interlaced) и TGA (true-color/grayscale/палитра, RLE, любой origin) и прочие форматы читает `stb_image`; результат — RGBA8 (16-битные PNG понижаются до 8 бит), затем `ImageIO::GenerateMips` строит полную mip-цепочку box-фильтром (нечётные размеры усредняют 2–3 пикселя по оси; `_SRGB`-форматы фильтруются в линейном пространстве). Отключить генерацию можно через `ImageIO::LoadOptions{ false }`. Unicode filenames поддерживаются через открытие файла по wide-пути.
+
+### Сохранение PNG/TGA
+
+`ImageIO::Save(path, image)` выбирает формат по расширению (`.png`/`.tga`, без учёта регистра); есть также `SavePng`, `SaveTga(path, image, rle = true)` и in-memory `EncodePng/EncodeTga`. `ResourceManager::SaveImage` — статическая обёртка, `ResourceManager::SaveTexture(id, path)` сохраняет CPU-пиксели загруженной текстуры. Записывается только верхний mip одного 2D-изображения. Поддерживаемые форматы: `R8G8B8A8`, `B8G8R8A8`, `B8G8R8X8` (+`_SRGB`; для X8 alpha пишется 255), `R8_UNORM` (grayscale PNG/TGA) и `R16_UNORM` (16-битный grayscale PNG — подходит для heightmap террейна). PNG кодируется через Windows Imaging Component, TGA — встроенным кодировщиком (top-left origin, RLE по строкам, footer TGA 2.0). Сжатые DDS, массивы, cube maps и volume отклоняются `std::invalid_argument` до создания файла.
 
 В синхронном режиме ошибка чтения/декодирования выбрасывает `std::runtime_error` и не попадает в cache. В асинхронном режиме устанавливаются `Failed` и `Texture::error`; renderer сохраняет плейсхолдер.
 
@@ -556,7 +560,7 @@ PrintAllTextures();
 - CPU-данные остаются в памяти после GPU upload; unload/cancellation при смене сцены пока не реализованы.
 - JSON читается и разбирается в job; создание ECS и генерация отдельных примитивов идут на главном потоке порциями. Один очень большой примитив может превысить мягкий бюджет.
 - Direct queue используется и для uploads, и для draw; отдельной copy queue нет.
-- Для non-DDS используется набор форматов `stb_image`; mip-уровни автоматически не генерируются.
+- Для non-DDS используется набор форматов `stb_image`; mip-цепочка строится на CPU (без сжатия в BC), поэтому PNG/TGA занимают в памяти ~4/3 от RGBA8 верхнего уровня.
 - `GetMesh/GetMaterial/GetTexture` используют `assert`, поэтому в Release неправильный ID может приводить к плохим последствиям без красивого exception.
 - Нет asset database, GUID, hot reload текстур/материалов и dependency tracking.
 

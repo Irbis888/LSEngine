@@ -4,6 +4,7 @@
 #include "World.h"
 #include "ResourceManager.h"
 #include "JobSystem.h"
+#include "Project.h"
 #include <filesystem>
 
 class PhysicsSystem;
@@ -21,6 +22,7 @@ private:
     bool mStandalone = false;
 
     std::filesystem::path mAssetRoot;
+    ProjectInfo mProject; // Settings of the project at mAssetRoot (file is empty without a .lsproject).
     std::string mQueuedRestore;
     ScriptSystem* mScripts = nullptr; // Owned by updateSystems; runs as a real ISystem.
 	World world;
@@ -56,7 +58,10 @@ public:
     void SetSceneLoadingBudget(const SceneLoadingBudget& budget);
     const SceneLoadingBudget& GetSceneLoadingBudget() const { return mSceneLoadingBudget; }
 
-	void Init(const GameTimer& gt, const std::string& startupScene = {}, bool standalone = false);
+    // standalone: a game process (no editor; Play starts after the scene loads).
+    // freeCamera: keep the fly camera in standalone mode (left mouse button held), as the
+    // editor's Play window does; shipped games (--game) control their camera themselves.
+	void Init(const GameTimer& gt, const std::string& startupScene = {}, bool standalone = false, bool freeCamera = false);
     bool IsStandalone() const { return mStandalone; }
 	void Update(const FrameContext& context);
 	void PhysicsUpdate(const FrameContext& context);
@@ -73,14 +78,18 @@ public:
     bool IsPlaying() const;
     bool RestorePlaySnapshot(const std::string& path, std::string& outError);
     const std::filesystem::path& GetAssetRoot() const { return mAssetRoot; }
+    const ProjectInfo& GetProject() const { return mProject; }
 
     // keepRuntimeMeshIds is for Play snapshots only; runtimeOnlyMeshes reports meshes
     // without a source description (saved as session ids, not loadable after restart).
+    // portableOnly writes a file for another process (Play window): no session mesh ids.
 	bool SaveScene(const std::string& path, std::string& outError, bool keepRuntimeMeshIds = false,
-        size_t* runtimeOnlyMeshes = nullptr);
+        size_t* runtimeOnlyMeshes = nullptr, bool portableOnly = false);
 	bool LoadScene(const std::string& path, std::string& outError);
     // File of the last completely loaded scene; Play snapshot restores do not change it.
     const std::string& GetScenePath() const { return mScenePath; }
+    // After "Save As": later saves of the current scene go to the new file.
+    void SetScenePath(const std::string& path) { mScenePath = path; }
 private:
     bool RequestScene(const std::string& path, std::string& outError, bool restore);
     std::string mScenePath;
