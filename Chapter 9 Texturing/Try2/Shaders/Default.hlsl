@@ -127,10 +127,10 @@ VertexOut VS(VertexIn vin)
     return vout;
 }
 
-float4 PS(VertexOut pin) : SV_Target0
+float4 ShadeSurface(VertexOut pin)
 {
-    float4 diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
-    float3 normalSample = gNormalMap.Sample(gsamAnisotropicWrap, pin.TexC).rgb;
+    float4 diffuseAlbedo = gDiffuseMap.Sample(gsamPointWrap, pin.TexC) * gDiffuseAlbedo;
+    float3 normalSample = gNormalMap.Sample(gsamPointWrap, pin.TexC).rgb;
     pin.NormalW = normalize(pin.NormalW);
     float3 bumpedNormalW = normalize(
     NormalSampleToWorldSpace(normalSample, pin.NormalW, pin.Tan));
@@ -159,3 +159,27 @@ float4 PS(VertexOut pin) : SV_Target0
 }
 
 
+
+#ifdef EDITOR_VIEWPORT
+cbuffer EditorSelection : register(b3)
+{
+    uint EntityIdentifier;
+};
+struct EditorPixelOutput
+{
+    float4 color : SV_Target0;
+    uint identifier : SV_Target1;
+};
+EditorPixelOutput PS(VertexOut pin)
+{
+    EditorPixelOutput output;
+    output.color = ShadeSurface(pin);
+    output.identifier = EntityIdentifier;
+    return output;
+}
+#else
+float4 PS(VertexOut pin) : SV_Target0
+{
+    return ShadeSurface(pin);
+}
+#endif

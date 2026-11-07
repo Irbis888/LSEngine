@@ -274,7 +274,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
     DirectX::XMStoreFloat4x4(&mMainPassCB.InvView, invViewTranspose);
 
     // Build projection matrix (standard perspective)
-    float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    float aspect = mEditorScene ? float(mEditorTarget->width) / mEditorTarget->height : static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
     const float fovY = DirectX::XM_PI / 2.0f;  // 45 degrees
     const float nearZ = 1.0f;
     const float farZ = 1500.0f;
@@ -352,6 +352,7 @@ void D3DRenderAdapter::BeginFrame()
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
     ID3D12DescriptorHeap* frameHeaps[]={mCbvSrvUavHeap.Get()};
     mCommandList->SetDescriptorHeaps(1,frameHeaps);
+    CollectEditorTargets();
     CollectTerrainResources();
     PumpResourceUploads();
 
@@ -379,7 +380,7 @@ void D3DRenderAdapter::BeginFrame()
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
 
-    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
     mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
 
     mCommandList->SetGraphicsRootConstantBufferView(3, mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
@@ -459,7 +460,7 @@ bool D3DRenderAdapter::ReloadShaders()
 
         if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
         {
-            mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+            mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
             mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
         }
 
@@ -497,7 +498,7 @@ bool D3DRenderAdapter::ReloadShaders()
 
     if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
     {
-        mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+        mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
         mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
     }
 
@@ -506,6 +507,10 @@ bool D3DRenderAdapter::ReloadShaders()
 
 void D3DRenderAdapter::OnResize(int width, int height)
 {
+    if (width <= 0 || height <= 0)
+    {
+        return;
+    }
     assert(md3dDevice);
     assert(mSwapChain);
     assert(mDirectCmdListAlloc);
@@ -782,7 +787,7 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
     XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
 
     // Build projection matrix (standard perspective)
-    float aspect = static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    float aspect = mEditorScene ? float(mEditorTarget->width) / mEditorTarget->height : static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
     const float fovY = camera.fov;
     const float nearZ = camera.nearZ;
     const float farZ = camera.farZ;
@@ -810,8 +815,10 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
     mMainPassCB.EyePosW = DirectX::XMFLOAT3(camPos.x, camPos.y, camPos.z);
 
     // Store render target dimensions
-    mMainPassCB.RenderTargetSize = DirectX::XMFLOAT2(static_cast<float>(mClientWidth), static_cast<float>(mClientHeight));
-    mMainPassCB.InvRenderTargetSize = DirectX::XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+    const float renderWidth = mEditorScene ? float(mEditorTarget->width) : float(mClientWidth);
+    const float renderHeight = mEditorScene ? float(mEditorTarget->height) : float(mClientHeight);
+    mMainPassCB.RenderTargetSize = DirectX::XMFLOAT2(renderWidth, renderHeight);
+    mMainPassCB.InvRenderTargetSize = DirectX::XMFLOAT2(1.0f / renderWidth, 1.0f / renderHeight);
 
     // Store near/far plane distances
     mMainPassCB.NearZ = nearZ;
@@ -975,12 +982,14 @@ void D3DRenderAdapter::BuildRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE normalRange;
         normalRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1 - normal texture
 
-        CD3DX12_ROOT_PARAMETER rootParams[5];
+        CD3DX12_ROOT_PARAMETER rootParams[6];
         rootParams[0].InitAsDescriptorTable(1, &albedoRange, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParams[1].InitAsDescriptorTable(1, &normalRange, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParams[2].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // b0 - object/world cbuffer
         rootParams[3].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL); // b1 - pass cbuffer (camera, lights)
         rootParams[4].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_ALL); // b2 - material cbuffer
+
+        rootParams[5].InitAsConstants(1, 3, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
         auto staticSamplers = GetStaticSamplers();
 
@@ -1043,6 +1052,14 @@ void D3DRenderAdapter::BuildPSOs()
     opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
+    const D3D_SHADER_MACRO editorDefines[] = {{"EDITOR_VIEWPORT", "1"}, {nullptr, nullptr}};
+    auto editorPixelShader = d3dUtils::CompileShader(L"Shaders/Default.hlsl", editorDefines, "PS", "ps_5_1");
+    opaquePsoDesc.PS = {editorPixelShader->GetBufferPointer(), editorPixelShader->GetBufferSize()};
+    opaquePsoDesc.NumRenderTargets = 2;
+    opaquePsoDesc.RTVFormats[1] = DXGI_FORMAT_R32_UINT;
+    opaquePsoDesc.SampleDesc.Count = 1;
+    opaquePsoDesc.SampleDesc.Quality = 0;
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaqueEditor"])));
     BuildTerrainPipeline();
 }
 
@@ -1168,8 +1185,9 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
 	}
 
 	// Set graphics pipeline state and root signature (must be done before drawing)
-	//mCommandList->SetPipelineState(mPSOs["opaque"].Get());
-	//mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+	mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
+	mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
 
 	// Bind vertex and index buffers
 	mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
@@ -1235,8 +1253,9 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     }
 
     // Set graphics pipeline state and root signature (must be done before drawing)
-    mCommandList->SetPipelineState(mPSOs["opaque"].Get());
+    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
     mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
 
     const auto& submesh = meshGPU->submeshes[submeshIndex];
 

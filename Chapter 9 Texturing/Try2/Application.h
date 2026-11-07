@@ -42,6 +42,8 @@ public:
 protected:
 
     virtual void OnResize();
+    virtual void AfterEditorUI() {}
+    virtual void AfterOverlay() {}
     virtual void Update(const FrameContext& context) = 0;
     virtual void PhysicsUpdate(const FrameContext& context) = 0;
     virtual void Draw(const FrameContext& context) = 0;

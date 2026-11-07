@@ -84,7 +84,7 @@ float4 PS(VertexOut pin) : SV_Target
 
     float4 ambient = gAmbientLight * albedo;
 
-    Material mat = { albedo, float3(0.04f, 0.04f, 0.04f), 1.0f - roughness }; // можно варьировать Fresnel
+    Material mat = { albedo, float3(0.04f, 0.04f, 0.04f), 1.0f - roughness }; // РјРѕР¶РЅРѕ РІР°СЂСЊРёСЂРѕРІР°С‚СЊ Fresnel
 
     float3 shadowFactor = 1.0f;
     float4 light = ComputeLighting(gLights, mat, posW, normal, toEye, shadowFactor);

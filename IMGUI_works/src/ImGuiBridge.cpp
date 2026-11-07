@@ -2,6 +2,9 @@
 
 #include "ImGuiPlatform.h"
 #include "Editor/EditorContext.h"
+#include "Editor/EditorLayout.h"
+#include <AssetPaths.h>
+#include <filesystem>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -91,6 +94,7 @@ namespace
         ctx.registry = &g_Engine->GetRegistry();
         ctx.resources = &g_Engine->GetResources();
         Editor_SetContext(&ctx);
+        EditorLayout::Configure(*Editor_GetContext());
     }
 
     void EnsureInitialized()
@@ -101,9 +105,22 @@ namespace
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+        io.ConfigDpiScaleFonts = true;
+        io.IniFilename = nullptr;
+        const auto fontPath = std::filesystem::current_path() / "../../IMGUI_works/Assets/Fonts/Roboto-Medium.ttf";
+        if (!io.Fonts->AddFontFromFileTTF(AssetPaths::ToUtf8(fontPath).c_str(), 16.0f))
+        {
+            throw std::runtime_error("Bundled editor font is missing");
+        }
 
         ImGui::StyleColorsDark();
+        auto& style = ImGui::GetStyle();
+        style.WindowRounding = 3;
+        style.FrameRounding = 3;
+        style.WindowPadding = ImVec2(10, 8);
+        style.FramePadding = ImVec2(6, 4);
+        style.ItemSpacing = ImVec2(8, 6);
 
         ImGui_ImplWin32_Init(g_Hwnd);
 
@@ -126,6 +143,11 @@ namespace
     }
 }
 
+void ImGuiBridge::EnableDpiAwareness()
+{
+    ImGui_ImplWin32_EnableDpiAwareness();
+}
+
 void ImGuiBridge::SetRuntimeMode(bool game)
 {
     g_RuntimeMode = game;
@@ -141,6 +163,11 @@ void ImGuiBridge::SetAppInstance(HINSTANCE inst)
 void ImGuiBridge::SetEngine(Engine* engine)
 {
     g_Engine = engine;
+    if (g_Licensed && !g_Initialized)
+    {
+        g_Visible = true;
+        EnsureInitialized();
+    }
     if (g_Initialized)
         BindEditorFromEngine();
 }
@@ -159,6 +186,7 @@ void ImGuiBridge::OnApplicationShutdown()
     if (!g_Initialized)
         return;
 
+    EditorLayout::Save(*Editor_GetContext());
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
@@ -170,8 +198,7 @@ void ImGuiBridge::OnResize()
 {
     if (!g_Initialized)
         return;
-    ImGui_ImplDX12_InvalidateDeviceObjects();
-    ImGui_ImplDX12_CreateDeviceObjects();
+    // Swapchain resize does not invalidate font textures or the DX12 backend.
 }
 
 bool ImGuiBridge::WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -222,6 +249,16 @@ void ImGuiBridge::BeginFrame(const FrameContext& context)
     if (!g_Initialized)
         return;
 
+    static ImGuiStyle baseStyle = ImGui::GetStyle();
+    static float previousDpiScale = 0;
+    const float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(g_Hwnd);
+    if (dpiScale != previousDpiScale)
+    {
+        ImGui::GetStyle() = baseStyle;
+        ImGui::GetStyle().ScaleAllSizes(dpiScale);
+        ImGui::GetStyle().FontScaleDpi = dpiScale;
+        previousDpiScale = dpiScale;
+    }
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
@@ -249,4 +286,9 @@ void ImGuiBridge::RenderOverlay(D3DRenderAdapter* adapter)
 
     const Dx12ImGuiBindings bindings = adapter->GetImGuiBindings();
     ImGui_ImplDX12_RenderDrawData(drawData, bindings.CommandList);
+}
+
+bool ImGuiBridge::IsCameraRotationAllowed()
+{
+    return !IsVisible() || Editor_GetContext()->viewport.cameraCaptured;
 }

@@ -1,632 +1,971 @@
 {
-  "version": 1,
-  "name": "Large Terrain",
   "entities": [
     {
+      "camera": {
+        "aspectRatio": 1.7777999639511108,
+        "farZ": 5000.0,
+        "fov": 1.0499999523162842,
+        "nearZ": 0.20000000298023224
+      },
       "tag": "Camera",
       "transform": {
         "position": [
-          0,
-          260,
-          -420
+          0.0,
+          260.0,
+          -420.0
         ],
         "rotation": [
-          0.46,
-          0,
-          0
+          0.46000000834465027,
+          0.0,
+          0.0
         ],
         "scale": [
-          1,
-          1,
-          1
+          1.0,
+          1.0,
+          1.0
         ]
-      },
-      "camera": {
-        "fov": 1.05,
-        "nearZ": 0.2,
-        "farZ": 5000,
-        "aspectRatio": 1.7778
       }
     },
     {
-      "tag": "Sun",
       "directionalLight": {
-        "direction": [
-          -0.6,
-          -0.8,
-          0.3
-        ],
         "color": [
-          1,
-          0.96,
-          0.88
+          1.0,
+          0.9599999785423279,
+          0.8799999952316284
         ],
+        "direction": [
+          -0.5746957659721375,
+          -0.7662610411643982,
+          0.2873478829860687
+        ],
+        "enabled": true,
         "intensity": 1.5
+      },
+      "tag": "Sun",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
       }
     },
     {
       "tag": "Large Terrain",
-      "transform": {
-        "position": [
-          -1024,
-          -40,
-          -1024
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
       "terrain": {
-        "source": "heightmap",
-        "samplesX": 1024,
-        "samplesZ": 1024,
-        "sizeX": 2048,
-        "sizeZ": 2048,
-        "heightScale": 200,
-        "heightOffset": 0,
         "chunkCells": 64,
-        "lodCount": 6,
-        "lodDistance": 100,
-        "seed": 73,
+        "collision": true,
+        "culling": true,
+        "frequency": 0.0020000000949949026,
+        "friction": 0.5,
+        "heightOffset": 0.0,
+        "heightScale": 200.0,
+        "heightmap": "../../Textures/textures/terrain_hm.dds",
+        "hysteresis": 0.15000000596046448,
+        "layerCount": 1,
         "layers": [
           {
-            "color": [
-              1,
-              1,
-              1
-            ],
-            "tileSize": 2048,
             "albedo": "../../Textures/textures/terrain_diffuse.dds",
-            "normal": "../../Textures/textures/terrain_nm.dds"
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "normal": "../../Textures/textures/terrain_nm.dds",
+            "roughness": 0.8999999761581421,
+            "tileSize": 2048.0
+          },
+          {
+            "albedo": "",
+            "color": [
+              0.41999998688697815,
+              0.3100000023841858,
+              0.1599999964237213
+            ],
+            "normal": "",
+            "roughness": 0.949999988079071,
+            "tileSize": 10.0
+          },
+          {
+            "albedo": "",
+            "color": [
+              0.3799999952316284,
+              0.4000000059604645,
+              0.41999998688697815
+            ],
+            "normal": "",
+            "roughness": 0.800000011920929,
+            "tileSize": 16.0
+          },
+          {
+            "albedo": "",
+            "color": [
+              0.8799999952316284,
+              0.8999999761581421,
+              0.9200000166893005
+            ],
+            "normal": "",
+            "roughness": 0.6499999761581421,
+            "tileSize": 20.0
           }
         ],
-        "heightmap": "../../Textures/textures/terrain_hm.dds",
-        "layerCount": 1
+        "lodCount": 6,
+        "lodDistance": 100.0,
+        "restitution": 0.05000000074505806,
+        "samplesX": 1024,
+        "samplesZ": 1024,
+        "seed": 73,
+        "showBounds": false,
+        "showLod": false,
+        "sizeX": 2048.0,
+        "sizeZ": 2048.0,
+        "skirtDepth": 12.0,
+        "source": "heightmap",
+        "weightmap": "",
+        "wireframe": false
+      },
+      "transform": {
+        "position": [
+          -1024.0,
+          -40.0,
+          -1024.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
       }
     },
     {
+      "collider": {
+        "friction": 0.10000000149011612,
+        "halfExtents": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.18000000715255737,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody0Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody0",
       "transform": {
         "position": [
           -18.0,
-          170,
-          -220
+          170.0,
+          -220.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.18,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.23000000417232513,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody1Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody1",
       "transform": {
         "position": [
           -6.0,
-          170,
-          -220
+          170.0,
+          -220.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.22999999999999998,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "sphere",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.2800000011920929,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody2Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody2",
       "transform": {
         "position": [
           6.0,
-          170,
-          -220
+          170.0,
+          -220.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.28,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.33000001311302185,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody3Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody3",
       "transform": {
         "position": [
           18.0,
-          170,
-          -220
+          170.0,
+          -220.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.33,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "sphere",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.3799999952316284,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody4Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody4",
       "transform": {
         "position": [
           -18.0,
-          180,
-          -208
+          180.0,
+          -208.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.38,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.4300000071525574,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody5Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody5",
       "transform": {
         "position": [
           -6.0,
-          180,
-          -208
+          180.0,
+          -208.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.43,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "sphere",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.47999998927116394,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody6Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody6",
       "transform": {
         "position": [
           6.0,
-          180,
-          -208
+          180.0,
+          -208.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.48000000000000004,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.5299999713897705,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody7Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody7",
       "transform": {
         "position": [
           18.0,
-          180,
-          -208
+          180.0,
+          -208.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.53,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "sphere",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.5799999833106995,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody8Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody8",
       "transform": {
         "position": [
           -18.0,
-          190,
-          -196
+          190.0,
+          -196.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.5800000000000001,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.6299999952316284,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody9Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody9",
       "transform": {
         "position": [
           -6.0,
-          190,
-          -196
+          190.0,
+          -196.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.63,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "sphere",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "aabb"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.6800000071525574,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody10Material",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody10",
       "transform": {
         "position": [
           6.0,
-          190,
-          -196
+          190.0,
+          -196.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            0.85,
-            0.6799999999999999,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
+      }
+    },
+    {
       "collider": {
-        "type": "aabb",
-        "radius": 0.5,
+        "friction": 0.10000000149011612,
         "halfExtents": [
           0.5,
           0.5,
           0.5
         ],
-        "friction": 0.1,
-        "restitution": 0.2
-      }
-    },
-    {
+        "isTrigger": false,
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 0.5,
+        "restitution": 0.20000000298023224,
+        "type": "sphere"
+      },
+      "mesh": {
+        "material": {
+          "color": [
+            0.8500000238418579,
+            0.7300000190734863,
+            0.10000000149011612
+          ],
+          "name": "TerrainBody11Material",
+          "roughness": 0.5
+        },
+        "primitive": "sphere",
+        "source": "primitive"
+      },
+      "rigidbody": {
+        "acceleration": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mass": 2.0,
+        "type": "dynamic",
+        "useGravity": true,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
       "tag": "TerrainBody11",
       "transform": {
         "position": [
           18.0,
-          190,
-          -196
+          190.0,
+          -196.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          4,
-          4,
-          4
+          4.0,
+          4.0,
+          4.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "sphere",
-        "material": {
-          "color": [
-            0.85,
-            0.73,
-            0.1
-          ],
-          "roughness": 0.5
-        }
-      },
-      "rigidbody": {
-        "type": "dynamic",
-        "mass": 2,
-        "useGravity": true
-      },
-      "collider": {
-        "type": "sphere",
-        "radius": 0.5,
-        "halfExtents": [
-          0.5,
-          0.5,
-          0.5
-        ],
-        "friction": 0.1,
-        "restitution": 0.2
       }
     },
     {
+      "mesh": {
+        "material": {
+          "color": [
+            1.0,
+            0.8999999761581421,
+            0.15000000596046448
+          ],
+          "name": "Ten metre scale markerMaterial",
+          "roughness": 0.5
+        },
+        "primitive": "cube",
+        "source": "primitive"
+      },
       "tag": "Ten metre scale marker",
       "transform": {
         "position": [
-          60,
-          150,
-          -170
+          60.0,
+          150.0,
+          -170.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
         ],
         "scale": [
-          1,
-          10,
-          1
+          1.0,
+          10.0,
+          1.0
         ]
-      },
-      "mesh": {
-        "source": "primitive",
-        "primitive": "cube",
-        "material": {
-          "color": [
-            1,
-            0.9,
-            0.15
-          ]
-        }
       }
     }
-  ]
+  ],
+  "name": "TerrainDemo",
+  "version": 1
 }

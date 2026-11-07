@@ -18,6 +18,7 @@ private:
     std::unique_ptr<PendingScene> mPendingScene;
     std::unique_ptr<World> mRetiredWorld;
     void PumpSceneLoading();
+    uint64_t mSceneGeneration = 1;
     bool mStartupScene = false;
     bool mStandalone = false;
 
@@ -62,6 +63,14 @@ public:
     // freeCamera: keep the fly camera in standalone mode (left mouse button held), as the
     // editor's Play window does; shipped games (--game) control their camera themselves.
 	void Init(const GameTimer& gt, const std::string& startupScene = {}, bool standalone = false, bool freeCamera = false);
+    uint64_t GetSceneGeneration() const
+    {
+        return mSceneGeneration;
+    }
+    IRenderAdapter& GetRenderer()
+    {
+        return *mRenderAdapter;
+    }
     bool IsStandalone() const { return mStandalone; }
 	void Update(const FrameContext& context);
 	void PhysicsUpdate(const FrameContext& context);

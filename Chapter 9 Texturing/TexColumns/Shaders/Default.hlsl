@@ -60,8 +60,8 @@ cbuffer cbPass : register(b1)
     // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
     // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
     // are spot lights for a imum of MaxLights per object.
-    // Автор этого говна больной и не лечится, почему я должен так ебаться считая сколько там светов каждого вида
-    // сука у него ещё maxlights это не сумма тех трёх а отдельный параметр
+    // РђРІС‚РѕСЂ СЌС‚РѕРіРѕ РіРѕРІРЅР° Р±РѕР»СЊРЅРѕР№ Рё РЅРµ Р»РµС‡РёС‚СЃСЏ, РїРѕС‡РµРјСѓ СЏ РґРѕР»Р¶РµРЅ С‚Р°Рє РµР±Р°С‚СЊСЃСЏ СЃС‡РёС‚Р°СЏ СЃРєРѕР»СЊРєРѕ С‚Р°Рј СЃРІРµС‚РѕРІ РєР°Р¶РґРѕРіРѕ РІРёРґР°
+    // СЃСѓРєР° Сѓ РЅРµРіРѕ РµС‰С‘ maxlights СЌС‚Рѕ РЅРµ СЃСѓРјРјР° С‚РµС… С‚СЂС‘С… Р° РѕС‚РґРµР»СЊРЅС‹Р№ РїР°СЂР°РјРµС‚СЂ
     Light gLights[MaxLights];
 };
 

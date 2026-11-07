@@ -82,6 +82,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -96,6 +97,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -112,6 +114,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,6 +133,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\external\tracy\public;$(ProjectDir);$(SolutionDir)..\..\Common;$(IMGUI_WORKS)\src;$(IMGUI_WORKS)\ThirdParty\imgui;$(IMGUI_WORKS)\ThirdParty\imgui\backends;$(IMGUI_WORKS)\ThirdParty\ImGuizmo\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -318,4 +322,23 @@
   </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClCompile Include="D3DEditorViewport.cpp"></ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorLayout.cpp"></ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorLayout.h"></ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\AssetConsolePanels.cpp"></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\tests\EditorValidation.cpp"></ClCompile>
+    <ClInclude Include="..\..\tests\EditorValidation.h"></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\tests\RunEditorTests.ps1"></None>
+    <None Include="EDITOR.md"></None>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\Roboto-Medium.ttf"></None>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\LICENSE-Roboto.txt"></None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\README.txt"></None>
+  </ItemGroup>
 </Project>

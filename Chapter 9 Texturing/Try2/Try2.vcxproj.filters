@@ -455,4 +455,23 @@
     <None Include="..\..\tests\fixtures\Terrain16.png"><Filter>Engine\Profiling</Filter></None>
     <None Include="..\..\tests\RunTerrainTests.ps1"><Filter>Engine\Profiling</Filter></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="D3DEditorViewport.cpp"><Filter>Graphics</Filter></ClCompile>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\EditorLayout.cpp"><Filter>Editor</Filter></ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\EditorLayout.h"><Filter>Editor</Filter></ClInclude>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\AssetConsolePanels.cpp"><Filter>Editor</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\tests\EditorValidation.cpp"><Filter>Engine\Profiling</Filter></ClCompile>
+    <ClInclude Include="..\..\tests\EditorValidation.h"><Filter>Engine\Profiling</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\tests\RunEditorTests.ps1"><Filter>Engine\Profiling</Filter></None>
+    <None Include="EDITOR.md"><Filter>Editor</Filter></None>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\Roboto-Medium.ttf"><Filter>Editor</Filter></None>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\LICENSE-Roboto.txt"><Filter>Editor</Filter></None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(IMGUI_WORKS)\Assets\Fonts\README.txt"><Filter>Editor</Filter></None>
+  </ItemGroup>
 </Project>

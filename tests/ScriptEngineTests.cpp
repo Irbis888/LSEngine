@@ -15,7 +15,18 @@
 
 namespace fs = std::filesystem;
 static bool captureInput = false;
-namespace ImGuiBridge { bool WantsCaptureInput() { return captureInput; } }
+namespace ImGuiBridge
+{
+    bool WantsCaptureInput()
+    {
+        return captureInput;
+    }
+
+    bool IsCameraRotationAllowed()
+    {
+        return true;
+    }
+}
 bool Editor_IsPhysicsEnabled() { return false; }
 static void Check(bool condition, const char* message) { if (!condition) throw std::runtime_error(message); }
 static void Write(const fs::path& path, const std::string& text)

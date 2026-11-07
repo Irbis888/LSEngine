@@ -29,6 +29,13 @@ public:
     void BeginFrame() override;
     void EndFrame() override;
     bool ReloadShaders() override;
+    uint64_t ResizeEditorViewport(uint32_t width, uint32_t height) override;
+    void BeginScene(bool editor, bool visible) override;
+    void EndScene() override;
+    void SetRenderEntity(entt::entity entity) override;
+    void RequestViewportPick(uint32_t x, uint32_t y, uint64_t request, uint64_t sceneGeneration) override;
+    bool PollViewportPick(ViewportPickResult& result) override;
+
 
     void SetTransform(const TransformComponent& world) override;
     void SetCamera(const CameraComponent& camera, const TransformComponent& transform) override;
@@ -81,6 +88,37 @@ public:
     Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
+    struct EditorTarget
+    {
+        ComPtr<ID3D12Resource> color;
+        ComPtr<ID3D12Resource> identifiers;
+        ComPtr<ID3D12Resource> depth;
+        ComPtr<ID3D12DescriptorHeap> rtvHeap;
+        ComPtr<ID3D12DescriptorHeap> dsvHeap;
+        UINT srvIndex = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        UINT64 retireFence = 0;
+    };
+    struct PickReadback
+    {
+        ComPtr<ID3D12Resource> buffer;
+        std::vector<entt::entity> entities;
+        ViewportPickResult result;
+        UINT64 fence = 0;
+    };
+    std::unique_ptr<EditorTarget> mEditorTarget;
+    std::deque<std::unique_ptr<EditorTarget>> mRetiredEditorTargets;
+    std::vector<UINT> mFreeEditorDescriptors;
+    std::deque<PickReadback> mPickReadbacks;
+    std::vector<entt::entity> mFrameEntities;
+    ViewportPickResult mPendingPick;
+    uint32_t mPickX = 0;
+    uint32_t mPickY = 0;
+    uint32_t mRenderEntityID = 0;
+    bool mEditorScene = false;
+    bool mSceneVisible = true;
+    void CollectEditorTargets();
     struct TerrainGPU
     {
         std::weak_ptr<const TerrainResource> owner;

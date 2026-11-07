@@ -91,7 +91,6 @@ struct DirectionalLightComponent
 {
     glm::vec3 color = glm::vec3(1.0f);
     float intensity = 1.0f;
-    glm::vec3 direction = glm::normalize(glm::vec3(-0.6f, -0.7f, 0.2f));
     bool enabled = true;
 };
 
@@ -154,6 +153,13 @@ struct SceneLightData
 
 
 
+struct ViewportPickResult
+{
+    uint64_t request = 0;
+    uint64_t sceneGeneration = 0;
+    entt::entity entity = entt::null;
+};
+
 class IRenderAdapter
 {
 public:
@@ -164,6 +170,18 @@ public:
     virtual void SetResourceManager(class ResourceManager* resourceManager) = 0;
     virtual void BeginFrame() = 0;
     virtual void EndFrame() = 0;
+    virtual uint64_t ResizeEditorViewport(uint32_t width, uint32_t height)
+    {
+        return 0;
+    }
+    virtual void BeginScene(bool editor, bool visible) {}
+    virtual void EndScene() {}
+    virtual void SetRenderEntity(entt::entity entity) {}
+    virtual void RequestViewportPick(uint32_t x, uint32_t y, uint64_t request, uint64_t sceneGeneration) {}
+    virtual bool PollViewportPick(ViewportPickResult& result)
+    {
+        return false;
+    }
     virtual bool ReloadShaders() = 0;
     virtual void SetTimeData(float TotalTime, float DeltaTime) = 0;
 

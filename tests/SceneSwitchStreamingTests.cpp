@@ -11,7 +11,18 @@
 
 // Only editor input/physics policy is stubbed; the test uses real Engine,
 // SceneSerializer, ResourceManager, JobSystem, RenderSystem and D3D12.
-namespace ImGuiBridge { bool WantsCaptureInput() { return false; } }
+namespace ImGuiBridge
+{
+    bool WantsCaptureInput()
+    {
+        return false;
+    }
+
+    bool IsCameraRotationAllowed()
+    {
+        return true;
+    }
+}
 bool Editor_IsPhysicsEnabled() { return false; }
 
 namespace

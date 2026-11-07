@@ -59,7 +59,7 @@ static void DrawLegendPanel(EditorContext& ctx)
         DrawBullet("Inspector",
             "Edit components of the selected entity (Transform, lights, physics, etc.).");
         DrawBullet("Viewport",
-            "Information about the 3D view. The scene draws full-window behind ImGui panels.");
+            "Embedded 3D scene. Click a surface to select; drag LMB to look, WASD/QE to move while the viewport has focus.");
         DrawBullet("Statistics",
             "FPS, frame time, entity counts, physics collision count for this frame.");
         DrawBullet("Legend / Help",
@@ -139,7 +139,6 @@ static void DrawLegendPanel(EditorContext& ctx)
             row("Tag", "Display name for an entity in Hierarchy.");
             row("Mesh ID", "Index into ResourceManager meshes.");
             row("VK_OEM_3", "Virtual-key code for ~ on US keyboards.");
-            row("PLACEHOLDER", "Feature planned but not implemented yet.");
             row("Edit", "Editor mode — design time, no physics.");
             row("Play", "Game in a separate window; physics and scripts run there.");
             row("Simulate", "Debug: in-process Play on the editor scene.");

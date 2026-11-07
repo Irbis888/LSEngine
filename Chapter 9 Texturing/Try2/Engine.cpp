@@ -308,6 +308,7 @@ void Engine::PumpSceneLoading()
         mRetiredWorld = std::make_unique<World>();
         mScripts->BeforeSceneChange();
         mTerrain->Reset();
+        ++mSceneGeneration;
         world.registry.swap(mRetiredWorld->registry);
         mScripts->Bind(world.registry);
         mSceneProgress.total = pending.result->data.entities.size();

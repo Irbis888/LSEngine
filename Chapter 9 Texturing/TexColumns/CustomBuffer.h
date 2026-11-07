@@ -19,7 +19,7 @@ public:
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> RTVlist;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> SRVlist;
 
-    // Инициализация всех ресурсов
+    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІСЃРµС… СЂРµСЃСѓСЂСЃРѕРІ
     CustomBuffer(UINT NumTextures);
     void Initialize(ID3D12Device* device, UINT width, UINT height,
         DXGI_FORMAT* formats,

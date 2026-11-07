@@ -12,7 +12,7 @@ struct ObjectConstants
 };
 
 struct PassConstants
-{   // тут вообще можно половину под нож
+{   // С‚СѓС‚ РІРѕРѕР±С‰Рµ РјРѕР¶РЅРѕ РїРѕР»РѕРІРёРЅСѓ РїРѕРґ РЅРѕР¶
     DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();
     DirectX::XMFLOAT4X4 InvView = MathHelper::Identity4x4();
     DirectX::XMFLOAT4X4 Proj = MathHelper::Identity4x4();

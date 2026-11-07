@@ -169,7 +169,7 @@ static void DrawDirectionalLightEditor(DirectionalLightComponent& light)
     ImGui::Checkbox("Enabled", &light.enabled);
     ImGui::ColorEdit3("Color", &light.color.x);
     ImGui::DragFloat("Intensity", &light.intensity, 0.05f, 0.0f, 100.0f);
-    ImGui::DragFloat3("Direction", &light.direction.x, 0.05f);
+    ImGui::TextDisabled("Direction follows Transform Rotation (local +Z).");
 }
 
 static void DrawPointLightEditor(PointLightComponent& light)
@@ -194,7 +194,7 @@ static void DrawSpotLightEditor(SpotLightComponent& light)
 
 static void DrawInspectorPanel(EditorContext& ctx)
 {
-    if (!ImGui::Begin("Inspector — Component Properties", &ctx.showInspector))
+    if (!ImGui::Begin("Inspector###Inspector", &ctx.showInspector))
     {
         ImGui::End();
         return;
@@ -247,7 +247,7 @@ static void DrawInspectorPanel(EditorContext& ctx)
             auto& mesh = ctx.registry->get<MeshComponent>(entity);
             int id = (int)mesh.meshID;
             ImGui::InputInt("Mesh ID", &id, 0, 0, ImGuiInputTextFlags_ReadOnly);
-            ImGui::TextDisabled("Mesh picker: [PLACEHOLDER]");
+
         }
         DrawMaterialEditor(ctx, entity);
     }

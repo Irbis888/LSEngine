@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "TextureBenchmark.h"
 #include "ImGuiBridge.h"
+#include "Editor/EditorContext.h"
 #include <WindowsX.h>
 #include <wrl.h>
 
@@ -137,11 +138,20 @@ int Application::Run()
 				//CalculateFrameStats();
 				mRenderAdapter->BeginFrame();
 				FrameContext context{ mTimer, InputState(), 0.0f };
-				Update(mFrameContext);
-				Draw(mFrameContext);
-				ImGuiBridge::BeginFrame(mFrameContext);
-				ImGuiBridge::RenderEditorUI(mFrameContext);
+                ImGuiBridge::BeginFrame(mFrameContext);
+                ImGuiBridge::RenderEditorUI(mFrameContext);
+                AfterEditorUI();
+                const bool editorVisible = ImGuiBridge::IsVisible();
+                const bool sceneVisible = !editorVisible || Editor_GetContext()->viewport.visible;
+                Update(mFrameContext);
+                mRenderAdapter->BeginScene(editorVisible, sceneVisible);
+                if (sceneVisible)
+                {
+                    Draw(mFrameContext);
+                }
+                mRenderAdapter->EndScene();
 				ImGuiBridge::RenderOverlay(static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
+                AfterOverlay();
 				mRenderAdapter->EndFrame();
 				memset(mInput.keysPressed, 0, sizeof(bool) * 256);
 				memset(mInput.keysReleased, 0, sizeof(bool) * 256);
@@ -169,6 +179,7 @@ int Application::Run()
 
 bool Application::Initialize()
 {
+    ImGuiBridge::EnableDpiAwareness();
 	if (!InitMainWindow())
 		return false;
 	mRenderAdapter = Application::CreateRenderer(mRenderAPI);
@@ -289,6 +300,12 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 		// WM_DESTROY is sent when the window is being destroyed.
+    case WM_KILLFOCUS:
+        mInput = {};
+        return 0;
+    case WM_CAPTURECHANGED:
+        mInput.mouseButtons[0] = false;
+        return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -300,6 +317,13 @@ LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return MAKELRESULT(0, MNC_CLOSE);
 
 		// Catch this message so to prevent the window from becoming too small.
+    case WM_DPICHANGED:
+    {
+        const RECT* suggested = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
+            suggested->right - suggested->left, suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        return 0;
+    }
 	case WM_GETMINMAXINFO:
 		((MINMAXINFO*)lParam)->ptMinTrackSize.x = 200;
 		((MINMAXINFO*)lParam)->ptMinTrackSize.y = 200;

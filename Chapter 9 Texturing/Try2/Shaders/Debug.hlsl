@@ -2,7 +2,7 @@
 
 cbuffer cbPerObject : register(b0)
 {
-} // можно пустой
+} // РјРѕР¶РЅРѕ РїСѓСЃС‚РѕР№
 
 Texture2D gDebugTex : register(t0);
 SamplerState gSampler : register(s0);

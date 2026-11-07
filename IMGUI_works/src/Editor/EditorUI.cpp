@@ -1,4 +1,5 @@
 #include "EditorContext.h"
+#include "EditorLayout.h"
 #include "EditorSceneIO.h"
 #include "EditorProject.h"
 #include "EditorPlayWindow.h"
@@ -23,6 +24,7 @@ void Editor_DrawViewport(EditorContext& ctx);
 void Editor_DrawStatistics(EditorContext& ctx, const FrameContext& context);
 void Editor_DrawGizmoToolbar(EditorContext& ctx);
 void Editor_DrawLegend(EditorContext& ctx);
+void Editor_DrawAssetsAndConsole(EditorContext& ctx);
 
 namespace
 {
@@ -221,8 +223,8 @@ static void DrawMainMenu(EditorContext& ctx)
         ImGui::MenuItem("Inspector", nullptr, &ctx.showInspector);
         ImGui::SetItemTooltip("Edit components of the selected entity.");
 
-        ImGui::MenuItem("Viewport Info", nullptr, &ctx.showViewport);
-        ImGui::SetItemTooltip("Mode and size hints; 3D scene draws behind panels.");
+        ImGui::MenuItem("Viewport", nullptr, &ctx.showViewport);
+        ImGui::SetItemTooltip("Scene render texture and entity selection.");
 
         ImGui::MenuItem("Statistics", nullptr, &ctx.showStatistics);
         ImGui::SetItemTooltip("FPS, frame time, entity counts, collisions.");
@@ -233,6 +235,13 @@ static void DrawMainMenu(EditorContext& ctx)
         ImGui::MenuItem("ImGui Demo (debug)", nullptr, &ctx.showDemo);
         ImGui::SetItemTooltip("Official Dear ImGui demonstration window.");
 
+        ImGui::MenuItem("Asset Browser", nullptr, &ctx.showAssets);
+        ImGui::MenuItem("Console", nullptr, &ctx.showConsole);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset Layout"))
+        {
+            EditorLayout::Reset(ctx);
+        }
         ImGui::EndMenu();
     }
 
@@ -371,8 +380,7 @@ static void DrawToolbar(EditorContext& ctx)
     ImGui::SameLine();
     Editor_DrawGizmoToolbar(ctx);
 
-    ImGui::SameLine();
-    ImGui::TextDisabled("| Undo/Redo [PLACEHOLDER]");
+
 
     if (ctx.engine)
     {
@@ -407,6 +415,27 @@ void Editor_BeginFrame(const FrameContext& context)
 {
     (void)context;
     EditorContext& ctx = *Editor_GetContext();
+    auto& viewportState = ctx.viewport;
+    if (ctx.engine && (viewportState.sceneGeneration != ctx.engine->GetSceneGeneration() ||
+        (ctx.selected != entt::null && !ctx.registry->valid(ctx.selected))))
+    {
+        Editor_SelectEntity(ctx, entt::null);
+        viewportState.sceneGeneration = ctx.engine->GetSceneGeneration();
+    }
+    if (viewportState.observedSelection != ctx.selected)
+    {
+        Editor_SelectEntity(ctx, ctx.selected);
+    }
+    ViewportPickResult pickResult;
+    while (ctx.engine && ctx.engine->GetRenderer().PollViewportPick(pickResult))
+    {
+        if (!ctx.engine->IsSceneLoading() && pickResult.request == viewportState.pendingPick &&
+            pickResult.sceneGeneration == ctx.engine->GetSceneGeneration() &&
+            (pickResult.entity == entt::null || ctx.registry->valid(pickResult.entity)))
+        {
+            Editor_SelectEntity(ctx, pickResult.entity);
+        }
+    }
     static bool wasLoading = false;
     const bool loading = ctx.engine && ctx.engine->IsSceneLoading();
     if (loading || wasLoading) ctx.selected = entt::null;
@@ -424,7 +453,17 @@ void Editor_BeginFrame(const FrameContext& context)
         EditorSceneIO::SaveCurrentScene(ctx);
     ImGuizmo::BeginFrame();
     DrawMainMenu(ctx);
+    const auto* viewport = ImGui::GetMainViewport();
+    const float toolbarTop = viewport->WorkPos.y;
+    const float toolbarHeight = ImGui::GetFrameHeightWithSpacing() * 2 + ImGui::GetStyle().WindowPadding.y * 2;
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, toolbarTop));
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, toolbarHeight));
+    ImGui::Begin("Toolbar###EditorToolbar", nullptr, ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
     DrawToolbar(ctx);
+    ImGui::End();
+    EditorLayout::DrawDockspace(ctx, toolbarTop + toolbarHeight);
 }
 
 void Editor_RenderUI(const FrameContext& context)
@@ -433,24 +472,26 @@ void Editor_RenderUI(const FrameContext& context)
 
     DrawPrimitiveCreator(ctx);
     EditorProject::DrawProjectDialogs(ctx);
-    Editor_DrawHierarchy(ctx);
-    Editor_DrawInspector(ctx);
+    if (ctx.showHierarchy)
+    {
+        Editor_DrawHierarchy(ctx);
+    }
+    if (ctx.showInspector)
+    {
+        Editor_DrawInspector(ctx);
+    }
     Editor_DrawViewport(ctx);
-    Editor_DrawStatistics(ctx, context);
-    Editor_DrawLegend(ctx);
+    if (ctx.showStatistics)
+    {
+        Editor_DrawStatistics(ctx, context);
+    }
+    if (ctx.showLegend)
+    {
+        Editor_DrawLegend(ctx);
+    }
 
     if (ctx.showDemo)
         ImGui::ShowDemoWindow(&ctx.showDemo);
 
-    ImGui::Begin("Material Editor (PLACEHOLDER)");
-    ImGui::TextDisabled("[PLACEHOLDER] Material editing panel");
-    ImGui::End();
-
-    ImGui::Begin("Asset Browser (PLACEHOLDER)");
-    ImGui::TextDisabled("[PLACEHOLDER] Drag-drop assets into scene");
-    if (ctx.resources)
-        ImGui::Text("ResourceManager bound.");
-    ImGui::End();
-
-    Editor_RenderGizmo(context);
+    Editor_DrawAssetsAndConsole(ctx);
 }

@@ -217,7 +217,6 @@ namespace
         return json{
             { "color", Vec3ToJson(light.color) },
             { "intensity", light.intensity },
-            { "direction", Vec3ToJson(light.direction) },
             { "enabled", light.enabled }
         };
     }
@@ -227,9 +226,6 @@ namespace
         DirectionalLightComponent light;
         light.color = JsonToVec3(value.value("color", json::array()), glm::vec3(1.0f));
         light.intensity = value.value("intensity", 1.0f);
-        light.direction = SafeNormalize(
-            JsonToVec3(value.value("direction", json::array()), glm::vec3(-0.6f, -0.7f, 0.2f)),
-            glm::normalize(glm::vec3(-0.6f, -0.7f, 0.2f)));
         light.enabled = value.value("enabled", true);
         return light;
     }
@@ -396,6 +392,15 @@ namespace
         if (value.contains("mesh")) entity.mesh = ReadMesh(value.at("mesh"), entity.tag);
         if (value.contains("camera")) entity.camera = JsonToCamera(value.at("camera"));
         if (value.contains("directionalLight")) entity.directionalLight = JsonToDirectionalLight(value.at("directionalLight"));
+        // Migrate legacy scenes once; explicit rotation always takes precedence.
+        if (entity.directionalLight && value.at("directionalLight").contains("direction") &&
+            (!value.contains("transform") || !value.at("transform").contains("rotation")))
+        {
+            const glm::vec3 direction = SafeNormalize(
+                JsonToVec3(value.at("directionalLight").at("direction"), glm::vec3(0, 0, 1)), glm::vec3(0, 0, 1));
+            entity.transform.rotation = glm::vec3(std::asin(glm::clamp(-direction.y, -1.0f, 1.0f)),
+                std::atan2(direction.x, direction.z), 0);
+        }
         if (value.contains("pointLight")) entity.pointLight = JsonToPointLight(value.at("pointLight"));
         if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
         if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));

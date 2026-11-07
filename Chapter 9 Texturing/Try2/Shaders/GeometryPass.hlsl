@@ -158,7 +158,7 @@ GBufferOutput PS(VertexOut pin)
     float2 currNDC = (posH.xy / posH.w) ;
     float2 prevNDC = (prevPosH.xy / prevPosH.w);
 
-    // Скорость в NDC
+    // РЎРєРѕСЂРѕСЃС‚СЊ РІ NDC
     float2 velocity = currNDC - prevNDC;
     velocity = velocity * float2(0.5, -0.5);
     

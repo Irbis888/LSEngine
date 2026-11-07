@@ -1,0 +1,17 @@
+root = true
+
+# Project-owned text files are UTF-8. Keep third-party distributions unchanged.
+[*.{c,cpp,h,hpp,hlsl,hlsli,lua,json,md,vcxproj,props,targets}]
+charset = utf-8
+
+[external/**]
+charset = unset
+
+[IMGUI_works/ThirdParty/**]
+charset = unset
+
+[Common/assimp/**]
+charset = unset
+
+[Common/glm/**]
+charset = unset

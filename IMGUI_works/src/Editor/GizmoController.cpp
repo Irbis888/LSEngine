@@ -11,6 +11,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include <cstring>
 
@@ -20,9 +21,9 @@ static glm::mat4 BuildWorldMatrix(const TransformComponent& t)
 
     m = glm::translate(m, t.position);
 
-    m = glm::rotate(m, t.rotation.x, glm::vec3(1, 0, 0));
-    m = glm::rotate(m, t.rotation.y, glm::vec3(0, 1, 0));
     m = glm::rotate(m, t.rotation.z, glm::vec3(0, 0, 1));
+    m = glm::rotate(m, t.rotation.y, glm::vec3(0, 1, 0));
+    m = glm::rotate(m, t.rotation.x, glm::vec3(1, 0, 0));
 
     m = glm::scale(m, t.scale);
 
@@ -53,9 +54,9 @@ static bool FindActiveCamera(entt::registry& reg, CameraComponent** outCam, Tran
     return false;
 }
 
-void Editor_RenderGizmo(const FrameContext& context)
+void Editor_RenderGizmo()
 {
-    (void)context;
+
 
     EditorContext& ctx = *Editor_GetContext();
 
@@ -65,7 +66,7 @@ void Editor_RenderGizmo(const FrameContext& context)
     if (!ctx.registry->all_of<TransformComponent>(ctx.selected))
         return;
 
-    if (ctx.mode != EditorMode::Edit)
+    if (!Editor_CanEditComponents() || !ctx.viewport.visible)
         return;
 
     CameraComponent* camera = nullptr;
@@ -77,15 +78,15 @@ void Editor_RenderGizmo(const FrameContext& context)
     ImGuizmo::SetOrthographic(false);
 
 
-    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
 
     const ImGuiIO& io = ImGui::GetIO();
 
     ImGuizmo::SetRect(
-        0.0f,
-        0.0f,
-        io.DisplaySize.x,
-        io.DisplaySize.y
+        ctx.viewport.imageMinimum.x,
+        ctx.viewport.imageMinimum.y,
+        ctx.viewport.imageMaximum.x - ctx.viewport.imageMinimum.x,
+        ctx.viewport.imageMaximum.y - ctx.viewport.imageMinimum.y
     );
 
     ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
@@ -118,17 +119,11 @@ void Editor_RenderGizmo(const FrameContext& context)
         ? camera->aspectRatio
         : io.DisplaySize.x / io.DisplaySize.y;
 
-    const glm::vec3 forward(
-        cosf(cameraTr->rotation.x) * sinf(cameraTr->rotation.y),
-        -sinf(cameraTr->rotation.x),
-        cosf(cameraTr->rotation.x) * cosf(cameraTr->rotation.y)
-    );
-
+    const glm::mat4 cameraRotation = glm::yawPitchRoll(cameraTr->rotation.y, cameraTr->rotation.x, cameraTr->rotation.z);
+    const glm::vec3 forward = glm::vec3(cameraRotation * glm::vec4(0, 0, 1, 0));
+    const glm::vec3 up = glm::vec3(cameraRotation * glm::vec4(0, 1, 0, 0));
     const glm::vec3 eye = cameraTr->position;
-    const glm::vec3 target = eye + glm::normalize(forward);
-
-    const glm::mat4 view =
-        glm::lookAtLH(eye, target, glm::vec3(0, 1, 0));
+    const glm::mat4 view = glm::lookAtLH(eye, eye + forward, up);
 
     const glm::mat4 proj =
         glm::perspectiveLH_ZO(

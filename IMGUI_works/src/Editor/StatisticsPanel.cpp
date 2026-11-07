@@ -120,7 +120,7 @@ static void DrawStatisticsPanel(EditorContext& ctx, const FrameContext& frame)
             physics.SetSchedulingSettings(settings);
         }
     }
-    ImGui::TextDisabled("GPU memory: [PLACEHOLDER]");
+
 
     ImGui::End();
 }

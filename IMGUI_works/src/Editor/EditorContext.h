@@ -2,6 +2,8 @@
 
 #include <entt/entt.hpp>
 #include <string>
+#include <cstdint>
+#include <imgui.h>
 
 class Engine;
 class ResourceManager;
@@ -20,6 +22,27 @@ enum class GizmoOperation
     Scale
 };
 
+struct EditorViewportState
+{
+    ImVec2 imageMinimum = {};
+    ImVec2 imageMaximum = {};
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool visible = false;
+    bool hovered = false;
+    bool focused = false;
+    bool cameraCaptured = false;
+    bool pointerDown = false;
+    bool pointerDragged = false;
+    ImVec2 pointerStart = {};
+    uint64_t selectionRevision = 0;
+    uint64_t pendingPick = 0;
+    uint64_t sceneGeneration = 0;
+    entt::entity observedSelection = entt::null;
+
+    bool ScreenToPixel(ImVec2 position, uint32_t& pixelX, uint32_t& pixelY) const;
+};
+
 struct EditorContext
 {
     Engine* engine = nullptr;
@@ -34,12 +57,15 @@ struct EditorContext
     bool showHierarchy = true;
     bool showInspector = true;
     bool showViewport = true;
-    bool showStatistics = true;
-    bool showLegend = true;
+    bool showAssets = true;
+    bool showConsole = true;
+    bool showStatistics = false;
+    bool showLegend = false;
     bool showDemo = false;
     bool showPrimitiveCreator = false;
 
 
+    EditorViewportState viewport;
     std::string statusMessage;
 };
 
@@ -51,5 +77,7 @@ bool Editor_WantsInputCapture();
 
 void Editor_BeginFrame(const FrameContext& context);
 void Editor_RenderUI(const FrameContext& context);
-void Editor_RenderGizmo(const FrameContext& context);
+void Editor_RenderGizmo();
 void Editor_DrawLegend(EditorContext& ctx);
+
+void Editor_SelectEntity(EditorContext& context, entt::entity entity);

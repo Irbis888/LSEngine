@@ -149,8 +149,11 @@ void DemoScene::Build(World& world, ResourceManager& resources)
         DirectionalLightComponent{
             glm::vec3(1.0f, 0.96f, 0.88f),
             1.15f,
-            glm::normalize(glm::vec3(-0.55f, -0.8f, 0.25f)),
             true });
+
+    const glm::vec3 sunDirection = glm::normalize(glm::vec3(-0.55f, -0.8f, 0.25f));
+    world.registry.get<TransformComponent>(sun).rotation = glm::vec3(
+        std::asin(-sunDirection.y), std::atan2(sunDirection.x, sunDirection.z), 0);
 
     entt::entity warmPoint = factory.CreateEmpty(
         "WarmPointLight",

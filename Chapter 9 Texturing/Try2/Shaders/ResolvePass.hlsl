@@ -49,27 +49,27 @@ float JONSWAP(float2 k, float omega_p)
 {
     float k_len = length(k);
 
-    // защита от деления на 0
+    // Р·Р°С‰РёС‚Р° РѕС‚ РґРµР»РµРЅРёСЏ РЅР° 0
     if (k_len < 1e-6)
         return 0.0;
 
-    // дисперсионное соотношение (deep water)
+    // РґРёСЃРїРµСЂСЃРёРѕРЅРЅРѕРµ СЃРѕРѕС‚РЅРѕС€РµРЅРёРµ (deep water)
     float omega = sqrt(G * k_len);
 
-    // параметры JONSWAP
+    // РїР°СЂР°РјРµС‚СЂС‹ JONSWAP
     float alpha = 0.0081;
     float gamma = 3.3;
 
-    // sigma зависит от того, меньше или больше пика
+    // sigma Р·Р°РІРёСЃРёС‚ РѕС‚ С‚РѕРіРѕ, РјРµРЅСЊС€Рµ РёР»Рё Р±РѕР»СЊС€Рµ РїРёРєР°
     float sigma = (omega <= omega_p) ? 0.07 : 0.09;
 
-    // базовый PM-спектр
+    // Р±Р°Р·РѕРІС‹Р№ PM-СЃРїРµРєС‚СЂ
     float pm =
         alpha * G * G /
         pow(omega, 5.0) *
         exp(-1.25 * pow(omega_p / omega, 4.0));
 
-    // усиление пика
+    // СѓСЃРёР»РµРЅРёРµ РїРёРєР°
     float exponent =
         exp(-pow(omega - omega_p, 2.0) /
             (2.0 * sigma * sigma * omega_p * omega_p));

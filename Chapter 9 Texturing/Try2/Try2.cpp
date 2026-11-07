@@ -18,6 +18,7 @@
 #include <fstream>
 #include <shellapi.h>
 #include "../../tests/TerrainValidation.h"
+#include "../../tests/EditorValidation.h"
 #pragma comment(lib, "Shell32.lib")
 
 #include <string>
@@ -77,9 +78,40 @@ public:
     void SetPlayWindow(const std::wstring& title) { mPlayTitle = title; mFreeCamera = true; }
     // End-to-end project check: "create" (new scene + PNG texture + save + reload + Play
     // window + Stop) or "reopen" (startup scene from the project file + Play + close window).
+    void SetEditorSmoke(bool preview = false)
+    {
+        mEditorValidation = std::make_unique<EditorValidation>();
+        mEditorValidation->preview = preview;
+    }
     void SetProjectSmoke(const std::string& mode) { mProjectSmoke = mode; }
 
 private:
+    std::unique_ptr<EditorValidation> mEditorValidation;
+    void AfterEditorUI() override
+    {
+        if (!mEditorValidation)
+        {
+            return;
+        }
+        try
+        {
+            mTimer.Start();
+            mEditorValidation->Tick(*mEngine, *static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "EDITOR_SMOKE_FAIL: " << error.what() << std::endl;
+            mEditorValidation.reset();
+            PostQuitMessage(2);
+        }
+    }
+    void AfterOverlay() override
+    {
+        if (mEditorValidation)
+        {
+            mEditorValidation->AfterOverlay(*static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
+        }
+    }
     std::wstring mPlayTitle;
     bool mPlayTitleShown = false;
     void UpdatePlayWindowTitle();
@@ -114,6 +146,11 @@ TestApp::TestApp(HINSTANCE hInstance, bool scriptSmoke, const std::string& gameS
     mStandalone = !gameScene.empty() && !terrainSmoke;
     if(terrainSmoke)mTerrainValidation=std::make_unique<TerrainValidation>();
     mMainWndCaption = title;
+    if (!mStandalone && !mTerrainValidation)
+    {
+        mClientWidth = 1440;
+        mClientHeight = 900;
+    }
     ImGuiBridge::SetRuntimeMode(mStandalone);
 }
 
@@ -478,6 +515,8 @@ namespace
     {
         std::wstring project, newProject, projectName, scene, game;
         bool play = false, noHotReload = false, gameSmoke = false, luaSmoke = false, terrainSmoke = false, showEditor = false;
+        bool editorSmoke = false;
+        bool editorPreview = false;
         std::string projectSmoke;
     };
 
@@ -501,6 +540,8 @@ namespace
             else if (a == L"--show-editor") o.showEditor = true;
             else if (a == L"--game" || a == L"--game-smoke") { o.gameSmoke = a == L"--game-smoke"; o.game = value(i); }
             else if (a == L"--lua-smoke") o.luaSmoke = true;
+            else if (a == L"--editor-preview") o.editorPreview = true;
+            else if (a == L"--editor-smoke") o.editorSmoke = true;
             else if (a == L"--terrain-smoke") o.terrainSmoke = true;
             else if (a == L"--project-smoke") o.projectSmoke = AssetPaths::ToUtf8(value(i));
             else throw std::runtime_error("Unknown option " + AssetPaths::ToUtf8(a) +
@@ -525,7 +566,7 @@ int main(int argc, char** argv)
         std::vector<std::wstring> args(arguments, arguments + argumentCount);
         LocalFree(arguments);
         const Options options = ParseOptions(args);
-        quietErrors = options.terrainSmoke || !options.projectSmoke.empty();
+        quietErrors = options.editorPreview || options.editorSmoke || options.terrainSmoke || !options.projectSmoke.empty();
 
         // Every run works inside one project; without --project it is the engine's sample project.
         ProjectInfo project;
@@ -565,6 +606,7 @@ int main(int argc, char** argv)
 
         HINSTANCE hInstance = GetModuleHandle(nullptr);
         TestApp theApp(hInstance, options.luaSmoke, gameScene, title, options.gameSmoke, options.terrainSmoke);
+        if (options.editorSmoke || options.editorPreview) theApp.SetEditorSmoke(options.editorPreview);
         if (options.play) theApp.SetPlayWindow(playTitle);
         if (!options.projectSmoke.empty()) theApp.SetProjectSmoke(options.projectSmoke);
         if (!theApp.Initialize())
@@ -572,7 +614,7 @@ int main(int argc, char** argv)
         if (options.noHotReload) theApp.GetEngine()->GetScripts().SetHotReload(false);
 
         ImGuiBridge::SetEngine(theApp.GetEngine());
-        if (options.luaSmoke || options.terrainSmoke || !options.projectSmoke.empty() || (options.showEditor && !options.play && options.game.empty()))
+        if (!ImGuiBridge::IsVisible() && (options.luaSmoke || options.terrainSmoke || !options.projectSmoke.empty() || (options.showEditor && !options.play && options.game.empty())))
         {
             // Exercise the real editor initialization/toggle path too.
             InputState toggle{};

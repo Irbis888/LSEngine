@@ -98,6 +98,7 @@ void TerrainSystem::Draw(entt::registry& reg)
             s.stats.triangles+=s.active->grids[s.lod[i]].indices.size()/3;
         }
         s.stats.selectMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+        mAdapter.SetRenderEntity(e);
         mAdapter.DrawTerrain(*s.active,t,c,s.visible);
     }
 }

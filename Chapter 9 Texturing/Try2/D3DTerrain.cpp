@@ -6,9 +6,10 @@
 void D3DRenderAdapter::BuildTerrainPipeline()
 {
     CD3DX12_DESCRIPTOR_RANGE range;range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,10,0);
-    CD3DX12_ROOT_PARAMETER params[3];params[0].InitAsDescriptorTable(1,&range);
+    CD3DX12_ROOT_PARAMETER params[4];params[0].InitAsDescriptorTable(1,&range);
     params[1].InitAsConstantBufferView(1);params[2].InitAsConstants(48,0);
-    auto samplers=GetStaticSamplers();CD3DX12_ROOT_SIGNATURE_DESC desc(3,params,UINT(samplers.size()),samplers.data(),D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    params[3].InitAsConstants(1, 3, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+    auto samplers=GetStaticSamplers();CD3DX12_ROOT_SIGNATURE_DESC desc(4,params,UINT(samplers.size()),samplers.data(),D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
     ComPtr<ID3DBlob> blob,error;
     const HRESULT hr=D3D12SerializeRootSignature(&desc,D3D_ROOT_SIGNATURE_VERSION_1,&blob,&error);
     if(error)OutputDebugStringA(static_cast<const char*>(error->GetBufferPointer()));ThrowIfFailed(hr);
@@ -27,10 +28,26 @@ void D3DRenderAdapter::BuildTerrainPipeline()
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p,IID_PPV_ARGS(&mPSOs["terrain"])));
     p.RasterizerState.FillMode=D3D12_FILL_MODE_WIREFRAME;
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p,IID_PPV_ARGS(&mPSOs["terrainWire"])));
+    const D3D_SHADER_MACRO editorDefines[] = {{"EDITOR_VIEWPORT", "1"}, {nullptr, nullptr}};
+    auto editorPixelShader = d3dUtils::CompileShader(L"Shaders/Terrain.hlsl", editorDefines, "PSTerrain", "ps_5_1");
+    p.PS = {editorPixelShader->GetBufferPointer(), editorPixelShader->GetBufferSize()};
+    p.NumRenderTargets = 2;
+    p.RTVFormats[1] = DXGI_FORMAT_R32_UINT;
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p, IID_PPV_ARGS(&mPSOs["terrainWireEditor"])));
+    p.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p, IID_PPV_ARGS(&mPSOs["terrainEditor"])));
+    p.NumRenderTargets = 1;
+    p.RTVFormats[1] = DXGI_FORMAT_UNKNOWN;
     p.InputLayout={};p.VS={bvs->GetBufferPointer(),bvs->GetBufferSize()};p.PS={bps->GetBufferPointer(),bps->GetBufferSize()};
     p.PrimitiveTopologyType=D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;p.RasterizerState.FillMode=D3D12_FILL_MODE_SOLID;
     p.DepthStencilState.DepthWriteMask=D3D12_DEPTH_WRITE_MASK_ZERO;p.DepthStencilState.DepthFunc=D3D12_COMPARISON_FUNC_LESS_EQUAL;
     ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p,IID_PPV_ARGS(&mPSOs["terrainBounds"])));
+    p.NumRenderTargets = 2;
+    p.RTVFormats[1] = DXGI_FORMAT_R32_UINT;
+    p.BlendState.IndependentBlendEnable = TRUE;
+    p.BlendState.RenderTarget[1].RenderTargetWriteMask = 0;
+    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&p, IID_PPV_ARGS(&mPSOs["terrainBoundsEditor"])));
+
 }
 void D3DRenderAdapter::CollectTerrainResources()
 {
@@ -137,6 +154,7 @@ void D3DRenderAdapter::DrawTerrain(const TerrainResource& r,const TransformCompo
     mCommandList->SetGraphicsRootSignature(mRootSignatures["terrain"].Get());
     mCommandList->SetGraphicsRootDescriptorTable(0,GetGPUDescriptorHandle(g.descriptors));
     mCommandList->SetGraphicsRootConstantBufferView(1,mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+    mCommandList->SetGraphicsRoot32BitConstant(3, mRenderEntityID, 0);
     struct Constants {glm::vec4 origin,scale,map,chunk,color[4],tiles,debug,lo,hi;} data;
     static_assert(sizeof(Constants)==48*4);
     data.origin={t.position,0};data.scale={s.sizeX/(s.samplesX-1)*t.scale.x,t.scale.y,s.sizeZ/(s.samplesZ-1)*t.scale.z,0};
@@ -153,14 +171,14 @@ void D3DRenderAdapter::DrawTerrain(const TerrainResource& r,const TransformCompo
         const auto& c=r.chunks[draw.chunk];data.map={float(s.samplesX),float(s.samplesZ),float(c.x),float(c.z)};
         data.chunk={float(c.cellsX),float(c.cellsZ),c.skirt,float(s.layerCount)};data.debug={options.showLod?1.f:0.f,float(draw.lod),float(normalFlags),0};
         data.lo={t.position+c.min*t.scale,0};data.hi={t.position+c.max*t.scale,0};
-        mCommandList->SetPipelineState(mPSOs[options.wireframe?"terrainWire":"terrain"].Get());
+        mCommandList->SetPipelineState(mPSOs[mEditorScene ? (options.wireframe ? "terrainWireEditor" : "terrainEditor") : (options.wireframe ? "terrainWire" : "terrain")].Get());
         mCommandList->SetGraphicsRoot32BitConstants(2,48,&data,0);
         D3D12_VERTEX_BUFFER_VIEW vb{g.vertices[draw.lod]->GetGPUVirtualAddress(),g.vertexBytes[draw.lod],sizeof(glm::vec3)};
         D3D12_INDEX_BUFFER_VIEW ib{g.indices[draw.lod]->GetGPUVirtualAddress(),g.indexCounts[draw.lod]*UINT(sizeof(uint32_t)),DXGI_FORMAT_R32_UINT};
         mCommandList->IASetVertexBuffers(0,1,&vb);mCommandList->IASetIndexBuffer(&ib);mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         mCommandList->DrawIndexedInstanced(g.indexCounts[draw.lod],1,0,0,0);
-        if(options.showBounds){mCommandList->SetPipelineState(mPSOs["terrainBounds"].Get());mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);mCommandList->DrawInstanced(24,1,0,0);}
+        if(options.showBounds){mCommandList->SetPipelineState(mPSOs[mEditorScene ? "terrainBoundsEditor" : "terrainBounds"].Get());mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);mCommandList->DrawInstanced(24,1,0,0);}
     }
-    mCommandList->SetPipelineState(mPSOs["opaque"].Get());mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
     mCommandList->SetGraphicsRootConstantBufferView(3,mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
 }

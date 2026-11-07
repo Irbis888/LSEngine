@@ -9,6 +9,7 @@ class Engine;
 
 namespace ImGuiBridge
 {
+    void EnableDpiAwareness();
     void SetRuntimeMode(bool game);
     void SetAppInstance(HINSTANCE inst);
     void SetEngine(Engine* engine);
@@ -27,4 +28,5 @@ namespace ImGuiBridge
     bool IsLicensed();
     bool IsVisible();
     bool WantsCaptureInput();
+    bool IsCameraRotationAllowed();
 }

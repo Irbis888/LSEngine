@@ -56,13 +56,13 @@ static void CollectEntities(entt::registry& reg, std::vector<entt::entity>& out)
 
 static void DrawHierarchyPanel(EditorContext& ctx)
 {
-    if (!ImGui::Begin("Scene Hierarchy", &ctx.showHierarchy))
+    if (!ImGui::Begin("Scene Hierarchy###SceneHierarchy", &ctx.showHierarchy))
     {
         ImGui::End();
         return;
     }
 
-    ImGui::TextDisabled("Click a row to select. Parent/child tree: [PLACEHOLDER]");
+    ImGui::TextDisabled("Click a row to select.");
 
     if (!ctx.registry)
     {
@@ -98,8 +98,12 @@ static void DrawHierarchyPanel(EditorContext& ctx)
         const bool selected = ctx.selected == entity;
         const std::string label = EntityLabel(*ctx.registry, entity);
 
+        ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
         if (ImGui::Selectable(label.c_str(), selected))
-            ctx.selected = entity;
+        {
+            Editor_SelectEntity(ctx, entity);
+        }
+        ImGui::PopID();
     }
 
     ImGui::End();

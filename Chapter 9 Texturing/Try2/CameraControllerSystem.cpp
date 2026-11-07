@@ -17,7 +17,7 @@ void CameraControllerSystem::Update(entt::registry& reg, const FrameContext& con
 	reg.view<TransformComponent, CameraComponent>().each(
 		[&](TransformComponent& transform, CameraComponent&)
 		{
-			if (input.mouseButtons[0])
+			if (input.mouseButtons[0] && ImGuiBridge::IsCameraRotationAllowed())
 			{
 				transform.rotation.y += input.mouseDeltaX * mMouseSensitivity;
 				transform.rotation.x += input.mouseDeltaY * mMouseSensitivity;
