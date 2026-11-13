@@ -66,12 +66,14 @@ void RunSceneSwitchStreamingTests(const std::filesystem::path& repo, const std::
         GameTimer timer; timer.Reset();
         InputState input{};
         FrameContext context{ timer, input, 0.0f };
-        Engine engine(&renderer);
-        const auto previousDirectory = fs::current_path();
-        fs::current_path(startup);
-        try { engine.Init(timer); }
-        catch (...) { fs::current_path(previousDirectory); throw; }
-        fs::current_path(previousDirectory);
+        std::ofstream(startup / "StreamingTest.lsproject") << json{
+            {"formatVersion", 1},
+            {"name", "Streaming test"},
+            {"startupScene", "Scenes/DemoScene.json"},
+            {"textureSearchPaths", {(repo / "Textures").generic_string()}}
+        }.dump();
+        Engine engine(&renderer, startup);
+        engine.Init(timer, "Scenes/DemoScene.json");
         // Optional benchmark sweep; production defaults are exercised when unset.
         if (const char* value = std::getenv("LSE_TEST_UPLOAD_MS"))
         {
@@ -123,7 +125,7 @@ void RunSceneSwitchStreamingTests(const std::filesystem::path& repo, const std::
             engine.Draw(context);
             const auto stats = engine.GetResources().GetTextureProgress();
             sawPartialTextures |= stats.total > 1 && stats.ready > 1 && stats.ready < stats.total;
-            const int checker = renderer.mTextures.at(std::to_string(engine.GetResources().GetPlaceholderTexture()))->SrvHeapIndex;
+            const int checker = renderer.mTextures.at(std::to_string(engine.GetResources().GetPlaceholderTexture()))->alternateSrvIndex;
             for (auto entity : engine.GetRegistry().view<MeshComponent>())
             {
                 const MeshID id = engine.GetRegistry().get<MeshComponent>(entity).meshID;

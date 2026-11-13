@@ -78,10 +78,16 @@ public:
     void SetPlayWindow(const std::wstring& title) { mPlayTitle = title; mFreeCamera = true; }
     // End-to-end project check: "create" (new scene + PNG texture + save + reload + Play
     // window + Stop) or "reopen" (startup scene from the project file + Play + close window).
-    void SetEditorSmoke(bool preview = false)
+    void SetEditorStartupScene(const std::string& path)
+    {
+        mGameScene = path;
+    }
+
+    void SetEditorSmoke(bool preview, bool materialTest)
     {
         mEditorValidation = std::make_unique<EditorValidation>();
         mEditorValidation->preview = preview;
+        mEditorValidation->materialTest = materialTest;
     }
     void SetProjectSmoke(const std::string& mode) { mProjectSmoke = mode; }
 
@@ -517,6 +523,7 @@ namespace
         bool play = false, noHotReload = false, gameSmoke = false, luaSmoke = false, terrainSmoke = false, showEditor = false;
         bool editorSmoke = false;
         bool editorPreview = false;
+        bool materialSmoke = false;
         std::string projectSmoke;
     };
 
@@ -540,6 +547,7 @@ namespace
             else if (a == L"--show-editor") o.showEditor = true;
             else if (a == L"--game" || a == L"--game-smoke") { o.gameSmoke = a == L"--game-smoke"; o.game = value(i); }
             else if (a == L"--lua-smoke") o.luaSmoke = true;
+            else if (a == L"--material-smoke") o.materialSmoke = true;
             else if (a == L"--editor-preview") o.editorPreview = true;
             else if (a == L"--editor-smoke") o.editorSmoke = true;
             else if (a == L"--terrain-smoke") o.terrainSmoke = true;
@@ -566,7 +574,7 @@ int main(int argc, char** argv)
         std::vector<std::wstring> args(arguments, arguments + argumentCount);
         LocalFree(arguments);
         const Options options = ParseOptions(args);
-        quietErrors = options.editorPreview || options.editorSmoke || options.terrainSmoke || !options.projectSmoke.empty();
+        quietErrors = options.materialSmoke || options.editorPreview || options.editorSmoke || options.terrainSmoke || !options.projectSmoke.empty();
 
         // Every run works inside one project; without --project it is the engine's sample project.
         ProjectInfo project;
@@ -597,7 +605,9 @@ int main(int argc, char** argv)
         std::wstring playTitle;
         if (options.play)
         {
-            gameScene = options.scene.empty() ? project.startupScene : AssetPaths::ToUtf8(std::filesystem::path(options.scene));
+            gameScene = options.scene.empty()
+                ? (options.materialSmoke ? "Scenes/MaterialsDemo.json" : project.startupScene)
+                : AssetPaths::ToUtf8(std::filesystem::path(options.scene));
             if (gameScene.empty()) throw std::runtime_error("The project has no startupScene; pass --scene <scene.json>");
             playTitle = AssetPaths::FromUtf8(project.name).wstring() + L" | Play: " +
                 AssetPaths::FromUtf8(gameScene).stem().wstring();
@@ -606,7 +616,14 @@ int main(int argc, char** argv)
 
         HINSTANCE hInstance = GetModuleHandle(nullptr);
         TestApp theApp(hInstance, options.luaSmoke, gameScene, title, options.gameSmoke, options.terrainSmoke);
-        if (options.editorSmoke || options.editorPreview) theApp.SetEditorSmoke(options.editorPreview);
+        if (options.editorSmoke || options.editorPreview || options.materialSmoke)
+        {
+            theApp.SetEditorSmoke(options.editorPreview, options.materialSmoke);
+        }
+        if (!options.play && options.game.empty() && (!options.scene.empty() || options.materialSmoke))
+        {
+            theApp.SetEditorStartupScene(options.scene.empty() ? "Scenes/MaterialsDemo.json" : AssetPaths::ToUtf8(options.scene));
+        }
         if (options.play) theApp.SetPlayWindow(playTitle);
         if (!options.projectSmoke.empty()) theApp.SetProjectSmoke(options.projectSmoke);
         if (!theApp.Initialize())

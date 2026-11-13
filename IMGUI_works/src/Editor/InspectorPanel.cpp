@@ -186,7 +186,7 @@ static void DrawSpotLightEditor(SpotLightComponent& light)
     ImGui::Checkbox("Enabled", &light.enabled);
     ImGui::ColorEdit3("Color", &light.color.x);
     ImGui::DragFloat("Intensity", &light.intensity, 0.05f, 0.0f, 100.0f);
-    ImGui::DragFloat3("Direction", &light.direction.x, 0.05f);
+    ImGui::TextDisabled("Direction follows Transform Rotation (local +Z).");
     ImGui::DragFloat("Falloff Start", &light.falloffStart, 0.1f, 0.0f, 1000.0f);
     ImGui::DragFloat("Falloff End", &light.falloffEnd, 0.1f, 0.0f, 1000.0f);
     ImGui::DragFloat("Spot Power", &light.spotPower, 1.0f, 1.0f, 128.0f);

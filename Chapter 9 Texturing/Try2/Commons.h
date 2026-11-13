@@ -16,6 +16,7 @@
 #include <windows.h>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <tracy/Tracy.hpp>
 
 #include "PhysicsCommons.h"
@@ -67,6 +68,15 @@ struct TransformComponent
 	glm::vec3 rotation;
 	glm::vec3 scale;
 };
+inline glm::vec3 LightDirectionFromRotation(const glm::vec3& rotationAngles)
+{
+    glm::mat4 rotation(1.0f);
+    rotation = glm::rotate(rotation, rotationAngles.z, glm::vec3(0, 0, 1));
+    rotation = glm::rotate(rotation, rotationAngles.y, glm::vec3(0, 1, 0));
+    rotation = glm::rotate(rotation, rotationAngles.x, glm::vec3(1, 0, 0));
+    return glm::normalize(glm::vec3(rotation * glm::vec4(0, 0, 1, 0)));
+}
+
 struct TagComponent
 {
 	std::string tag;
@@ -107,7 +117,6 @@ struct SpotLightComponent
 {
     glm::vec3 color = glm::vec3(1.0f);
     float intensity = 1.0f;
-    glm::vec3 direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
     float falloffStart = 1.0f;
     float falloffEnd = 35.0f;
     float spotPower = 32.0f;

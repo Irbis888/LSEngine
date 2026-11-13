@@ -28,11 +28,7 @@ public:
                     return;
                 }
 
-                glm::mat4 rotation(1.0f);
-                rotation = glm::rotate(rotation, transform.rotation.z, glm::vec3(0, 0, 1));
-                rotation = glm::rotate(rotation, transform.rotation.y, glm::vec3(0, 1, 0));
-                rotation = glm::rotate(rotation, transform.rotation.x, glm::vec3(1, 0, 0));
-                const glm::vec3 direction = glm::normalize(glm::vec3(rotation * glm::vec4(0, 0, 1, 0)));
+                const glm::vec3 direction = LightDirectionFromRotation(transform.rotation);
                 lights.directionalLights.push_back(DirectionalLightData{
                     light.color * light.intensity,
                     direction });
@@ -60,7 +56,7 @@ public:
                 lights.spotLights.push_back(SpotLightData{
                     light.color * light.intensity,
                     transform.position,
-                    glm::normalize(light.direction),
+                    LightDirectionFromRotation(transform.rotation),
                     light.falloffStart,
                     light.falloffEnd,
                     light.spotPower });

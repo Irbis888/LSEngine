@@ -1,4 +1,5 @@
 #include "EditorContext.h"
+#include <D3DRenderAdapter.h>
 
 #include <imgui.h>
 #include <Commons.h>
@@ -56,6 +57,22 @@ static void DrawStatisticsPanel(EditorContext& ctx, const FrameContext& frame)
     ImGui::Text("FPS (1s avg): %.1f", g_FpsAverager.AverageFps());
     ImGui::Text("Frame time: %.3f ms", dt * 1000.0f);
     ImGui::Text("Total time: %.2f s", frame.timer.TotalTime());
+
+    if (ctx.engine)
+    {
+        const auto* renderer = dynamic_cast<const D3DRenderAdapter*>(&ctx.engine->GetRenderer());
+        if (renderer)
+        {
+            const auto stats = renderer->GetSurfaceCacheStats();
+            ImGui::Text("Material PSOs: %llu created, %llu hits, %llu misses",
+                static_cast<unsigned long long>(stats.created), static_cast<unsigned long long>(stats.hits),
+                static_cast<unsigned long long>(stats.misses));
+            if (!renderer->GetSurfaceDiagnostic().empty())
+            {
+                ImGui::TextWrapped("%s", renderer->GetSurfaceDiagnostic().c_str());
+            }
+        }
+    }
 
     if (ctx.registry)
     {

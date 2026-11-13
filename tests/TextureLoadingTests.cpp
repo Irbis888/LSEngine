@@ -83,7 +83,7 @@ static void VerifyUploads(ResourceManager& resources, const std::vector<TextureI
             auto& gpu = *renderer.mTextures.at(std::to_string(id));
             const auto desc = gpu.Resource->GetDesc();
             const auto& image = resources.GetTexture(id).imageData;
-            Check(desc.Format == image.format && desc.MipLevels == image.mipLevels, "GPU metadata differs");
+            Check(gpu.viewFormat == image.format && desc.MipLevels == image.mipLevels, "GPU metadata differs");
             const UINT count = static_cast<UINT>(image.subresources.size());
             Readback readback{ id };
             readback.footprints.resize(count); readback.rows.resize(count); readback.rowSizes.resize(count);
@@ -110,10 +110,10 @@ static void VerifyUploads(ResourceManager& resources, const std::vector<TextureI
         }
         Material textured;
         textured.name = "Texture test material";
-        textured.albedo = ids[0];
-        textured.normal = ids[1];
+        textured.parameters.albedo = ids[0];
+        textured.parameters.normal = ids[1];
         auto* material = renderer.GetOrLoadMaterial(resources.CreateMaterial(textured));
-        Check(material && material->DiffuseSrvHeapIndex == renderer.UploadTexture(ids[0]) &&
+        Check(material && material->DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(ids[0]))->alternateSrvIndex &&
             material->NormalSrvHeapIndex == renderer.UploadTexture(ids[1]), "Material did not use CPU textures");
         auto* fallback = renderer.GetOrLoadMaterial(resources.CreateSolidMaterial("Fallback", glm::vec3(1.0f)));
         Check(fallback && fallback->DiffuseSrvHeapIndex >= 0 && fallback->NormalSrvHeapIndex >= 0,

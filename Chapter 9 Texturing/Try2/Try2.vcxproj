@@ -341,4 +341,21 @@
   <ItemGroup>
     <None Include="$(IMGUI_WORKS)\Assets\Fonts\README.txt"></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="D3DSurfaceMaterials.cpp" />
+    <Text Include="Shaders\Surface.hlsli" />
+    <Text Include="Shaders\SurfaceOutput.hlsli" />
+    <Text Include="Shaders\Unlit.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MATERIALS.md"></None>
+    <None Include="Scenes\MaterialsDemo.json"></None>
+    <None Include="Scenes\MaterialsBaseline.json"></None>
+    <None Include="..\..\tests\RunMaterialTests.ps1"></None>
+    <None Include="Assets\MaterialDemo\Grille.obj"></None>
+    <None Include="Assets\MaterialDemo\Grille.png"></None>
+    <None Include="Assets\MaterialDemo\Normal.png"></None>
+    <None Include="Assets\MaterialDemo\ORM.png"></None>
+    <None Include="Assets\MaterialDemo\Emissive.png"></None>
+  </ItemGroup>
 </Project>

@@ -187,11 +187,12 @@ void DemoScene::Build(World& world, ResourceManager& resources)
         SpotLightComponent{
             glm::vec3(1.0f, 0.9f, 0.7f),
             2.0f,
-            glm::normalize(glm::vec3(0.0f, -0.9f, 0.35f)),
             2.0f,
             45.0f,
             24.0f,
             true });
+
+    world.registry.get<TransformComponent>(spot).rotation = glm::vec3(std::atan2(0.9f, 0.35f), 0, 0);
 
     factory.CreateCamera(
         "MainCamera",

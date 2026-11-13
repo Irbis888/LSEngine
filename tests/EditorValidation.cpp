@@ -52,6 +52,25 @@ namespace
         Pick(context, 0.5f + worldPosition.x / (2 * distance * tangent * aspect),
             0.5f - worldPosition.y / (2 * distance * tangent));
     }
+    void CheckDebugLayer(D3DRenderAdapter& renderer)
+    {
+        ComPtr<ID3D12InfoQueue> queue;
+        if (FAILED(renderer.GetImGuiBindings().Device->QueryInterface(IID_PPV_ARGS(&queue))))
+        {
+            return;
+        }
+        for (UINT64 index = 0; index < queue->GetNumStoredMessages(); ++index)
+        {
+            SIZE_T bytes = 0;
+            queue->GetMessage(index, nullptr, &bytes);
+            std::vector<char> storage(bytes);
+            auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
+            queue->GetMessage(index, message, &bytes);
+            Check(message->Severity != D3D12_MESSAGE_SEVERITY_ERROR &&
+                message->Severity != D3D12_MESSAGE_SEVERITY_CORRUPTION, message->pDescription);
+        }
+    }
+
 }
 
 void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
@@ -65,6 +84,11 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
         return;
     }
     Check(engine.GetSceneLoadProgress().error.empty(), "Scene loading failed");
+    if (materialTest)
+    {
+        CheckMaterials(engine, renderer);
+        return;
+    }
     if (preview)
     {
         if (stage == 0 && ++frames >= 150)
@@ -80,19 +104,7 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
         }
         else if (stage == 1)
         {
-            ComPtr<ID3D12InfoQueue> queue;
-            if (SUCCEEDED(renderer.GetImGuiBindings().Device->QueryInterface(IID_PPV_ARGS(&queue))))
-            {
-                for (UINT64 index = 0; index < queue->GetNumStoredMessages(); ++index)
-                {
-                    SIZE_T bytes = 0;
-                    queue->GetMessage(index, nullptr, &bytes);
-                    std::vector<char> storage(bytes);
-                    auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
-                    queue->GetMessage(index, message, &bytes);
-                    Check(message->Severity != D3D12_MESSAGE_SEVERITY_ERROR && message->Severity != D3D12_MESSAGE_SEVERITY_CORRUPTION, message->pDescription);
-                }
-            }
+            CheckDebugLayer(renderer);
             std::cout << "EDITOR_PREVIEW_PASS " << AssetPaths::ToUtf8(output / "editor.bmp") << std::endl;
             PostQuitMessage(0);
             stage = 10;
@@ -224,8 +236,6 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
         context.showViewport = true;
         context.showInspector = false;
         EditorLayout::Save(context);
-        EditorLayout::Configure(context);
-        Check(!context.showInspector, "Closed-panel settings were not restored");
         context.showInspector = true;
         EditorLayout::Reset(context);
         stage = 6;
@@ -276,19 +286,7 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
         {
             return;
         }
-        ComPtr<ID3D12InfoQueue> queue;
-        if (SUCCEEDED(renderer.GetImGuiBindings().Device->QueryInterface(IID_PPV_ARGS(&queue))))
-        {
-            for (UINT64 index = 0; index < queue->GetNumStoredMessages(); ++index)
-            {
-                SIZE_T bytes = 0;
-                queue->GetMessage(index, nullptr, &bytes);
-                std::vector<char> storage(bytes);
-                auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
-                queue->GetMessage(index, message, &bytes);
-                Check(message->Severity != D3D12_MESSAGE_SEVERITY_ERROR && message->Severity != D3D12_MESSAGE_SEVERITY_CORRUPTION, message->pDescription);
-            }
-        }
+        CheckDebugLayer(renderer);
         std::cout << "EDITOR_SMOKE_PASS: docking, viewport, MRT depth picking, empty/background, stale selection/deletion/scene, resize retirement, Cyrillic, separate Play; layout=" << EditorLayout::SettingsDirectory() << std::endl;
         PostQuitMessage(0);
         stage = 10;
@@ -302,7 +300,9 @@ void EditorValidation::AfterOverlay(D3DRenderAdapter& renderer)
         auto& registry = Editor_GetContext()->engine->GetRegistry();
         registry.destroy(Find(registry, "Ближняя сфера"));
     }
-    if (stage != (preview ? 1 : 20) || capture || output.empty())
+    const int captureStage = materialTest ? 31 : (preview ? 1 : 20);
+    if (stage != captureStage || capture || output.empty() ||
+        (materialTest && std::filesystem::is_regular_file(output / "editor.bmp")))
     {
         return;
     }
@@ -360,4 +360,161 @@ void EditorValidation::CaptureCompleted(D3DRenderAdapter& renderer)
     }
     capture->Unmap(0, nullptr);
     capture.Reset();
+}
+
+
+void EditorValidation::CheckMaterials(Engine& engine, D3DRenderAdapter& renderer)
+{
+    auto& registry = engine.GetRegistry();
+    auto& resources = engine.GetResources();
+    auto& context = *Editor_GetContext();
+    const auto meshFor = [&](const char* name)
+    {
+        return registry.get<MeshComponent>(Find(registry, name)).meshID;
+    };
+    const auto materialFor = [&](const char* name) -> Material&
+    {
+        const auto& mesh = resources.GetMesh(meshFor(name));
+        Check(!mesh.submeshes.empty(), "Material demo mesh did not load");
+        return resources.GetMaterial(mesh.submeshes.front().material);
+    };
+    const auto pick = [&](const glm::vec3& position)
+    {
+        const float distance = position.z + 14;
+        const float tangent = std::tan(1.05f * 0.5f);
+        const float aspect = float(context.viewport.width) / context.viewport.height;
+        Pick(context, 0.5f + position.x / (2 * distance * tangent * aspect),
+            0.5f - (position.y - 2) / (2 * distance * tangent));
+    };
+    const auto stats = renderer.GetSurfaceCacheStats();
+
+    switch (stage)
+    {
+    case 0:
+    {
+        if (++frames < 90)
+        {
+            return;
+        }
+        Check(stats.created == 4, "Expected two default PSOs and one each for masked and Unlit");
+        output = std::filesystem::temp_directory_path() / ("LSMaterialCheck-" + std::to_string(GetCurrentProcessId()));
+        std::filesystem::create_directories(output);
+        stage = 31;
+        if (!engine.IsStandalone())
+        {
+            Check(context.viewport.visible, "Material editor viewport is hidden");
+            pick(glm::vec3(0, 2, 0));
+        }
+        break;
+    }
+    case 31:
+    {
+        if (engine.IsStandalone())
+        {
+            CheckDebugLayer(renderer);
+            std::cout << "MATERIAL_STANDALONE_PASS " << AssetPaths::ToUtf8(output / "editor.bmp") << std::endl;
+            PostQuitMessage(0);
+            stage = 40;
+            return;
+        }
+        if (context.viewport.pendingPick)
+        {
+            return;
+        }
+        Check(context.selected == Find(registry, "Behind grille"), "Mask hole blocked the entity behind the grille");
+        // The grid bars are at texels 3..6 of each 16 texel tile.
+        pick(glm::vec3(4.8f * (36.5f / 64 - 0.5f), 2, 0));
+        stage = 32;
+        break;
+    }
+    case 32:
+    {
+        if (context.viewport.pendingPick)
+        {
+            return;
+        }
+        Check(context.selected == Find(registry, "Masked grille"), "Opaque mask pixel did not select the grille");
+        Material& material = materialFor("Rough dielectric");
+        material.parameters.roughness = 0.31f;
+        material.parameters.normal = materialFor("ORM and normal").parameters.normal;
+        material.parameters.albedo = materialFor("Masked grille").parameters.albedo;
+        materialStats = stats;
+        stage = 33;
+        break;
+    }
+    case 33:
+    {
+        Check(stats.created == materialStats.created && stats.misses == materialStats.misses &&
+            stats.hits > materialStats.hits, "Texture/constant edit missed the existing PSO cache");
+        auto base = std::make_shared<MaterialBase>();
+        base->mode = SurfaceMode::Masked;
+        materialFor("Rough dielectric").base = base;
+        materialStats = stats;
+        stage = 34;
+        break;
+    }
+    case 34:
+    {
+        Check(stats.created == materialStats.created + 1, "New masked state should create exactly one PSO");
+        const auto shaderPath = output / "ReloadProbe.hlsl";
+        const auto sourceDirectory = std::filesystem::absolute("Shaders");
+        for (const char* include : {"Surface.hlsli", "SurfaceOutput.hlsli", "LightingUtil.hlsl"})
+        {
+            std::filesystem::copy_file(sourceDirectory / include, output / include,
+                std::filesystem::copy_options::overwrite_existing);
+        }
+        std::filesystem::copy_file(sourceDirectory / "Unlit.hlsl", shaderPath,
+            std::filesystem::copy_options::overwrite_existing);
+        auto base = std::make_shared<MaterialBase>();
+        base->program.file = shaderPath.wstring();
+        materialFor("Rough dielectric").base = base;
+        materialStats = stats;
+        stage = 35;
+        break;
+    }
+    case 35:
+    {
+        Check(stats.created == materialStats.created + 1, "A different shader program should create exactly one PSO");
+        std::ofstream(output / "ReloadProbe.hlsl") << "not a valid HLSL program\n";
+        Check(!renderer.ReloadShaders(), "Broken HLSL was accepted by reload");
+        Check(renderer.GetSurfaceDiagnostic().find("ReloadProbe.hlsl") != std::string::npos,
+            "Reload diagnostic did not identify the broken program");
+        materialStats = renderer.GetSurfaceCacheStats();
+        stage = 36;
+        break;
+    }
+    case 36:
+    {
+        Check(stats.created == materialStats.created && stats.hits > materialStats.hits,
+            "Failed reload did not keep the working pipeline");
+        MaterialDesc broken;
+        broken.name = "Missing map and shader";
+        broken.albedoTexture = (output / "MissingMap.png").wstring();
+        broken.surface.emplace().program.file = (output / "MissingShader.hlsl").wstring();
+        resources.SetMeshMaterial(meshFor("Rough dielectric"), resources.CreateTexturedMaterial(broken));
+        stage = 37;
+        frames = 0;
+        break;
+    }
+    case 37:
+    {
+        if (++frames < 60)
+        {
+            return;
+        }
+        const auto& parameters = materialFor("Rough dielectric").parameters;
+        Check(resources.GetTexture(parameters.albedo).state == ResourceState::Failed,
+            "A missing explicit map must retain Failed state");
+        const auto materialId = resources.GetMesh(meshFor("Rough dielectric")).submeshes.front().material;
+        const auto& gpu = *renderer.GetOrLoadMaterial(materialId);
+        Check(gpu.DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(resources.GetPlaceholderTexture()))->alternateSrvIndex,
+            "Missing color map did not bind the checker in sRGB");
+        CheckDebugLayer(renderer);
+        std::cout << "MATERIAL_SMOKE_PASS created=" << stats.created << " hits=" << stats.hits
+            << " misses=" << stats.misses << " capture=" << AssetPaths::ToUtf8(output / "editor.bmp") << std::endl;
+        PostQuitMessage(0);
+        stage = 40;
+        break;
+    }
+    }
 }

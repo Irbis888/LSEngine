@@ -6,6 +6,7 @@
 #include <cmath>
 #include <assert.h>
 #include "ResourceManager.h"
+#include <algorithm>
 
 //#define DEBUG
 
@@ -15,6 +16,43 @@ static const int SwapChainBufferCount = 2;
 
 namespace
 {
+    struct TextureViews
+    {
+        DXGI_FORMAT resource;
+        DXGI_FORMAT linear;
+        DXGI_FORMAT srgb;
+    };
+
+    TextureViews GetTextureViews(DXGI_FORMAT format)
+    {
+        switch (format)
+        {
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+            return {DXGI_FORMAT_R8G8B8A8_TYPELESS, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
+        case DXGI_FORMAT_B8G8R8A8_UNORM:
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+            return {DXGI_FORMAT_B8G8R8A8_TYPELESS, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM_SRGB};
+        case DXGI_FORMAT_B8G8R8X8_UNORM:
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+            return {DXGI_FORMAT_B8G8R8X8_TYPELESS, DXGI_FORMAT_B8G8R8X8_UNORM, DXGI_FORMAT_B8G8R8X8_UNORM_SRGB};
+        case DXGI_FORMAT_BC1_UNORM:
+        case DXGI_FORMAT_BC1_UNORM_SRGB:
+            return {DXGI_FORMAT_BC1_TYPELESS, DXGI_FORMAT_BC1_UNORM, DXGI_FORMAT_BC1_UNORM_SRGB};
+        case DXGI_FORMAT_BC2_UNORM:
+        case DXGI_FORMAT_BC2_UNORM_SRGB:
+            return {DXGI_FORMAT_BC2_TYPELESS, DXGI_FORMAT_BC2_UNORM, DXGI_FORMAT_BC2_UNORM_SRGB};
+        case DXGI_FORMAT_BC3_UNORM:
+        case DXGI_FORMAT_BC3_UNORM_SRGB:
+            return {DXGI_FORMAT_BC3_TYPELESS, DXGI_FORMAT_BC3_UNORM, DXGI_FORMAT_BC3_UNORM_SRGB};
+        case DXGI_FORMAT_BC7_UNORM:
+        case DXGI_FORMAT_BC7_UNORM_SRGB:
+            return {DXGI_FORMAT_BC7_TYPELESS, DXGI_FORMAT_BC7_UNORM, DXGI_FORMAT_BC7_UNORM_SRGB};
+        default:
+            return {format, format, DXGI_FORMAT_UNKNOWN};
+        }
+    }
+
     void SyncSubmeshMaterials(MeshGPU& gpuMesh, const Mesh& cpuMesh)
     {
         if (gpuMesh.materialVersion == cpuMesh.materialVersion &&
@@ -172,8 +210,15 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     CreateSwapChain();
     CreateRtvAndDsvDescriptorHeaps();
     BuildRootSignatures();
-    BuildShadersAndInputLayout();
-    BuildPSOs();
+    BuildSurfaceInputLayout();
+    const MaterialBase defaultSurface;
+    for (const bool editor : {false, true})
+    {
+        const auto key = MakeSurfaceKey(defaultSurface, editor);
+        mSurfacePipelines.emplace(key, BuildSurfacePipeline(key));
+        ++mSurfaceCacheStats.created;
+    }
+    BuildTerrainPipeline();
 
     // Create frame resources (one per frame in flight)
     for (int i = 0; i < NumFrameResources; ++i)
@@ -380,10 +425,10 @@ void D3DRenderAdapter::BeginFrame()
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
 
-    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
-    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
-
-    mCommandList->SetGraphicsRootConstantBufferView(3, mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+    while (!mRetiredSurfacePipelines.empty() && mRetiredSurfacePipelines.front().fence <= mFence->GetCompletedValue())
+    {
+        mRetiredSurfacePipelines.pop_front();
+    }
 
 }
 
@@ -449,59 +494,53 @@ void D3DRenderAdapter::EndFrame()
 
 bool D3DRenderAdapter::ReloadShaders()
 {
-    auto previousShaders = mShaders;
-    auto previousPSOs = mPSOs;
-    auto previousInputLayout = mInputLayout;
+    auto previousShaders = std::move(mSurfaceShaders);
+    auto previousTerrainPipelines = mPSOs;
+    auto previousRoots = mRootSignatures;
+    decltype(mSurfacePipelines) replacements;
 
     try
     {
-        BuildShadersAndInputLayout();
-        BuildPSOs();
-
-        if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
+        for (const auto& [key, pipeline] : mSurfacePipelines)
         {
-            mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
-            mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
+            replacements.emplace(key, BuildSurfacePipeline(key));
+            ++mSurfaceCacheStats.created;
         }
+        BuildTerrainPipeline();
 
-        OutputDebugStringA("Shaders reloaded successfully.\n");
+        RetiredSurfacePipelines retired;
+        retired.fence = mCurrentFence + 1;
+        for (const auto& [key, pipeline] : mSurfacePipelines)
+        {
+            retired.pipelines.push_back(pipeline);
+        }
+        for (const auto& [name, pipeline] : previousTerrainPipelines)
+        {
+            retired.pipelines.push_back(pipeline);
+        }
+        for (const auto& [name, signature] : previousRoots)
+        {
+            retired.rootSignatures.push_back(signature);
+        }
+        mRetiredSurfacePipelines.push_back(std::move(retired));
+        mSurfacePipelines.swap(replacements);
+        mSurfaceFailures.clear();
+        mSurfaceDiagnostic.clear();
         return true;
     }
-    catch (const DxException& e)
+    catch (const std::exception& error)
     {
-        mShaders = previousShaders;
-        mPSOs = previousPSOs;
-        mInputLayout = previousInputLayout;
-
-        OutputDebugStringA("Shader reload failed. Keeping previous shaders.\n");
-        OutputDebugStringW(e.ToString().c_str());
-        OutputDebugStringW(L"\n");
+        mSurfaceDiagnostic = error.what();
     }
-    catch (const std::exception& e)
+    catch (const DxException& error)
     {
-        mShaders = previousShaders;
-        mPSOs = previousPSOs;
-        mInputLayout = previousInputLayout;
-
-        OutputDebugStringA("Shader reload failed. Keeping previous shaders: ");
-        OutputDebugStringA(e.what());
-        OutputDebugStringA("\n");
-    }
-    catch (...)
-    {
-        mShaders = previousShaders;
-        mPSOs = previousPSOs;
-        mInputLayout = previousInputLayout;
-
-        OutputDebugStringA("Shader reload failed with unknown error. Keeping previous shaders.\n");
+        mSurfaceDiagnostic = "D3D12 rejected a shader or pipeline (HRESULT " + std::to_string(error.ErrorCode) + ")";
     }
 
-    if (mCommandList && mPSOs["opaque"] && mRootSignatures["standard"])
-    {
-        mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
-        mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
-    }
-
+    mSurfaceShaders = std::move(previousShaders);
+    mPSOs = std::move(previousTerrainPipelines);
+    mRootSignatures = std::move(previousRoots);
+    std::cerr << "Shader reload rejected, keeping previous pipelines: " << mSurfaceDiagnostic << '\n';
     return false;
 }
 
@@ -744,7 +783,6 @@ void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
     DirectX::XMStoreFloat4x4(&objConstants.TexTransform, DirectX::XMMatrixTranspose(texTransformXM));
 
     mCurrFrameResource->ObjectCB->CopyData(mCurrentObjectCBIndex, objConstants);
-    mCurrentTransform = world;
 }
 
 void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformComponent& transform)
@@ -900,29 +938,93 @@ void D3DRenderAdapter::SetLights(const SceneLightData& lights)
     }
 }
 
-void D3DRenderAdapter::SetMaterial(MaterialID material) {
-    if (!mCurrFrameResource) return;
+void D3DRenderAdapter::SetMaterial(MaterialID materialId)
+{
+    if (!mCurrFrameResource || !mResourceManager)
+    {
+        return;
+    }
 
-    MaterialGPU* matGPU = GetOrLoadMaterial(material);
-    if (!matGPU) return;
+    const Material& material = mResourceManager->GetMaterial(materialId);
+    static const MaterialBase defaultBase;
+    const MaterialBase& base = material.base ? *material.base : defaultBase;
+    ID3D12PipelineState* pipeline = nullptr;
+    if ((!mEditorScene || base.program.editorVariant) &&
+        (base.mode != SurfaceMode::Masked || base.program.maskedVariant) &&
+        base.mode != SurfaceMode::Translucent)
+    {
+        pipeline = FindSurfacePipeline(MakeSurfaceKey(base, mEditorScene));
+    }
+    else
+    {
+        const auto key = MakeSurfaceKey(base, mEditorScene);
+        const auto [failure, added] = mSurfaceFailures.try_emplace(key, "Unsupported surface mode or shader variant");
+        if (added)
+        {
+            mSurfaceDiagnostic = failure->second;
+            std::cerr << material.name << ": " << mSurfaceDiagnostic << '\n';
+        }
+    }
+    if (!pipeline)
+    {
+        MaterialBase fallback = defaultBase;
+        fallback.mode = base.mode == SurfaceMode::Masked ? SurfaceMode::Masked : SurfaceMode::Opaque;
+        fallback.twoSided = base.twoSided;
+        pipeline = FindSurfacePipeline(MakeSurfaceKey(fallback, mEditorScene));
+        if (!pipeline)
+        {
+            pipeline = mSurfacePipelines.at(MakeSurfaceKey(defaultBase, mEditorScene)).Get();
+        }
+    }
 
-    MaterialConstants matConstants;
-    matConstants.DiffuseAlbedo = matGPU->DiffuseAlbedo;
-    matConstants.FresnelR0 = matGPU->FresnelR0;
-    matConstants.Roughness = matGPU->Roughness;
-    matConstants.MatTransform = matGPU->MatTransform;
+    const MaterialGPU& gpu = *GetOrLoadMaterial(materialId);
+    const auto& parameters = material.parameters;
+    const auto finiteOr = [](float value, float fallback)
+    {
+        return std::isfinite(value) ? value : fallback;
+    };
+    const auto unit = [&](float value, float fallback)
+    {
+        return std::clamp(finiteOr(value, fallback), 0.0f, 1.0f);
+    };
+    MaterialConstants constants{};
+    constants.baseColor = {unit(parameters.baseColor.r, 1), unit(parameters.baseColor.g, 1),
+        unit(parameters.baseColor.b, 1), unit(parameters.baseColor.a, 1)};
+    constants.emissiveColor = {unit(parameters.emissiveColor.r, 0),
+        unit(parameters.emissiveColor.g, 0), unit(parameters.emissiveColor.b, 0)};
+    constants.emissiveIntensity = std::max(0.0f, finiteOr(parameters.emissiveIntensity, 1));
+    constants.uvScale = {finiteOr(parameters.uvScale.x, 1), finiteOr(parameters.uvScale.y, 1)};
+    constants.uvOffset = {finiteOr(parameters.uvOffset.x, 0), finiteOr(parameters.uvOffset.y, 0)};
+    constants.roughness = unit(parameters.roughness, 0.5f);
+    const float defaultMetallic = gpu.hasORM ? 1.0f : 0.0f;
+    constants.metallic = unit(parameters.metallic.value_or(defaultMetallic), defaultMetallic);
+    constants.normalStrength = std::clamp(finiteOr(parameters.normalStrength, 1), 0.0f, 8.0f);
+    constants.aoStrength = unit(parameters.aoStrength, 1);
+    constants.alphaCutoff = unit(parameters.alphaCutoff, 0.5f);
+    constants.textureFlags = gpu.textureFlags;
 
-    const UINT materialCBIndex = mNextMaterialCBIndex++;
-    if(materialCBIndex>=16384) throw std::runtime_error("Frame MaterialCB capacity (16384) exceeded");
-    mCurrFrameResource->MaterialCB->CopyData(materialCBIndex, matConstants);
+    const UINT materialIndex = mNextMaterialCBIndex++;
+    if (materialIndex >= 16384)
+    {
+        throw std::runtime_error("Frame MaterialCB capacity (16384) exceeded");
+    }
+    auto& frame = *mCurrFrameResource;
+    frame.MaterialCB->CopyData(materialIndex, constants);
 
-    D3D12_GPU_VIRTUAL_ADDRESS matCBAddress =
-        mCurrFrameResource->MaterialCB->Resource()->GetGPUVirtualAddress() +
-        static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(materialCBIndex) *
-        mCurrFrameResource->MaterialCB->ElementByteSize();
-    mCommandList->SetGraphicsRootConstantBufferView(4, matCBAddress);
-
-    mCurrentMaterial = material;
+    ID3D12DescriptorHeap* heaps[] = {mCbvSrvUavHeap.Get()};
+    mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
+    mCommandList->SetPipelineState(pipeline);
+    mCommandList->SetGraphicsRootSignature(mRootSignatures.at("standard").Get());
+    mCommandList->SetGraphicsRootDescriptorTable(0, GetGPUDescriptorHandle(gpu.DiffuseSrvHeapIndex));
+    mCommandList->SetGraphicsRootDescriptorTable(1, GetGPUDescriptorHandle(gpu.NormalSrvHeapIndex));
+    mCommandList->SetGraphicsRootDescriptorTable(6, GetGPUDescriptorHandle(gpu.ormSrvIndex));
+    mCommandList->SetGraphicsRootDescriptorTable(7, GetGPUDescriptorHandle(gpu.emissiveSrvIndex));
+    mCommandList->SetGraphicsRootConstantBufferView(2, frame.ObjectCB->Resource()->GetGPUVirtualAddress() +
+        UINT64(mCurrentObjectCBIndex) * frame.ObjectCB->ElementByteSize());
+    mCommandList->SetGraphicsRootConstantBufferView(3, frame.PassCB->Resource()->GetGPUVirtualAddress());
+    mCommandList->SetGraphicsRootConstantBufferView(4, frame.MaterialCB->Resource()->GetGPUVirtualAddress() +
+        UINT64(materialIndex) * frame.MaterialCB->ElementByteSize());
+    mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
 }
 
 void D3DRenderAdapter::SetTimeData(float TotalTime, float DeltaTime)
@@ -952,14 +1054,8 @@ void D3DRenderAdapter::DrawIndexed(
 // ROOT SIGNATURES AND PSOs
 // -------------------------------------------------------------
 
-void D3DRenderAdapter::BuildShadersAndInputLayout()
+void D3DRenderAdapter::BuildSurfaceInputLayout()
 {
-    mShaders["standardVS"] = d3dUtils::CompileShader(L"Shaders\\Default.hlsl", nullptr, "VS", "vs_5_1");
-    if (!mShaders["standardVS"]) throw std::runtime_error("Failed to compile vertex shader");
-
-    mShaders["standardPS"] = d3dUtils::CompileShader(L"Shaders\\Default.hlsl", nullptr, "PS", "ps_5_1");
-    if (!mShaders["standardPS"]) throw std::runtime_error("Failed to compile pixel shader");
-
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -982,7 +1078,12 @@ void D3DRenderAdapter::BuildRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE normalRange;
         normalRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1 - normal texture
 
-        CD3DX12_ROOT_PARAMETER rootParams[6];
+        CD3DX12_DESCRIPTOR_RANGE ormRange;
+        ormRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
+        CD3DX12_DESCRIPTOR_RANGE emissiveRange;
+        emissiveRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);
+
+        CD3DX12_ROOT_PARAMETER rootParams[8];
         rootParams[0].InitAsDescriptorTable(1, &albedoRange, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParams[1].InitAsDescriptorTable(1, &normalRange, D3D12_SHADER_VISIBILITY_PIXEL);
         rootParams[2].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // b0 - object/world cbuffer
@@ -990,6 +1091,8 @@ void D3DRenderAdapter::BuildRootSignatures()
         rootParams[4].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_ALL); // b2 - material cbuffer
 
         rootParams[5].InitAsConstants(1, 3, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParams[6].InitAsDescriptorTable(1, &ormRange, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParams[7].InitAsDescriptorTable(1, &emissiveRange, D3D12_SHADER_VISIBILITY_PIXEL);
 
         auto staticSamplers = GetStaticSamplers();
 
@@ -1015,52 +1118,6 @@ void D3DRenderAdapter::BuildRootSignatures()
             IID_PPV_ARGS(&mRootSignatures["standard"])));
 
     }
-}
-
-void D3DRenderAdapter::BuildPSOs()
-{
-    // PSO for forward lighting: single render target, one draw call per lit object
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC opaquePsoDesc;
-    ZeroMemory(&opaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-
-    if (!mShaders["standardVS"] || !mShaders["standardPS"])
-        throw std::runtime_error("Shaders not compiled before BuildPSOs");
-
-    opaquePsoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
-    opaquePsoDesc.pRootSignature = mRootSignatures["standard"].Get();
-    opaquePsoDesc.VS =
-    {
-        reinterpret_cast<BYTE*>(mShaders["standardVS"]->GetBufferPointer()),
-        mShaders["standardVS"]->GetBufferSize()
-    };
-    opaquePsoDesc.PS = 
-    {
-        reinterpret_cast<BYTE*>(mShaders["standardPS"]->GetBufferPointer()),
-        mShaders["standardPS"]->GetBufferSize()
-    };
-    opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    opaquePsoDesc.SampleMask = UINT_MAX;
-    opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
-    // Single render target: directly render to back buffer with albedo + normal-based lighting
-    opaquePsoDesc.NumRenderTargets = 1;
-    opaquePsoDesc.RTVFormats[0] = mBackBufferFormat;
-    opaquePsoDesc.DSVFormat = mDepthStencilFormat;
-    opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
-    opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
-
-    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
-    const D3D_SHADER_MACRO editorDefines[] = {{"EDITOR_VIEWPORT", "1"}, {nullptr, nullptr}};
-    auto editorPixelShader = d3dUtils::CompileShader(L"Shaders/Default.hlsl", editorDefines, "PS", "ps_5_1");
-    opaquePsoDesc.PS = {editorPixelShader->GetBufferPointer(), editorPixelShader->GetBufferSize()};
-    opaquePsoDesc.NumRenderTargets = 2;
-    opaquePsoDesc.RTVFormats[1] = DXGI_FORMAT_R32_UINT;
-    opaquePsoDesc.SampleDesc.Count = 1;
-    opaquePsoDesc.SampleDesc.Quality = 0;
-    ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaqueEditor"])));
-    BuildTerrainPipeline();
 }
 
 // -------------------------------------------------------------
@@ -1177,131 +1234,34 @@ MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
 
 void D3DRenderAdapter::DrawMesh(MeshID meshId)
 {
-	MeshGPU* meshGPU = GetMeshGPU(meshId);
-	if (!meshGPU || meshGPU->submeshes.empty())
-	{
-		//::OutputDebugStringA(L"Mesh not found or has no submeshes: " + std::to_wstring(meshId) + L"\n");
-		return;
-	}
-
-	// Set graphics pipeline state and root signature (must be done before drawing)
-	mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
-	mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
-    mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
-
-	// Bind vertex and index buffers
-	mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
-	mCommandList->IASetIndexBuffer(&meshGPU->ibView);
-
-	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress =
-		mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() +
-		static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(mCurrentObjectCBIndex) *
-		mCurrFrameResource->ObjectCB->ElementByteSize();
-	mCommandList->SetGraphicsRootConstantBufferView(2, objectCBAddress);
-
-	// Draw all submeshes with their respective materials
-	for (size_t i = 0; i < meshGPU->submeshes.size(); ++i)
-	{
-		const auto& submesh = meshGPU->submeshes[i];
-
-		// Refresh material SRVs, using defaults until the upload pump publishes textures.
-		MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
-
-		// Bind textures if available
-		if (matGPU)
-		{
-			// Bind descriptor heap for texture access
-			ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
-			mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
-
-			if (matGPU->DiffuseSrvHeapIndex >= 0)
-			{
-				D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
-				mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
-			}
-
-			if (matGPU->NormalSrvHeapIndex >= 0)
-			{
-				D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
-				mCommandList->SetGraphicsRootDescriptorTable(1, normalSRV);
-			}
-
-			// Set material for this submesh
-			SetMaterial(submesh.material);
-		}
-
-		// Draw this submesh
-		mCommandList->DrawIndexedInstanced(
-			submesh.indexCount,    // IndexCountPerInstance
-			1,                      // InstanceCount
-			submesh.indexOffset,   // StartIndexLocation
-			0,                      // BaseVertexLocation
-			0                       // StartInstanceLocation
-		);
-	}
+    const MeshGPU* mesh = GetMeshGPU(meshId);
+    if (!mesh)
+    {
+        return;
+    }
+    for (uint32_t submeshIndex = 0; submeshIndex < mesh->submeshes.size(); ++submeshIndex)
+    {
+        DrawGpuSubmesh(*mesh, submeshIndex);
+    }
 }
 
 void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
 {
-    ID3D12DescriptorHeap* heaps[]={mCbvSrvUavHeap.Get()};
-    mCommandList->SetDescriptorHeaps(1,heaps);
-    MeshGPU* meshGPU = GetMeshGPU(meshId);
-    if (!meshGPU || submeshIndex >= meshGPU->submeshes.size())
+    const MeshGPU* mesh = GetMeshGPU(meshId);
+    if (mesh && submeshIndex < mesh->submeshes.size())
     {
-        return;
+        DrawGpuSubmesh(*mesh, submeshIndex);
     }
+}
 
-    // Set graphics pipeline state and root signature (must be done before drawing)
-    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());
-    mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
-    mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
-
-    const auto& submesh = meshGPU->submeshes[submeshIndex];
-
-    // Bind vertex and index buffers
-    mCommandList->IASetVertexBuffers(0, 1, &meshGPU->vbView);
-    mCommandList->IASetIndexBuffer(&meshGPU->ibView);
-    D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress =
-        mCurrFrameResource->ObjectCB->Resource()->GetGPUVirtualAddress() +
-        static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(mCurrentObjectCBIndex) *
-        mCurrFrameResource->ObjectCB->ElementByteSize();
-    mCommandList->SetGraphicsRootConstantBufferView(2, objectCBAddress);
-
-    // Refresh material SRVs, using defaults until the upload pump publishes textures.
-    MaterialGPU* matGPU = GetOrLoadMaterial(submesh.material);
-
-    // Bind textures if available
-    if (matGPU)
-    {
-        // Bind descriptor heap for texture access
-        ID3D12DescriptorHeap* heaps[] = { mCbvSrvUavHeap.Get() };
-        mCommandList->SetDescriptorHeaps(_countof(heaps), heaps);
-
-        if (matGPU->DiffuseSrvHeapIndex >= 0)
-        {
-            D3D12_GPU_DESCRIPTOR_HANDLE diffuseSRV = GetGPUDescriptorHandle(matGPU->DiffuseSrvHeapIndex);
-            mCommandList->SetGraphicsRootDescriptorTable(0, diffuseSRV);
-        }
-
-        if (matGPU->NormalSrvHeapIndex >= 0)
-        {
-            D3D12_GPU_DESCRIPTOR_HANDLE normalSRV = GetGPUDescriptorHandle(matGPU->NormalSrvHeapIndex);
-            mCommandList->SetGraphicsRootDescriptorTable(1, normalSRV);
-        }
-
-        // Set material for this submesh
-        SetMaterial(submesh.material);
-    }
-
-    // Draw this specific submesh
-    mCommandList->DrawIndexedInstanced(
-        submesh.indexCount,     // IndexCountPerInstance
-        1,                      // InstanceCount
-        submesh.indexOffset,    // StartIndexLocation
-        0,                      // BaseVertexLocation
-        0                       // StartInstanceLocation
-    );
+void D3DRenderAdapter::DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex)
+{
+    const auto& submesh = mesh.submeshes[submeshIndex];
+    SetMaterial(submesh.material);
+    mCommandList->IASetVertexBuffers(0, 1, &mesh.vbView);
+    mCommandList->IASetIndexBuffer(&mesh.ibView);
+    mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    mCommandList->DrawIndexedInstanced(submesh.indexCount, 1, submesh.indexOffset, 0, 0);
 }
 
 int D3DRenderAdapter::UploadTexture(TextureID textureId)
@@ -1317,6 +1277,13 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
         image.pixels.empty() || image.subresources.empty()) return -1;
     ZoneScopedN("Texture GPU upload");
 
+    const TextureViews views = GetTextureViews(image.format);
+    const UINT descriptorCount = views.srgb == DXGI_FORMAT_UNKNOWN ? 1 : 2;
+    if (descriptorCount > mCbvSrvUavDescriptorCount - mNextCbvSrvIndex)
+    {
+        return -1;
+    }
+
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = image.dimension == ImageDimension::Texture1D ? D3D12_RESOURCE_DIMENSION_TEXTURE1D
         : image.dimension == ImageDimension::Texture3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
@@ -1326,13 +1293,14 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
     desc.DepthOrArraySize = static_cast<UINT16>(
         image.dimension == ImageDimension::Texture3D ? image.depth : image.arraySize);
     desc.MipLevels = static_cast<UINT16>(image.mipLevels);
-    desc.Format = image.format;
+    desc.Format = views.resource;
     desc.SampleDesc.Count = 1;
     desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     auto textureGPU = std::make_unique<TextureGPU>();
     textureGPU->Filename = cpuTexture.filename;
     textureGPU->Name = cpuTexture.name;
+    textureGPU->viewFormat = image.format;
     const CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
     HRESULT hr = md3dDevice->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE,
         &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textureGPU->Resource));
@@ -1411,36 +1379,21 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
     md3dDevice->CreateShaderResourceView(textureGPU->Resource.Get(), &srvDesc, handle);
     const int srvIndex = static_cast<int>(mNextCbvSrvIndex++);
     textureGPU->SrvHeapIndex = srvIndex;
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT support{views.linear};
+    textureGPU->surfaceTexture = srvDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D &&
+        SUCCEEDED(md3dDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))) &&
+        (support.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE) != 0;
+    if (views.srgb != DXGI_FORMAT_UNKNOWN)
+    {
+        srvDesc.Format = image.format == views.srgb ? views.linear : views.srgb;
+        handle.Offset(1, mCbvSrvUavDescriptorSize);
+        md3dDevice->CreateShaderResourceView(textureGPU->Resource.Get(), &srvDesc, handle);
+        textureGPU->alternateSrvIndex = static_cast<int>(mNextCbvSrvIndex++);
+    }
     textureGPU->uploadCompleteFence = mCurrentFence + 1;
     mTextures[key] = std::move(textureGPU);
     mResourceManager->FinishTextureUpload(textureId);
     return srvIndex;
-}
-
-MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
-{
-    if (!mResourceManager) return nullptr;
-    const auto& cpuMaterial = mResourceManager->GetMaterial(materialId);
-    auto& material = mMaterials[std::to_string(materialId)];
-    if (!material) material = std::make_unique<MaterialGPU>();
-    material->Name = cpuMaterial.name;
-    material->DiffuseAlbedo = DirectX::XMFLOAT4(cpuMaterial.color.x,
-        cpuMaterial.color.y, cpuMaterial.color.z, 1.0f);
-    material->FresnelR0 = DirectX::XMFLOAT3(0.1f, 0.1f, 0.1f);
-    material->Roughness = cpuMaterial.roughness;
-    const auto descriptor = [&](TextureID id, TextureID fallback)
-    {
-        auto found = mTextures.find(std::to_string(id));
-        if (found != mTextures.end()) return found->second->SrvHeapIndex;
-        return mTextures.at(std::to_string(fallback))->SrvHeapIndex;
-    };
-    // Re-evaluate every draw: a cached material switches to the real SRV as
-    // soon as the upload pump publishes it. Shared fallback SRVs are never
-    // overwritten, so frames already submitted remain valid.
-    material->DiffuseSrvHeapIndex = descriptor(cpuMaterial.albedo,
-        cpuMaterial.albedo ? mResourceManager->GetPlaceholderTexture() : mResourceManager->GetWhiteTexture());
-    material->NormalSrvHeapIndex = descriptor(cpuMaterial.normal, mResourceManager->GetFlatNormalTexture());
-    return material.get();
 }
 
 void D3DRenderAdapter::CleanupMeshUploadBuffers()

@@ -809,30 +809,46 @@ MaterialID ResourceManager::CreateSolidMaterial(
 {
     Material mat;
     mat.name = name;
-    mat.color = color;
-    mat.roughness = roughness;
+    mat.parameters.baseColor = glm::vec4(color, 1);
+    mat.parameters.roughness = roughness;
 
     return CreateMaterial(mat);
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
 {
-    Material mat;
-    mat.name = desc.name;
-    mat.color = desc.color;
-    mat.roughness = desc.roughness;
-
-    if (!desc.albedoTexture.empty())
+    Material material(desc.surface ? std::make_shared<const MaterialBase>(*desc.surface) : nullptr);
+    material.name = desc.name;
+    material.parameters.baseColor = glm::vec4(desc.color, material.parameters.baseColor.a);
+    material.parameters.roughness = desc.roughness;
+    const auto loadMap = [&](const std::wstring& filename, TextureID inherited)
     {
-        mat.albedo = LoadTexture(desc.albedoTexture);
-    }
-
-    if (!desc.normalTexture.empty())
-    {
-        mat.normal = LoadTexture(desc.normalTexture);
-    }
-
-    return CreateMaterial(mat);
+        if (filename.empty())
+        {
+            return inherited;
+        }
+        try
+        {
+            return LoadTexture(filename);
+        }
+        catch (const std::exception& error)
+        {
+            Texture failed;
+            failed.filename = filename;
+            failed.name = WideToUtf8(filename);
+            failed.state = ResourceState::Failed;
+            failed.error = error.what();
+            const TextureID id = gNextTextureID++;
+            mTextures.emplace(id, std::move(failed));
+            return id;
+        }
+    };
+    auto& parameters = material.parameters;
+    parameters.albedo = loadMap(desc.albedoTexture, parameters.albedo);
+    parameters.normal = loadMap(desc.normalTexture, parameters.normal);
+    parameters.orm = loadMap(desc.ormTexture, parameters.orm);
+    parameters.emissive = loadMap(desc.emissiveTexture, parameters.emissive);
+    return CreateMaterial(material);
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(
@@ -976,15 +992,15 @@ void ResourceManager::PrintAllMaterials() const
         std::cout << "MaterialID: " << id << "\n";
         std::cout << "Name: " << mat.name << "\n";
 
-        std::cout << "Albedo: " << mat.albedo << "\n";
-        std::cout << "Normal: " << mat.normal << "\n";
+        std::cout << "Albedo: " << mat.parameters.albedo << "\n";
+        std::cout << "Normal: " << mat.parameters.normal << "\n";
 
         std::cout << "Color: ("
-            << mat.color.x << ", "
-            << mat.color.y << ", "
-            << mat.color.z << ")\n";
+            << mat.parameters.baseColor.x << ", "
+            << mat.parameters.baseColor.y << ", "
+            << mat.parameters.baseColor.z << ")\n";
 
-        std::cout << "Roughness: " << mat.roughness << "\n";
+        std::cout << "Roughness: " << mat.parameters.roughness << "\n";
 
         std::cout << "------------------------\n";
     }

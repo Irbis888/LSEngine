@@ -173,4 +173,97 @@ void Editor_DrawGizmoToolbar(EditorContext& ctx)
     ImGui::SameLine();
     ImGui::Checkbox("Local space##gizmo", &ctx.gizmoLocal);
     ImGui::SetItemTooltip("When checked, gizmo uses object axes. Off = world axes.");
+}void Editor_DrawSceneGuides()
+{
+    EditorContext& context = *Editor_GetContext();
+    CameraComponent* camera = nullptr;
+    TransformComponent* cameraTransform = nullptr;
+    if (!context.registry || !FindActiveCamera(*context.registry, &camera, &cameraTransform))
+    {
+        return;
+    }
+    const glm::mat4 cameraRotation = glm::yawPitchRoll(cameraTransform->rotation.y, cameraTransform->rotation.x, cameraTransform->rotation.z);
+    const glm::vec3 forward = glm::vec3(cameraRotation * glm::vec4(0, 0, 1, 0));
+    const glm::vec3 up = glm::vec3(cameraRotation * glm::vec4(0, 1, 0, 0));
+    const glm::mat4 view = glm::lookAtLH(cameraTransform->position, cameraTransform->position + forward, up);
+    const glm::mat4 projection = glm::perspectiveLH_ZO(camera->fov, camera->aspectRatio, camera->nearZ, camera->farZ);
+    const glm::mat4 viewProjection = projection * view;
+    const ImVec2 minimum = context.viewport.imageMinimum;
+    const ImVec2 maximum = context.viewport.imageMaximum;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    auto screenPosition = [&](const glm::vec4& clipPosition)
+    {
+        const glm::vec3 normalized = glm::vec3(clipPosition) / clipPosition.w;
+        return ImVec2(minimum.x + (normalized.x + 1) * 0.5f * (maximum.x - minimum.x),
+            minimum.y + (1 - normalized.y) * 0.5f * (maximum.y - minimum.y));
+    };
+    auto drawSegment = [&](const glm::vec3& start, const glm::vec3& end, ImU32 color, float thickness)
+    {
+        glm::vec4 clipStart = viewProjection * glm::vec4(start, 1);
+        glm::vec4 clipEnd = viewProjection * glm::vec4(end, 1);
+        if (clipStart.z < 0 && clipEnd.z < 0)
+        {
+            return;
+        }
+        if (clipStart.z < 0)
+        {
+            clipStart = glm::mix(clipStart, clipEnd, clipStart.z / (clipStart.z - clipEnd.z));
+        }
+        else if (clipEnd.z < 0)
+        {
+            clipEnd = glm::mix(clipEnd, clipStart, clipEnd.z / (clipEnd.z - clipStart.z));
+        }
+        if (clipStart.w <= 0 || clipEnd.w <= 0)
+        {
+            return;
+        }
+        drawList->AddLine(screenPosition(clipStart), screenPosition(clipEnd), color, thickness);
+    };
+    if (context.showGrid)
+    {
+        const float gridStep = std::pow(10.0f, std::floor(std::log10(std::max(std::abs(cameraTransform->position.y), 10.0f))) - 1);
+        const float centerX = std::floor(cameraTransform->position.x / gridStep) * gridStep;
+        const float centerZ = std::floor(cameraTransform->position.z / gridStep) * gridStep;
+        const float extent = gridStep * 30;
+        for (int lineIndex = -30; lineIndex <= 30; ++lineIndex)
+        {
+            const float coordinateX = centerX + lineIndex * gridStep;
+            const float coordinateZ = centerZ + lineIndex * gridStep;
+            const ImU32 color = lineIndex % 5 == 0 ? IM_COL32(155, 165, 180, 85) : IM_COL32(155, 165, 180, 35);
+            drawSegment(glm::vec3(coordinateX, 0, centerZ - extent), glm::vec3(coordinateX, 0, centerZ + extent), color, 1);
+            drawSegment(glm::vec3(centerX - extent, 0, coordinateZ), glm::vec3(centerX + extent, 0, coordinateZ), color, 1);
+        }
+        drawSegment(glm::vec3(-extent, 0, 0), glm::vec3(extent, 0, 0), IM_COL32(235, 75, 75, 180), 2);
+        drawSegment(glm::vec3(0, 0, -extent), glm::vec3(0, 0, extent), IM_COL32(75, 135, 240, 180), 2);
+        drawSegment(glm::vec3(0), glm::vec3(0, gridStep * 10, 0), IM_COL32(80, 220, 110, 180), 2);
+    }
+    if (!context.showLightDirections)
+    {
+        return;
+    }
+    for (auto entity : context.registry->view<TransformComponent>())
+    {
+        if (!context.registry->any_of<DirectionalLightComponent, SpotLightComponent>(entity))
+        {
+            continue;
+        }
+        const auto& transform = context.registry->get<TransformComponent>(entity);
+        const glm::vec3 direction = LightDirectionFromRotation(transform.rotation);
+        const float arrowLength = glm::clamp(glm::distance(cameraTransform->position, transform.position) * 0.12f, 2.0f, 25.0f);
+        const glm::vec3 tip = transform.position + direction * arrowLength;
+        const glm::vec3 reference = std::abs(direction.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+        const glm::vec3 side = glm::normalize(glm::cross(direction, reference));
+        const ImU32 color = context.selected == entity ? IM_COL32(255, 240, 130, 255) : IM_COL32(255, 190, 65, 220);
+        drawSegment(transform.position, tip, color, 3);
+        drawSegment(tip, tip - direction * arrowLength * 0.22f + side * arrowLength * 0.12f, color, 3);
+        drawSegment(tip, tip - direction * arrowLength * 0.22f - side * arrowLength * 0.12f, color, 3);
+        const glm::vec4 clipOrigin = viewProjection * glm::vec4(transform.position, 1);
+        if (clipOrigin.z >= 0 && clipOrigin.w > 0)
+        {
+            const ImVec2 origin = screenPosition(clipOrigin);
+            drawList->AddCircle(origin, 6, color, 16, 2);
+            const auto* tag = context.registry->try_get<TagComponent>(entity);
+            drawList->AddText(ImVec2(origin.x + 9, origin.y + 3), color, tag ? tag->tag.c_str() : "Light");
+        }
+    }
 }

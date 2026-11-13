@@ -55,6 +55,54 @@ namespace
         material.roughness = value.value("roughness", 0.5f);
         if (value.contains("albedo")) material.albedoTexture = StringToWide(value.at("albedo").get<std::string>());
         if (value.contains("normal")) material.normalTexture = StringToWide(value.at("normal").get<std::string>());
+        if (value.contains("surface"))
+        {
+            const auto& description = value.at("surface");
+            MaterialBase& base = material.surface.emplace();
+            auto& parameters = base.defaults;
+            const std::string mode = description.value("mode", "opaque");
+            if (mode == "masked")
+            {
+                base.mode = SurfaceMode::Masked;
+            }
+            else if (mode != "opaque")
+            {
+                throw std::runtime_error("Unsupported surface mode: " + mode);
+            }
+            base.twoSided = description.value("twoSided", false);
+            if (description.contains("shader"))
+            {
+                base.program.file = StringToWide(description.at("shader").get<std::string>());
+            }
+            base.program.vertexEntry = description.value("vertexEntry", base.program.vertexEntry);
+            base.program.pixelEntry = description.value("pixelEntry", base.program.pixelEntry);
+            base.program.editorVariant = description.value("editorVariant", true);
+            base.program.maskedVariant = description.value("maskedVariant", true);
+            parameters.baseColor = glm::vec4(material.color, description.value("alpha", 1.0f));
+            parameters.roughness = material.roughness;
+            parameters.normalStrength = description.value("normalStrength", 1.0f);
+            parameters.aoStrength = description.value("aoStrength", 1.0f);
+            parameters.alphaCutoff = description.value("alphaCutoff", 0.5f);
+            parameters.emissiveColor = JsonToVec3(description.value("emissiveColor", json::array()));
+            parameters.emissiveIntensity = description.value("emissiveIntensity", 1.0f);
+            if (description.contains("metallic"))
+            {
+                parameters.metallic = description.at("metallic").get<float>();
+            }
+            const auto readUV = [&](const char* name, glm::vec2 fallback)
+            {
+                if (!description.contains(name))
+                {
+                    return fallback;
+                }
+                const auto& array = description.at(name);
+                return glm::vec2(array.at(0).get<float>(), array.at(1).get<float>());
+            };
+            parameters.uvScale = readUV("uvScale", glm::vec2(1));
+            parameters.uvOffset = readUV("uvOffset", glm::vec2(0));
+            material.ormTexture = StringToWide(description.value("orm", ""));
+            material.emissiveTexture = StringToWide(description.value("emissive", ""));
+        }
         return material;
     }
 
@@ -92,6 +140,41 @@ namespace
         json value{ { "name", material.name }, { "color", Vec3ToJson(material.color) }, { "roughness", material.roughness } };
         if (!material.albedoTexture.empty()) value["albedo"] = ProjectPath(root, AssetPaths::ToUtf8(material.albedoTexture));
         if (!material.normalTexture.empty()) value["normal"] = ProjectPath(root, AssetPaths::ToUtf8(material.normalTexture));
+        if (material.surface)
+        {
+            const auto& base = *material.surface;
+            const auto& parameters = base.defaults;
+            auto& description = value["surface"];
+            description = {
+                {"shader", AssetPaths::ToUtf8(base.program.file)},
+                {"vertexEntry", base.program.vertexEntry},
+                {"pixelEntry", base.program.pixelEntry},
+                {"editorVariant", base.program.editorVariant},
+                {"maskedVariant", base.program.maskedVariant},
+                {"mode", base.mode == SurfaceMode::Masked ? "masked" : "opaque"},
+                {"twoSided", base.twoSided},
+                {"alpha", parameters.baseColor.a},
+                {"normalStrength", parameters.normalStrength},
+                {"aoStrength", parameters.aoStrength},
+                {"alphaCutoff", parameters.alphaCutoff},
+                {"emissiveColor", Vec3ToJson(parameters.emissiveColor)},
+                {"emissiveIntensity", parameters.emissiveIntensity},
+                {"uvScale", {parameters.uvScale.x, parameters.uvScale.y}},
+                {"uvOffset", {parameters.uvOffset.x, parameters.uvOffset.y}}
+            };
+            if (parameters.metallic)
+            {
+                description["metallic"] = *parameters.metallic;
+            }
+            if (!material.ormTexture.empty())
+            {
+                description["orm"] = ProjectPath(root, AssetPaths::ToUtf8(material.ormTexture));
+            }
+            if (!material.emissiveTexture.empty())
+            {
+                description["emissive"] = ProjectPath(root, AssetPaths::ToUtf8(material.emissiveTexture));
+            }
+        }
         return value;
     }
 
@@ -257,7 +340,6 @@ namespace
         return json{
             { "color", Vec3ToJson(light.color) },
             { "intensity", light.intensity },
-            { "direction", Vec3ToJson(light.direction) },
             { "falloffStart", light.falloffStart },
             { "falloffEnd", light.falloffEnd },
             { "spotPower", light.spotPower },
@@ -270,9 +352,6 @@ namespace
         SpotLightComponent light;
         light.color = JsonToVec3(value.value("color", json::array()), glm::vec3(1.0f));
         light.intensity = value.value("intensity", 1.0f);
-        light.direction = SafeNormalize(
-            JsonToVec3(value.value("direction", json::array()), glm::vec3(0.0f, -1.0f, 0.0f)),
-            glm::vec3(0.0f, -1.0f, 0.0f));
         light.falloffStart = value.value("falloffStart", 1.0f);
         light.falloffEnd = value.value("falloffEnd", 35.0f);
         light.spotPower = value.value("spotPower", 32.0f);
@@ -403,6 +482,14 @@ namespace
         }
         if (value.contains("pointLight")) entity.pointLight = JsonToPointLight(value.at("pointLight"));
         if (value.contains("spotLight")) entity.spotLight = JsonToSpotLight(value.at("spotLight"));
+        if (entity.spotLight && value.at("spotLight").contains("direction") &&
+            (!value.contains("transform") || !value.at("transform").contains("rotation")))
+        {
+            const glm::vec3 direction = SafeNormalize(
+                JsonToVec3(value.at("spotLight").at("direction"), glm::vec3(0, -1, 0)), glm::vec3(0, -1, 0));
+            entity.transform.rotation = glm::vec3(std::asin(glm::clamp(-direction.y, -1.0f, 1.0f)),
+                std::atan2(direction.x, direction.z), 0);
+        }
         if (value.contains("rigidbody")) entity.rigidbody = JsonToRigidbody(value.at("rigidbody"));
         if (value.contains("collider")) entity.collider = JsonToCollider(value.at("collider"));
         if (value.contains("script")) entity.script = ScriptFromJson(value.at("script"));

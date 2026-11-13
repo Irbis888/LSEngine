@@ -21,13 +21,19 @@ void Editor_DrawViewport(EditorContext& context)
         viewport.pointerDown = false;
         return;
     }
-    if (!ImGui::Begin("Viewport###Viewport", &context.showViewport, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+    if (!ImGui::Begin("Viewport###Viewport", &context.showViewport, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
     {
         viewport.cameraCaptured = false;
         viewport.pointerDown = false;
         ImGuizmo::Enable(false);
         ImGui::End();
         return;
+    }
+    if (ImGui::BeginMenuBar())
+    {
+        ImGui::Checkbox("Grid XZ / XYZ axes", &context.showGrid);
+        ImGui::Checkbox("Light directions", &context.showLightDirections);
+        ImGui::EndMenuBar();
     }
     const ImVec2 imageSize = ImGui::GetContentRegionAvail();
     if (imageSize.x < 1 || imageSize.y < 1)
@@ -54,6 +60,7 @@ void Editor_DrawViewport(EditorContext& context)
         context.registry->get<CameraComponent>(entity).aspectRatio = float(viewport.width) / viewport.height;
     }
     ImGui::GetWindowDrawList()->PushClipRect(viewport.imageMinimum, viewport.imageMaximum, true);
+    Editor_DrawSceneGuides();
     Editor_RenderGizmo();
     ImGui::GetWindowDrawList()->PopClipRect();
 

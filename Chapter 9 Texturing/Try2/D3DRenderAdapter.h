@@ -3,6 +3,8 @@
 #include "d3dUtils.h"
 #include "MathHelper.h"
 #include "FrameRes.h"
+#include "ResourceManager.h"
+#include <map>
 #include <deque>
 #include <unordered_set>
 
@@ -29,6 +31,20 @@ public:
     void BeginFrame() override;
     void EndFrame() override;
     bool ReloadShaders() override;
+    struct SurfaceCacheStats
+    {
+        uint64_t created = 0;
+        uint64_t hits = 0;
+        uint64_t misses = 0;
+    };
+    SurfaceCacheStats GetSurfaceCacheStats() const
+    {
+        return mSurfaceCacheStats;
+    }
+    const std::string& GetSurfaceDiagnostic() const
+    {
+        return mSurfaceDiagnostic;
+    }
     uint64_t ResizeEditorViewport(uint32_t width, uint32_t height) override;
     void BeginScene(bool editor, bool visible) override;
     void EndScene() override;
@@ -88,6 +104,49 @@ public:
     Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
+    struct SurfacePipelineKey
+    {
+        SurfaceProgram program;
+        SurfaceMode mode = SurfaceMode::Opaque;
+        bool twoSided = false;
+        DXGI_FORMAT colorFormat = DXGI_FORMAT_UNKNOWN;
+        DXGI_FORMAT identifierFormat = DXGI_FORMAT_UNKNOWN;
+        DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
+        UINT samples = 1;
+        UINT sampleQuality = 0;
+
+        auto operator<=>(const SurfacePipelineKey&) const = default;
+    };
+    struct SurfaceShaderKey
+    {
+        std::wstring file;
+        std::string entry;
+        bool pixel = false;
+        bool editor = false;
+        bool masked = false;
+
+        auto operator<=>(const SurfaceShaderKey&) const = default;
+    };
+    struct RetiredSurfacePipelines
+    {
+        UINT64 fence = 0;
+        std::vector<ComPtr<ID3D12PipelineState>> pipelines;
+        std::vector<ComPtr<ID3D12RootSignature>> rootSignatures;
+    };
+    std::map<SurfacePipelineKey, ComPtr<ID3D12PipelineState>> mSurfacePipelines;
+    std::map<SurfaceShaderKey, ComPtr<ID3DBlob>> mSurfaceShaders;
+    std::map<SurfacePipelineKey, std::string> mSurfaceFailures;
+    std::deque<RetiredSurfacePipelines> mRetiredSurfacePipelines;
+    std::unordered_set<TextureID> mReportedSurfaceTextures;
+    SurfaceCacheStats mSurfaceCacheStats;
+    std::string mSurfaceDiagnostic;
+    SurfacePipelineKey MakeSurfaceKey(const MaterialBase& base, bool editor) const;
+    ID3D12PipelineState* FindSurfacePipeline(const SurfacePipelineKey& key);
+    ComPtr<ID3D12PipelineState> BuildSurfacePipeline(const SurfacePipelineKey& key);
+    ComPtr<ID3DBlob> FindSurfaceShader(const SurfaceShaderKey& key);
+    void DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex);
+    int SurfaceTextureDescriptor(TextureID id, TextureID fallback, bool srgb, DXGI_FORMAT& format, bool* loaded = nullptr);
+
     struct EditorTarget
     {
         ComPtr<ID3D12Resource> color;
@@ -185,9 +244,7 @@ private:
     // Next free descriptor index in the CBV/SRV/UAV heap
     UINT mNextCbvSrvIndex = 0;
 
-    // Current material/transform state (set by SetMaterial/SetTransform)
-    MaterialID mCurrentMaterial = 0;
-    TransformComponent mCurrentTransform;
+    // Frame-local constant buffer indices.
     UINT mCurrentObjectCBIndex = 0;
     UINT mNextObjectCBIndex = 0;
     UINT mNextMaterialCBIndex = 0;
@@ -218,7 +275,6 @@ public:
     std::unordered_map<MeshID, std::unique_ptr<MeshGPU>> mGeometries;
     std::unordered_map<std::string, std::unique_ptr<MaterialGPU>> mMaterials;
     std::unordered_map<std::string, std::unique_ptr<TextureGPU>> mTextures;
-    std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
     std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
     std::unordered_map<std::string, ComPtr<ID3D12RootSignature>> mRootSignatures;
 
@@ -238,9 +294,8 @@ public:
     MaterialGPU* GetOrLoadMaterial(MaterialID materialId);
 
     // Build root signatures and PSOs
-    void BuildShadersAndInputLayout();
+    void BuildSurfaceInputLayout();
     void BuildRootSignatures();
-    void BuildPSOs();
     std::vector<D3D12_STATIC_SAMPLER_DESC> GetStaticSamplers();
 
     // GetMeshGPU uploads primitives on first draw; other CPU-ready meshes use the BeginFrame queue.

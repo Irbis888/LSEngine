@@ -45,11 +45,30 @@ struct PassConstants
 
 struct MaterialConstants
 {
-    DirectX::XMFLOAT4 DiffuseAlbedo;  // vec4 RGBA
-    DirectX::XMFLOAT3 FresnelR0;      // vec3 for Fresnel reflection at 0 degrees
-    float Roughness;                   // Roughness value for PBR
-    DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4(); // 4x4 matrix for material texture transform
+    DirectX::XMFLOAT4 baseColor;
+    DirectX::XMFLOAT3 emissiveColor;
+    float emissiveIntensity;
+    DirectX::XMFLOAT2 uvScale;
+    DirectX::XMFLOAT2 uvOffset;
+    float roughness;
+    float metallic;
+    float normalStrength;
+    float aoStrength;
+    float alphaCutoff;
+    uint32_t textureFlags;
+    DirectX::XMFLOAT2 padding;
 };
+
+static_assert(sizeof(MaterialConstants) == 80);
+static_assert(offsetof(MaterialConstants, emissiveIntensity) == 28);
+static_assert(offsetof(MaterialConstants, uvScale) == 32);
+static_assert(offsetof(MaterialConstants, roughness) == 48);
+static_assert(offsetof(MaterialConstants, alphaCutoff) == 64);
+static_assert(offsetof(MaterialConstants, textureFlags) == 68);
+static_assert(sizeof(ObjectConstants) == 192);
+static_assert(offsetof(PassConstants, Lights) == 448);
+static_assert(sizeof(Light) == 48);
+
 
 // =========================================================================
 // UPLOAD BUFFER TEMPLATE

@@ -179,6 +179,5 @@ void D3DRenderAdapter::DrawTerrain(const TerrainResource& r,const TransformCompo
         mCommandList->DrawIndexedInstanced(g.indexCounts[draw.lod],1,0,0,0);
         if(options.showBounds){mCommandList->SetPipelineState(mPSOs[mEditorScene ? "terrainBoundsEditor" : "terrainBounds"].Get());mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);mCommandList->DrawInstanced(24,1,0,0);}
     }
-    mCommandList->SetPipelineState(mPSOs[mEditorScene ? "opaqueEditor" : "opaque"].Get());mCommandList->SetGraphicsRootSignature(mRootSignatures["standard"].Get());
-    mCommandList->SetGraphicsRootConstantBufferView(3,mCurrFrameResource->PassCB->Resource()->GetGPUVirtualAddress());
+
 }

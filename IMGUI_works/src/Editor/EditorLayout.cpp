@@ -24,7 +24,8 @@ namespace
         return {{"hierarchy", context.showHierarchy}, {"inspector", context.showInspector},
             {"viewport", context.showViewport}, {"assets", context.showAssets},
             {"console", context.showConsole}, {"statistics", context.showStatistics},
-            {"legend", context.showLegend}};
+            {"legend", context.showLegend}, {"grid", context.showGrid},
+            {"lightDirections", context.showLightDirections}};
     }
 }
 
@@ -70,6 +71,8 @@ void EditorLayout::Configure(EditorContext& context)
         context.showConsole = panels.value("console", true);
         context.showStatistics = panels.value("statistics", false);
         context.showLegend = panels.value("legend", false);
+        context.showGrid = panels.value("grid", true);
+        context.showLightDirections = panels.value("lightDirections", true);
     }
     previousPanels.clear();
 }

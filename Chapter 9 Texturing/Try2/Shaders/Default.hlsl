@@ -1,185 +1,57 @@
-//***************************************************************************************
-// Default.hlsl by Frank Luna (C) 2015 All Rights Reserved.
-//***************************************************************************************
+// Lit implementation of the shared mesh surface contract.
+#include "Surface.hlsli"
 
-// Defaults for number of lights.
-#ifndef NUM_DIR_LIGHTS
-    #define NUM_DIR_LIGHTS 1
-#endif
-
-#ifndef NUM_POINT_LIGHTS
-    #define NUM_POINT_LIGHTS 2
-#endif
-
-#ifndef NUM_SPOT_LIGHTS
-    #define NUM_SPOT_LIGHTS 3
-#endif
-
-// Include structures and functions for lighting.
-#include "LightingUtil.hlsl"
-
-Texture2D    gDiffuseMap : register(t0);
-Texture2D    gNormalMap : register(t1);
-
-
-SamplerState gsamPointWrap        : register(s0);
-SamplerState gsamPointClamp       : register(s1);
-SamplerState gsamLinearWrap       : register(s2);
-SamplerState gsamLinearClamp      : register(s3);
-SamplerState gsamAnisotropicWrap  : register(s4);
-SamplerState gsamAnisotropicClamp : register(s5);
-
-// Constant data that varies per frame.
-cbuffer cbPerObject : register(b0)
+float3 EvaluateBRDF(float3 baseColor, float metallic, float roughness,
+    float3 normal, float3 view, float3 light, float3 radiance)
 {
-    float4x4 gWorld;
-    float4x4 gInvWorld;
-	float4x4 gTexTransform;
-};
-
-// Constant data that varies per material.
-cbuffer cbPass : register(b1)
-{
-    float4x4 gView;
-    float4x4 gInvView;
-    float4x4 gProj;
-    float4x4 gInvProj;
-    float4x4 gViewProj;
-    float4x4 gInvViewProj;
-    float3 gEyePosW;
-    float cbPerObjectPad1;
-    float2 gRenderTargetSize;
-    float2 gInvRenderTargetSize;
-    float gNearZ;
-    float gFarZ;
-    float gTotalTime;
-    float gDeltaTime;
-    float4 gAmbientLight;
-
-    // Indices [0, NUM_DIR_LIGHTS) are directional lights;
-    // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
-    // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
-    // are spot lights for a imum of MaxLights per object.
-    Light gLights[MaxLights];
-};
-
-cbuffer cbMaterial : register(b2)
-{
-	float4   gDiffuseAlbedo;
-    float3   gFresnelR0;
-    float    gRoughness;
-	float4x4 gMatTransform;
-};
-
-struct VertexIn
-{
-	float3 PosL    : POSITION;
-    float3 NormalL : NORMAL;
-    float3 Tan : TANGENT;
-    float2 TexC : TEXCOORD;
-};
-
-struct VertexOut
-{
-	float4 PosH    : SV_POSITION;
-    float3 PosW    : POSITION;
-    float3 NormalW : NORMAL;
-	float2 TexC    : TEXCOORD;
-    float3 Tan : TANGENT;
-};
-float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, float3 tangentW)
-{
-	// Uncompress each component from [0,1] to [-1,1].
-    float3 normalT = 2.0f * normalMapSample - 1.0f;
-
-	// Build orthonormal basis.
-    float3 N = unitNormalW;
-    float3 T = normalize(tangentW - dot(tangentW, N) * N);
-    float3 B = cross(N, T);
-
-    float3x3 TBN = float3x3(T, B, N);
-
-	// Transform from tangent space to world space.
-    float3 bumpedNormalW = mul(normalT, TBN);
-
-    return bumpedNormalW;
-}
-VertexOut VS(VertexIn vin)
-{
-	VertexOut vout = (VertexOut)0.0f;
-    // Transform to world space.
-    float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
-    vout.PosW = posW;
-
-    vout.PosH = mul(posW, gViewProj);
-    
-    float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
-    vout.TexC = mul(texC, gMatTransform).xy;
-    
-    // Assumes nonuniform scaling; otherwise, need to use inverse-transpose of world matrix.
-    vout.NormalW = mul(vin.NormalL, (float3x3)gWorld);
-    vout.Tan = mul(vin.Tan, (float3x3) gWorld);
-    // Transform to homogeneous clip space.
-
-	// Output vertex attributes for interpolation across triangle.
- 
-    
-    return vout;
+    const float normalLight = saturate(dot(normal, light));
+    const float normalView = max(saturate(dot(normal, view)), 1e-4f);
+    const float3 halfVector = SafeUnit(view + light, normal);
+    const float normalHalf = saturate(dot(normal, halfVector));
+    const float viewHalf = saturate(dot(view, halfVector));
+    const float alpha = roughness * roughness;
+    const float alphaSquared = alpha * alpha;
+    const float distributionTerm = normalHalf * normalHalf * (alphaSquared - 1) + 1;
+    const float distribution = alphaSquared / max(3.14159265f * distributionTerm * distributionTerm, 1e-12f);
+    const float smithLight = normalView * sqrt(alphaSquared + (1 - alphaSquared) * normalLight * normalLight);
+    const float smithView = normalLight * sqrt(alphaSquared + (1 - alphaSquared) * normalView * normalView);
+    const float visibility = 0.5f / max(smithLight + smithView, 1e-5f);
+    const float3 reflectance = lerp(float3(0.04f, 0.04f, 0.04f), baseColor, metallic);
+    const float3 fresnel = reflectance + (1 - reflectance) * pow(1 - viewHalf, 5);
+    const float3 diffuse = (1 - fresnel) * (1 - metallic) * baseColor / 3.14159265f;
+    return (diffuse + fresnel * distribution * visibility) * radiance * normalLight;
 }
 
-float4 ShadeSurface(VertexOut pin)
+float3 ShadeSurface(SurfaceInterpolants input, bool frontFace, float3 baseColor)
 {
-    float4 diffuseAlbedo = gDiffuseMap.Sample(gsamPointWrap, pin.TexC) * gDiffuseAlbedo;
-    float3 normalSample = gNormalMap.Sample(gsamPointWrap, pin.TexC).rgb;
-    pin.NormalW = normalize(pin.NormalW);
-    float3 bumpedNormalW = normalize(
-    NormalSampleToWorldSpace(normalSample, pin.NormalW, pin.Tan));
+    const float3 normal = ReadWorldNormal(input, frontFace);
+    const float3 view = SafeUnit(EyePosition - input.worldPosition, normal);
+    const float3 orm = ORMMap.Sample(SurfaceSampler, input.uv).rgb;
+    const float roughness = clamp(RoughnessFactor * orm.g, 0.045f, 1.0f);
+    const float metallic = saturate(MetallicFactor * orm.b);
+    const float ao = lerp(1.0f, saturate(orm.r), AOStrength);
+    float3 color = AmbientLight.rgb * baseColor * (1 - metallic) * ao;
 
-    
-    // Interpolating normal can unnormalize it, so renormalize it.
-
-    // Vector from point being lit to eye. 
-    float3 toEyeW = normalize(gEyePosW - pin.PosW);
-
-    // Light terms.
-    float4 ambient = gAmbientLight*diffuseAlbedo;
-
-    const float shininess = 1.0f - gRoughness;
-    Material mat = { diffuseAlbedo, gFresnelR0, shininess };
-    float3 shadowFactor = 1.0f;
-    float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
-       bumpedNormalW, toEyeW, shadowFactor);
-
-    float4 litColor = ambient + directLight;
-    // Common convention to take alpha from diffuse albedo.
-    litColor.a = diffuseAlbedo.a;
-    //litColor.rgb = 1.0 - litColor.rgb;
-
-    return litColor;
+    [unroll]
+    for (int lightIndex = 0; lightIndex < 6; ++lightIndex)
+    {
+        const Light source = Lights[lightIndex];
+        float3 lightDirection = SafeUnit(-source.Direction, normal);
+        float attenuation = 1.0f;
+        if (lightIndex >= 1)
+        {
+            const float3 offset = source.Position - input.worldPosition;
+            const float distanceToLight = length(offset);
+            lightDirection = SafeUnit(offset, normal);
+            attenuation = saturate((source.FalloffEnd - distanceToLight) / max(source.FalloffEnd - source.FalloffStart, 1e-5f));
+            if (lightIndex >= 3)
+            {
+                attenuation *= pow(max(dot(-lightDirection, source.Direction), 1e-6f), max(source.SpotPower, 0.0f));
+            }
+        }
+        color += EvaluateBRDF(baseColor, metallic, roughness, normal, view, lightDirection, source.Strength * attenuation);
+    }
+    return color + ReadEmissive(input.uv);
 }
 
-
-
-#ifdef EDITOR_VIEWPORT
-cbuffer EditorSelection : register(b3)
-{
-    uint EntityIdentifier;
-};
-struct EditorPixelOutput
-{
-    float4 color : SV_Target0;
-    uint identifier : SV_Target1;
-};
-EditorPixelOutput PS(VertexOut pin)
-{
-    EditorPixelOutput output;
-    output.color = ShadeSurface(pin);
-    output.identifier = EntityIdentifier;
-    return output;
-}
-#else
-float4 PS(VertexOut pin) : SV_Target0
-{
-    return ShadeSurface(pin);
-}
-#endif
+#include "SurfaceOutput.hlsli"

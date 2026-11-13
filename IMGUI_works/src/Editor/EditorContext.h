@@ -54,6 +54,8 @@ struct EditorContext
     GizmoOperation gizmoOp = GizmoOperation::Translate;
     bool gizmoLocal = true;
 
+    bool showGrid = true;
+    bool showLightDirections = true;
     bool showHierarchy = true;
     bool showInspector = true;
     bool showViewport = true;
@@ -81,3 +83,5 @@ void Editor_RenderGizmo();
 void Editor_DrawLegend(EditorContext& ctx);
 
 void Editor_SelectEntity(EditorContext& context, entt::entity entity);
+
+void Editor_DrawSceneGuides();

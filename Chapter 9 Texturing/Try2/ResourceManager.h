@@ -1,4 +1,6 @@
 #pragma once
+#include <compare>
+#include <optional>
 #include "Commons.h"
 #include "ImageData.h"
 #include <deque>
@@ -68,6 +70,50 @@ struct Mesh
     size_t GeometryBytes() const { return GetVertices().size() * sizeof(Vertex) + GetIndices().size() * sizeof(uint32_t); }
 };
 
+enum class SurfaceMode
+{
+    Opaque,
+    Masked,
+    Translucent
+};
+
+struct SurfaceProgram
+{
+    std::wstring file = L"Shaders/Default.hlsl";
+    std::string vertexEntry = "VS";
+    std::string pixelEntry = "PS";
+    bool editorVariant = true;
+    bool maskedVariant = true;
+
+    auto operator<=>(const SurfaceProgram&) const = default;
+};
+
+struct MaterialParameters
+{
+    glm::vec4 baseColor{1.0f};
+    TextureID albedo = 0;
+    TextureID normal = 0;
+    TextureID orm = 0;
+    TextureID emissive = 0;
+    float roughness = 0.5f;
+    std::optional<float> metallic;
+    float normalStrength = 1.0f;
+    float aoStrength = 1.0f;
+    float alphaCutoff = 0.5f;
+    glm::vec3 emissiveColor{0.0f};
+    float emissiveIntensity = 1.0f;
+    glm::vec2 uvScale{1.0f};
+    glm::vec2 uvOffset{0.0f};
+};
+
+struct MaterialBase
+{
+    SurfaceProgram program;
+    SurfaceMode mode = SurfaceMode::Opaque;
+    bool twoSided = false;
+    MaterialParameters defaults;
+};
+
 struct MaterialDesc
 {
     std::string name;
@@ -75,18 +121,21 @@ struct MaterialDesc
     std::wstring normalTexture;
     glm::vec3 color = glm::vec3(1.0f);
     float roughness = 0.5f;
+    std::optional<MaterialBase> surface;
+    std::wstring ormTexture;
+    std::wstring emissiveTexture;
 };
 
 struct Material
 {
+    explicit Material(std::shared_ptr<const MaterialBase> definition = {})
+        : base(std::move(definition)), parameters(base ? base->defaults : MaterialParameters{})
+    {
+    }
+
     std::string name;
-
-    TextureID albedo = 0;
-    TextureID normal = 0;
-
-    // простые параметры (пока)
-    glm::vec3 color = glm::vec3(1.0f);
-    float roughness = 0.5f;
+    std::shared_ptr<const MaterialBase> base;
+    MaterialParameters parameters;
 };
 
 struct Texture

@@ -94,10 +94,12 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         ids.push_back(resources.LoadTexture(path.wstring()));
     }
     Material mat;
-    mat.name = "Streaming material"; mat.albedo = ids[0]; mat.normal = ids[1];
+    mat.name = "Streaming material";
+    mat.parameters.albedo = ids[0];
+    mat.parameters.normal = ids[1];
     const MaterialID material = resources.CreateMaterial(mat);
     Material brokenMat = mat;
-    brokenMat.albedo = failed;
+    brokenMat.parameters.albedo = failed;
     const MaterialID brokenMaterial = resources.CreateMaterial(brokenMat);
     const MeshID cube = resources.CreateCube(material);
     const MeshID plane = resources.CreatePlane(material);
@@ -176,7 +178,7 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
             Check(resources.GetActiveLoadCount() <= 2 && resources.GetQueuedLoadCount() > 0,
                 "Resource job admission was not bounded");
             cachedMaterial = renderer.GetOrLoadMaterial(material);
-            placeholder = renderer.mTextures.at(std::to_string(resources.GetPlaceholderTexture()))->SrvHeapIndex;
+            placeholder = renderer.mTextures.at(std::to_string(resources.GetPlaceholderTexture()))->alternateSrvIndex;
             Check(cachedMaterial->DiffuseSrvHeapIndex == placeholder &&
                 cachedMaterial->NormalSrvHeapIndex == renderer.mTextures.at(std::to_string(resources.GetFlatNormalTexture()))->SrvHeapIndex,
                 "Pending textures did not bind checkerboard and flat normal");
@@ -232,7 +234,7 @@ void RunResourceStreamingTests(const std::filesystem::path& repo, const std::fil
         Check(resources.GetLoadingStats().readyBytes == 0, "Completed GPU resources retained their pending-memory charge");
         Check(frames >= ids.size(), "Texture budget did not distribute uploads across frames");
         Check(cachedMaterial->DiffuseSrvHeapIndex != placeholder &&
-            cachedMaterial->DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(ids[0]))->SrvHeapIndex &&
+            cachedMaterial->DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(ids[0]))->alternateSrvIndex &&
             cachedMaterial->NormalSrvHeapIndex == renderer.mTextures.at(std::to_string(ids[1]))->SrvHeapIndex,
             "Cached material did not switch to the uploaded texture");
         Check(resources.GetTexture(failed).state == ResourceState::Failed && !resources.GetTexture(failed).error.empty(),
