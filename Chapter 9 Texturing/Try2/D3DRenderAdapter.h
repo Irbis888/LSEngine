@@ -68,6 +68,9 @@ public:
 
     // Draw a complete mesh with all its submeshes, binding appropriate material for each
     void DrawMesh(MeshID meshId) override;
+    void DrawMeshWithMaterial(MeshID meshId, MaterialID material) override;
+    uint64_t MaterialPreviewTexture() override;
+    void DrawMaterialPreview(MeshID mesh, float rotation) override;
 
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
@@ -144,7 +147,7 @@ private:
     ID3D12PipelineState* FindSurfacePipeline(const SurfacePipelineKey& key);
     ComPtr<ID3D12PipelineState> BuildSurfacePipeline(const SurfacePipelineKey& key);
     ComPtr<ID3DBlob> FindSurfaceShader(const SurfaceShaderKey& key);
-    void DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex);
+    void DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex, MaterialID material = 0);
     int SurfaceTextureDescriptor(TextureID id, TextureID fallback, bool srgb, DXGI_FORMAT& format, bool* loaded = nullptr);
 
     struct EditorTarget
@@ -166,7 +169,10 @@ private:
         ViewportPickResult result;
         UINT64 fence = 0;
     };
+    std::unique_ptr<EditorTarget> CreateEditorTarget(uint32_t width, uint32_t height, UINT srvIndex, bool picking);
     std::unique_ptr<EditorTarget> mEditorTarget;
+    std::unique_ptr<EditorTarget> mMaterialPreview;
+    UINT mPassConstantIndex = 0;
     std::deque<std::unique_ptr<EditorTarget>> mRetiredEditorTargets;
     std::vector<UINT> mFreeEditorDescriptors;
     std::deque<PickReadback> mPickReadbacks;

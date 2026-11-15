@@ -815,7 +815,7 @@ MaterialID ResourceManager::CreateSolidMaterial(
     return CreateMaterial(mat);
 }
 
-MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
+Material ResourceManager::BuildTexturedMaterial(const MaterialDesc& desc)
 {
     Material material(desc.surface ? std::make_shared<const MaterialBase>(*desc.surface) : nullptr);
     material.name = desc.name;
@@ -848,7 +848,17 @@ MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
     parameters.normal = loadMap(desc.normalTexture, parameters.normal);
     parameters.orm = loadMap(desc.ormTexture, parameters.orm);
     parameters.emissive = loadMap(desc.emissiveTexture, parameters.emissive);
-    return CreateMaterial(material);
+    return material;
+}
+
+MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
+{
+    return CreateMaterial(BuildTexturedMaterial(desc));
+}
+
+void ResourceManager::UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc)
+{
+    GetMaterial(id) = BuildTexturedMaterial(desc);
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(

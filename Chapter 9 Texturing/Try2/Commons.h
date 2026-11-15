@@ -85,6 +85,13 @@ struct MeshComponent
 {
 	MeshID meshID;
 };
+struct MaterialComponent
+{
+    std::string assetPath;
+    MaterialID material = 0;
+    std::string error;
+};
+
 struct CameraComponent
 {
     float fov;           // Field of view in degrees
@@ -208,6 +215,15 @@ public:
     ) = 0;
 
     virtual void DrawMesh(MeshID meshId) = 0;
+    virtual void DrawMeshWithMaterial(MeshID meshId, MaterialID material)
+    {
+        DrawMesh(meshId);
+    }
+    virtual uint64_t MaterialPreviewTexture()
+    {
+        return 0;
+    }
+    virtual void DrawMaterialPreview(MeshID mesh, float rotation) {}
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
     virtual bool PrepareTerrain(const std::shared_ptr<const struct TerrainResource>&) { return false; }
     virtual void DrawTerrain(const struct TerrainResource&, const TransformComponent&,

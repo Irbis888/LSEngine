@@ -25,9 +25,6 @@ uint64_t D3DRenderAdapter::ResizeEditorViewport(uint32_t width, uint32_t height)
     {
         return GetGPUDescriptorHandle(mEditorTarget->srvIndex).ptr;
     }
-    auto target = std::make_unique<EditorTarget>();
-    target->width = width;
-    target->height = height;
     // Reserved range below the engine's allocator (1024), separate from ImGui (900..963).
     if (mFreeEditorDescriptors.empty())
     {
@@ -49,11 +46,27 @@ uint64_t D3DRenderAdapter::ResizeEditorViewport(uint32_t width, uint32_t height)
         // Keep the previous image until a fence releases a slot. Never wait for resize.
         return mEditorTarget ? GetGPUDescriptorHandle(mEditorTarget->srvIndex).ptr : 0;
     }
-    target->srvIndex = mFreeEditorDescriptors.back();
+    auto target = CreateEditorTarget(width, height, mFreeEditorDescriptors.back(), true);
     mFreeEditorDescriptors.pop_back();
+    if (mEditorTarget)
+    {
+        mEditorTarget->retireFence = mCurrentFence + 1;
+        mRetiredEditorTargets.push_back(std::move(mEditorTarget));
+    }
+    mEditorTarget = std::move(target);
+    return GetGPUDescriptorHandle(mEditorTarget->srvIndex).ptr;
+}
+
+std::unique_ptr<D3DRenderAdapter::EditorTarget> D3DRenderAdapter::CreateEditorTarget(
+    uint32_t width, uint32_t height, UINT srvIndex, bool picking)
+{
+    auto target = std::make_unique<EditorTarget>();
+    target->width = width;
+    target->height = height;
+    target->srvIndex = srvIndex;
     D3D12_DESCRIPTOR_HEAP_DESC heapDescription = {};
     heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    heapDescription.NumDescriptors = 2;
+    heapDescription.NumDescriptors = picking ? 2 : 1;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&heapDescription, IID_PPV_ARGS(&target->rtvHeap)));
     heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
     heapDescription.NumDescriptors = 1;
@@ -65,10 +78,13 @@ uint64_t D3DRenderAdapter::ResizeEditorViewport(uint32_t width, uint32_t height)
     clearValue.Format = mBackBufferFormat;
     ThrowIfFailed(md3dDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
         &textureDescription, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearValue, IID_PPV_ARGS(&target->color)));
-    textureDescription.Format = DXGI_FORMAT_R32_UINT;
-    clearValue.Format = DXGI_FORMAT_R32_UINT;
-    ThrowIfFailed(md3dDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
-        &textureDescription, D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&target->identifiers)));
+    if (picking)
+    {
+        textureDescription.Format = DXGI_FORMAT_R32_UINT;
+        clearValue.Format = DXGI_FORMAT_R32_UINT;
+        ThrowIfFailed(md3dDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
+            &textureDescription, D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&target->identifiers)));
+    }
     textureDescription.Format = mDepthStencilFormat;
     textureDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     clearValue.Format = mDepthStencilFormat;
@@ -76,24 +92,22 @@ uint64_t D3DRenderAdapter::ResizeEditorViewport(uint32_t width, uint32_t height)
     ThrowIfFailed(md3dDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
         &textureDescription, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue, IID_PPV_ARGS(&target->depth)));
     auto colorView = target->rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    auto identifierView = CD3DX12_CPU_DESCRIPTOR_HANDLE(colorView, 1, mRtvDescriptorSize);
     md3dDevice->CreateRenderTargetView(target->color.Get(), nullptr, colorView);
-    md3dDevice->CreateRenderTargetView(target->identifiers.Get(), nullptr, identifierView);
+    if (picking)
+    {
+        const auto identifierView = CD3DX12_CPU_DESCRIPTOR_HANDLE(colorView, 1, mRtvDescriptorSize);
+        md3dDevice->CreateRenderTargetView(target->identifiers.Get(), nullptr, identifierView);
+    }
     md3dDevice->CreateDepthStencilView(target->depth.Get(), nullptr, target->dsvHeap->GetCPUDescriptorHandleForHeapStart());
     D3D12_SHADER_RESOURCE_VIEW_DESC shaderView = {};
     shaderView.Format = mBackBufferFormat;
     shaderView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    shaderView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    shaderView.Shader4ComponentMapping = picking ? D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING :
+        D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(0, 1, 2, D3D12_SHADER_COMPONENT_MAPPING_FORCE_VALUE_1);
     shaderView.Texture2D.MipLevels = 1;
     auto descriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(), target->srvIndex, mCbvSrvUavDescriptorSize);
     md3dDevice->CreateShaderResourceView(target->color.Get(), &shaderView, descriptor);
-    if (mEditorTarget)
-    {
-        mEditorTarget->retireFence = mCurrentFence + 1;
-        mRetiredEditorTargets.push_back(std::move(mEditorTarget));
-    }
-    mEditorTarget = std::move(target);
-    return GetGPUDescriptorHandle(mEditorTarget->srvIndex).ptr;
+    return target;
 }
 
 void D3DRenderAdapter::BeginScene(bool editor, bool visible)
@@ -211,4 +225,70 @@ bool D3DRenderAdapter::PollViewportPick(ViewportPickResult& result)
     }
     mPickReadbacks.pop_front();
     return true;
+}
+
+uint64_t D3DRenderAdapter::MaterialPreviewTexture()
+{
+    if (!mMaterialPreview)
+    {
+        // Slot 996 follows the resizable viewport pool (980..995).
+        mMaterialPreview = CreateEditorTarget(512, 512, 996, false);
+    }
+    return GetGPUDescriptorHandle(mMaterialPreview->srvIndex).ptr;
+}
+
+void D3DRenderAdapter::DrawMaterialPreview(MeshID mesh, float rotation)
+{
+    if (!mesh || !mMaterialPreview)
+    {
+        return;
+    }
+
+    const bool editorScene = mEditorScene;
+    const PassConstants sceneConstants = mMainPassCB;
+    mEditorScene = false;
+    mPassConstantIndex = 1;
+
+    auto& target = *mMaterialPreview;
+    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(target.color.Get(),
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    mCommandList->ResourceBarrier(1, &barrier);
+    const auto renderView = target.rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    const auto depthView = target.dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    const float background[] = {0.14f, 0.16f, 0.19f, 1.0f};
+    mCommandList->OMSetRenderTargets(1, &renderView, TRUE, &depthView);
+    mCommandList->ClearRenderTargetView(renderView, background, 0, nullptr);
+    mCommandList->ClearDepthStencilView(depthView, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1, 0, 0, nullptr);
+
+    const D3D12_VIEWPORT viewport{0, 0, float(target.width), float(target.height), 0, 1};
+    const D3D12_RECT scissor{0, 0, LONG(target.width), LONG(target.height)};
+    mCommandList->RSSetViewports(1, &viewport);
+    mCommandList->RSSetScissorRects(1, &scissor);
+
+    CameraComponent camera{};
+    camera.fov = 0.65f;
+    camera.nearZ = 0.1f;
+    camera.farZ = 25;
+    SetCamera(camera, TransformComponent{{0, 0, -4}, {0, 0, 0}, {1, 1, 1}});
+
+    SceneLightData lighting;
+    lighting.ambient = {0.25f, 0.27f, 0.32f, 1.0f};
+    lighting.directionalLights.push_back({{2.4f, 2.25f, 2.05f}, glm::normalize(glm::vec3(0.5f, -0.65f, 0.75f))});
+    lighting.pointLights.push_back({{1.1f, 1.45f, 2.3f}, {2, 1.4f, -2}, 1, 9});
+    SetLights(lighting);
+    UpdCB();
+    SetTransform(TransformComponent{{0, 0, 0}, {0.12f, rotation, 0}, {2, 2, 2}});
+    DrawMesh(mesh);
+
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(target.color.Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    mCommandList->ResourceBarrier(1, &barrier);
+    const auto backBuffer = CurrentBackBufferView();
+    mCommandList->OMSetRenderTargets(1, &backBuffer, TRUE, nullptr);
+    mCommandList->RSSetViewports(1, &mScreenViewport);
+    mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+    mEditorScene = editorScene;
+    mPassConstantIndex = 0;
+    mMainPassCB = sceneConstants;
 }

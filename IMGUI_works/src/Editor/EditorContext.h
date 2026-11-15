@@ -62,11 +62,14 @@ struct EditorContext
     bool showAssets = true;
     bool showConsole = true;
     bool showStatistics = false;
+    bool showMaterialEditor = false;
     bool showLegend = false;
     bool showDemo = false;
     bool showPrimitiveCreator = false;
 
 
+    uint32_t materialPreviewMesh = 0;
+    float materialPreviewRotation = 0.0f;
     EditorViewportState viewport;
     std::string statusMessage;
 };

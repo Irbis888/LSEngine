@@ -358,4 +358,8 @@
     <None Include="Assets\MaterialDemo\ORM.png"></None>
     <None Include="Assets\MaterialDemo\Emissive.png"></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.cpp"></ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.h"></ClInclude>
+  </ItemGroup>
 </Project>

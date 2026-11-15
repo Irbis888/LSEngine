@@ -5,6 +5,8 @@
 #include <ResourceManager.h>
 #include <Editor/EditorContext.h>
 #include <Editor/EditorLayout.h>
+#include <Editor/MaterialEditor.h>
+#include <SceneSerializer.h>
 #include <Editor/EditorPlayWindow.h>
 #include <imgui_internal.h>
 #include <d3d12sdklayers.h>
@@ -301,8 +303,9 @@ void EditorValidation::AfterOverlay(D3DRenderAdapter& renderer)
         registry.destroy(Find(registry, "Ближняя сфера"));
     }
     const int captureStage = materialTest ? 31 : (preview ? 1 : 20);
-    if (stage != captureStage || capture || output.empty() ||
-        (materialTest && std::filesystem::is_regular_file(output / "editor.bmp")))
+    const bool captureMaterialEditor = materialTest && stage == 39 && frames >= 2 && Editor_GetContext()->materialPreviewMesh;
+    if ((stage != captureStage && !captureMaterialEditor) || capture || output.empty() ||
+        (materialTest && std::filesystem::is_regular_file(output / (captureMaterialEditor ? "material-editor.bmp" : "editor.bmp"))))
     {
         return;
     }
@@ -345,7 +348,8 @@ void EditorValidation::CaptureCompleted(D3DRenderAdapter& renderer)
     imageHeader.biHeight = -LONG(height);
     imageHeader.biPlanes = 1;
     imageHeader.biBitCount = 32;
-    std::ofstream file(output / "editor.bmp", std::ios::binary);
+    const char* filename = materialTest && stage == 39 ? "material-editor.bmp" : "editor.bmp";
+    std::ofstream file(output / filename, std::ios::binary);
     file.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
     file.write(reinterpret_cast<const char*>(&imageHeader), sizeof(imageHeader));
     std::vector<uint8_t> row(width * 4);
@@ -509,9 +513,81 @@ void EditorValidation::CheckMaterials(Engine& engine, D3DRenderAdapter& renderer
         const auto& gpu = *renderer.GetOrLoadMaterial(materialId);
         Check(gpu.DiffuseSrvHeapIndex == renderer.mTextures.at(std::to_string(resources.GetPlaceholderTexture()))->alternateSrvIndex,
             "Missing color map did not bind the checker in sRGB");
+        MaterialDesc description;
+        description.name = "Preview material";
+        description.color = {0.25f, 0.48f, 0.85f};
+        description.roughness = 0.29f;
+        description.surface.emplace().defaults.metallic = 0.27f;
+        description.surface->defaults.uvOffset = {0.1f, 0.2f};
+        description.surface->defaults.baseColor.a = 0.91f;
+        const std::string path = AssetPaths::ToUtf8(output / L"Материал.lsmaterial");
+        resources.SaveMaterialAsset(path, description);
+        const MaterialID asset = resources.LoadMaterialAsset(path);
+        Check(resources.LoadMaterialAsset(path) == asset, "Repeated file assignment created another material");
+        const auto& restored = resources.GetMaterial(asset).parameters;
+        Check(restored.baseColor == glm::vec4(description.color, 0.91f) &&
+            restored.metallic == 0.27f && restored.uvOffset == glm::vec2(0.1f, 0.2f),
+            "Material file round trip lost parameters");
+        description.roughness = 0.35f;
+        resources.SaveMaterialAsset(path, description);
+        Check(resources.LoadMaterialAsset(path) == asset && resources.GetMaterial(asset).parameters.roughness == 0.35f,
+            "Saving an assigned material did not update existing references");
+
+        const auto grille = Find(registry, "Masked grille");
+        const MeshID mesh = meshFor("Masked grille");
+        const MaterialID original = resources.GetMesh(mesh).submeshes.front().material;
+        registry.emplace<MaterialComponent>(grille, MaterialComponent{path, asset, {}});
+        const auto snapshot = output / "MaterialComponentScene.json";
+        SceneSerializer::Save(engine.GetWorld(), AssetPaths::ToUtf8(snapshot), engine.GetAssetRoot());
+        const auto roundTrip = SceneSerializer::Read(AssetPaths::ToUtf8(snapshot));
+        bool restoredComponent = false;
+        World testWorld;
+        for (const auto& entity : roundTrip.entities)
+        {
+            if (entity.tag == "Masked grille")
+            {
+                SceneSerializer::CreateEntity(testWorld, resources, entity);
+                const auto restoredEntity = Find(testWorld.registry, "Masked grille");
+                const auto& component = testWorld.registry.get<MaterialComponent>(restoredEntity);
+                restoredComponent = component.assetPath == path && component.material == asset;
+                break;
+            }
+        }
+        Check(restoredComponent, "Material component did not survive scene save and load");
+        Check(resources.GetMesh(mesh).submeshes.front().material == original,
+            "Component assignment altered a shared mesh");
+
+        pick(glm::vec3(0, 2, 0));
+        stage = 38;
+        break;
+    }
+    case 38:
+    {
+        if (context.viewport.pendingPick)
+        {
+            return;
+        }
+        const auto grille = Find(registry, "Masked grille");
+        Check(context.selected == grille, "Scene draw ignored the entity's opaque material component");
+        registry.remove<MaterialComponent>(grille);
+        Editor_OpenMaterial(context, AssetPaths::ToUtf8(output / L"Материал.lsmaterial"));
+        stage = 39;
+        frames = 0;
+        pick(glm::vec3(0, 2, 0));
+        break;
+    }
+    case 39:
+    {
+        if (++frames < 3 || context.viewport.pendingPick || !context.materialPreviewMesh)
+        {
+            return;
+        }
+        Check(context.selected == Find(registry, "Behind grille"), "Removing the component did not restore the mask");
+        Check(std::filesystem::is_regular_file(output / "material-editor.bmp"), "Material editor preview was not captured");
         CheckDebugLayer(renderer);
         std::cout << "MATERIAL_SMOKE_PASS created=" << stats.created << " hits=" << stats.hits
             << " misses=" << stats.misses << " capture=" << AssetPaths::ToUtf8(output / "editor.bmp") << std::endl;
+        std::cout << "MATERIAL_EDITOR_PASS " << AssetPaths::ToUtf8(output / "material-editor.bmp") << std::endl;
         PostQuitMessage(0);
         stage = 40;
         break;

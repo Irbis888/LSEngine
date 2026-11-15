@@ -223,7 +223,7 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     // Create frame resources (one per frame in flight)
     for (int i = 0; i < NumFrameResources; ++i)
     {
-        mFrameResources.push_back(std::make_unique<FrameRes>(md3dDevice.Get(), 1, 16384, 16384));
+        mFrameResources.push_back(std::make_unique<FrameRes>(md3dDevice.Get(), 2, 16385, 16385));
     }
     mCurrFrameResourceIndex = 0;
     mCurrFrameResource = mFrameResources[mCurrFrameResourceIndex].get();
@@ -319,7 +319,11 @@ void D3DRenderAdapter::UpdateMainPassCB()
     DirectX::XMStoreFloat4x4(&mMainPassCB.InvView, invViewTranspose);
 
     // Build projection matrix (standard perspective)
-    float aspect = mEditorScene ? float(mEditorTarget->width) / mEditorTarget->height : static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    const EditorTarget* renderTarget = mPassConstantIndex == 1 ? mMaterialPreview.get() :
+        (mEditorScene ? mEditorTarget.get() : nullptr);
+    const float renderWidth = renderTarget ? float(renderTarget->width) : float(mClientWidth);
+    const float renderHeight = renderTarget ? float(renderTarget->height) : float(mClientHeight);
+    const float aspect = renderWidth / renderHeight;
     const float fovY = DirectX::XM_PI / 2.0f;  // 45 degrees
     const float nearZ = 1.0f;
     const float farZ = 1500.0f;
@@ -359,7 +363,7 @@ void D3DRenderAdapter::UpdateMainPassCB()
     mMainPassCB.DeltaTime = mDeltaTime;
 
     // Copy to GPU constant buffer
-    mCurrFrameResource->PassCB->CopyData(0, mMainPassCB);
+    mCurrFrameResource->PassCB->CopyData(mPassConstantIndex, mMainPassCB);
 }
 
 void D3DRenderAdapter::UpdCB()
@@ -766,7 +770,10 @@ void D3DRenderAdapter::SetTransform(const TransformComponent& world) {
     if (!mCurrFrameResource) return;
 
     mCurrentObjectCBIndex = mNextObjectCBIndex++;
-    if(mCurrentObjectCBIndex>=16384) throw std::runtime_error("Frame ObjectCB capacity (16384) exceeded");
+    if (mCurrentObjectCBIndex >= 16385)
+    {
+        throw std::runtime_error("Frame ObjectCB capacity (16385) exceeded");
+    }
 
     // Build world matrix from transform component (TRS composition)
     ObjectConstants objConstants;
@@ -825,7 +832,11 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
     XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
 
     // Build projection matrix (standard perspective)
-    float aspect = mEditorScene ? float(mEditorTarget->width) / mEditorTarget->height : static_cast<float>(mClientWidth) / static_cast<float>(mClientHeight);
+    const EditorTarget* renderTarget = mPassConstantIndex == 1 ? mMaterialPreview.get() :
+        (mEditorScene ? mEditorTarget.get() : nullptr);
+    const float renderWidth = renderTarget ? float(renderTarget->width) : float(mClientWidth);
+    const float renderHeight = renderTarget ? float(renderTarget->height) : float(mClientHeight);
+    const float aspect = renderWidth / renderHeight;
     const float fovY = camera.fov;
     const float nearZ = camera.nearZ;
     const float farZ = camera.farZ;
@@ -853,8 +864,6 @@ void D3DRenderAdapter::SetCamera(const CameraComponent& camera, const TransformC
     mMainPassCB.EyePosW = DirectX::XMFLOAT3(camPos.x, camPos.y, camPos.z);
 
     // Store render target dimensions
-    const float renderWidth = mEditorScene ? float(mEditorTarget->width) : float(mClientWidth);
-    const float renderHeight = mEditorScene ? float(mEditorTarget->height) : float(mClientHeight);
     mMainPassCB.RenderTargetSize = DirectX::XMFLOAT2(renderWidth, renderHeight);
     mMainPassCB.InvRenderTargetSize = DirectX::XMFLOAT2(1.0f / renderWidth, 1.0f / renderHeight);
 
@@ -1004,9 +1013,9 @@ void D3DRenderAdapter::SetMaterial(MaterialID materialId)
     constants.textureFlags = gpu.textureFlags;
 
     const UINT materialIndex = mNextMaterialCBIndex++;
-    if (materialIndex >= 16384)
+    if (materialIndex >= 16385)
     {
-        throw std::runtime_error("Frame MaterialCB capacity (16384) exceeded");
+        throw std::runtime_error("Frame MaterialCB capacity (16385) exceeded");
     }
     auto& frame = *mCurrFrameResource;
     frame.MaterialCB->CopyData(materialIndex, constants);
@@ -1021,7 +1030,8 @@ void D3DRenderAdapter::SetMaterial(MaterialID materialId)
     mCommandList->SetGraphicsRootDescriptorTable(7, GetGPUDescriptorHandle(gpu.emissiveSrvIndex));
     mCommandList->SetGraphicsRootConstantBufferView(2, frame.ObjectCB->Resource()->GetGPUVirtualAddress() +
         UINT64(mCurrentObjectCBIndex) * frame.ObjectCB->ElementByteSize());
-    mCommandList->SetGraphicsRootConstantBufferView(3, frame.PassCB->Resource()->GetGPUVirtualAddress());
+    mCommandList->SetGraphicsRootConstantBufferView(3, frame.PassCB->Resource()->GetGPUVirtualAddress() +
+        UINT64(mPassConstantIndex) * frame.PassCB->ElementByteSize());
     mCommandList->SetGraphicsRootConstantBufferView(4, frame.MaterialCB->Resource()->GetGPUVirtualAddress() +
         UINT64(materialIndex) * frame.MaterialCB->ElementByteSize());
     mCommandList->SetGraphicsRoot32BitConstant(5, mRenderEntityID, 0);
@@ -1234,6 +1244,11 @@ MeshGPU* D3DRenderAdapter::GetMeshGPU(MeshID meshId)
 
 void D3DRenderAdapter::DrawMesh(MeshID meshId)
 {
+    DrawMeshWithMaterial(meshId, 0);
+}
+
+void D3DRenderAdapter::DrawMeshWithMaterial(MeshID meshId, MaterialID material)
+{
     const MeshGPU* mesh = GetMeshGPU(meshId);
     if (!mesh)
     {
@@ -1241,7 +1256,7 @@ void D3DRenderAdapter::DrawMesh(MeshID meshId)
     }
     for (uint32_t submeshIndex = 0; submeshIndex < mesh->submeshes.size(); ++submeshIndex)
     {
-        DrawGpuSubmesh(*mesh, submeshIndex);
+        DrawGpuSubmesh(*mesh, submeshIndex, material);
     }
 }
 
@@ -1254,10 +1269,10 @@ void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
     }
 }
 
-void D3DRenderAdapter::DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex)
+void D3DRenderAdapter::DrawGpuSubmesh(const MeshGPU& mesh, uint32_t submeshIndex, MaterialID material)
 {
     const auto& submesh = mesh.submeshes[submeshIndex];
-    SetMaterial(submesh.material);
+    SetMaterial(material ? material : submesh.material);
     mCommandList->IASetVertexBuffers(0, 1, &mesh.vbView);
     mCommandList->IASetIndexBuffer(&mesh.ibView);
     mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

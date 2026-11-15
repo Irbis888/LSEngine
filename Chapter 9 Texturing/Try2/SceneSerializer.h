@@ -25,6 +25,7 @@ public:
         std::string tag;
         TransformComponent transform;
         std::optional<MeshDescription> mesh;
+        std::string materialAsset;
         std::optional<CameraComponent> camera;
         std::optional<DirectionalLightComponent> directionalLight;
         std::optional<PointLightComponent> pointLight;
@@ -37,6 +38,7 @@ public:
     struct SceneData { std::vector<EntityDescription> entities; };
 
     // CPU-only file reading, JSON parsing and validation, safe inside a job.
+    static MaterialDesc ReadMaterialAsset(const std::filesystem::path& file);
     static SceneData Read(const std::string& path);
     // One entity object in the scene-entity format (tag defaults to defaultTag). CPU-only.
     static EntityDescription ReadPrefab(const std::filesystem::path& file, const std::string& defaultTag);

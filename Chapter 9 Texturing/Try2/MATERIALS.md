@@ -15,7 +15,15 @@ Try2.exe --play --scene Scenes/MaterialsDemo.json
 - `MaterialParameters` хранит разрешённые значения и TextureID. Конструктор `Material(sharedBase)` копирует defaults. Несколько материалов могут ссылаться на одну базу и менять собственные параметры.
 - `MaterialGPU` хранит вычисленные индексы SRV и флаги интерпретации карт. `SetMaterial` выбирает PSO и пишет константы в текущий frame resource. `DrawMesh` и `DrawSubmesh` вызывают общий `DrawGpuSubmesh`.
 - `ResourceManager::CreateTexturedMaterial(MaterialDesc)` преобразует старые albedo, normal, RGB color и roughness. Старые сцены и импорт Assimp используют стандартный Lit. В JSON расширенные поля находятся в `mesh.material.surface`, а старые поля остаются на прежнем месте.
-- Точки для будущего редактора на главном потоке: `CreateMaterial(Material(sharedBase))`, `GetMaterial(id).parameters`, замена `GetMaterial(id).base`, `SetMeshMaterial` и `SetSubmeshMaterial`. Для сохранения текущий редактор обновляет исходный `MeshSourceComponent` с `MaterialDesc`. Изменение только runtime-параметров через API действует до загрузки сцены. Самостоятельные ресурсы материалов с общими ссылками между сценами, редактор полного набора параметров и система наследования инстансов остаются следующим этапом.
+- `MaterialComponent` задаёт материал всем submesh конкретной сущности. RenderSystem передаёт MaterialID в `DrawMeshWithMaterial`, не меняя MeshID и материалы общей геометрии. В сцене хранится `"materialComponent": {"asset": "Assets/Materials/Material.lsmaterial"}`. Удаление компонента возвращает исходные материалы. Если файл не читается, сущность продолжает рисоваться с исходными материалами, а Inspector показывает ошибку.
+- `ResourceManager::LoadMaterialAsset` переиспользует MaterialID по пути. `SaveMaterialAsset` сохраняет JSON версии 1 и обновляет закешированный материал после успешной записи файла. Все сущности с этим путём получают изменения. Файлы текстур и материалов разрешаются относительно корня проекта.
+
+## Редактор материалов
+
+1. Откройте **View → Material Editor**, затем **New** или **Open…**. Двойной клик по `.lsmaterial` в Asset Browser тоже открывает файл.
+2. Изменяйте свойства и вращайте шарик перетаскиванием или ползунком. Просмотр использует отдельный квадратный render target и тот же D3D12-путь материалов с постоянным студийным светом. Окно можно докать.
+3. Сохраните материал в проект, по умолчанию в `Assets/Materials`. Выберите сущность с мешем и нажмите **Apply to selected**. В Inspector также есть **Add material component…**, замена файла и удаление компонента.
+4. Сохраните сцену, чтобы назначение осталось после перезапуска. Отдельный Play читает тот же файл материала. Черновик в редакторе обновляет только шарик, а **Save** применяет правки к существующим назначениям этого файла. Настройка материалов наследованием инстансов остаётся отдельным этапом.
 
 Пример поля `surface`:
 
@@ -78,6 +86,6 @@ F5 строит набор новых пайплайнов и публикует
 
 ## Проверка
 
-`tests/RunMaterialTests.ps1 -Configuration Debug` и `Release` запускают обычный Try2 в editor и standalone, сохраняют реальные backbuffer-захваты и проверяют picking через отверстие и по полосе маски, кеш после изменения roughness и карт, отдельные ключи режима и программы, откат сломанного HLSL, fallback отсутствующей карты и D3D12 info queue при наличии debug layer. Дополнительно открываются baseline и TerrainDemo. Скрипт печатает пути к захватам и счётчики. Стандартные editor/texture проверки покрывают прежние сцены и потоковую загрузку.
+`tests/RunMaterialTests.ps1 -Configuration Debug` и `Release` запускают обычный Try2 в editor и standalone, сохраняют реальные backbuffer-захваты и проверяют picking через отверстие и по полосе маски, кеш после изменения roughness и карт, отдельные ключи режима и программы, откат сломанного HLSL, fallback отсутствующей карты и D3D12 info queue при наличии debug layer. Дополнительно открываются baseline и TerrainDemo. Скрипт печатает пути к захватам и счётчики. Проверка также сохраняет и повторно читает материал с кириллическим именем, обновляет его по прежнему ID, проверяет сериализацию компонента, назначение и удаление через GPU picking и сохраняет кадр окна с шариком. Стандартные editor/texture проверки покрывают прежние сцены и потоковую загрузку.
 
 Основные изменения: ResourceManager.h/.cpp, SceneSerializer.cpp, FrameRes.h, d3dUtils.h, D3DRenderAdapter.h/.cpp, D3DSurfaceMaterials.cpp, D3DTerrain.cpp, Default.hlsl, Surface.hlsli, SurfaceOutput.hlsli, Unlit.hlsl, Try2.cpp, StatisticsPanel.cpp, сцены/Assets/MaterialDemo, файлы проекта и проверки в tests.

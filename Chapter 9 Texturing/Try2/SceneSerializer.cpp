@@ -468,6 +468,10 @@ namespace
         SceneSerializer::EntityDescription entity;
         entity.tag = value.value("tag", defaultTag);
         entity.transform = JsonToTransform(value.value("transform", json::object()));
+        if (value.contains("materialComponent"))
+        {
+            entity.materialAsset = value.at("materialComponent").at("asset").get<std::string>();
+        }
         if (value.contains("mesh")) entity.mesh = ReadMesh(value.at("mesh"), entity.tag);
         if (value.contains("camera")) entity.camera = JsonToCamera(value.at("camera"));
         if (value.contains("directionalLight")) entity.directionalLight = JsonToDirectionalLight(value.at("directionalLight"));
@@ -536,6 +540,11 @@ size_t SceneSerializer::Save(const World& world, const std::string& path, const 
                 if (!source || keepRuntimeMeshIds) value["id"] = mesh->meshID;
                 serializedEntity["mesh"] = std::move(value);
             }
+        }
+
+        if (const auto* material = world.registry.try_get<MaterialComponent>(entity))
+        {
+            serializedEntity["materialComponent"] = {{"asset", ProjectPath(root, material->assetPath)}};
         }
 
         if (const auto* camera = world.registry.try_get<CameraComponent>(entity))
@@ -641,6 +650,21 @@ void SceneSerializer::Instantiate(entt::registry& registry, entt::entity entity,
             registry.emplace<MeshSourceComponent>(entity, MeshSourceComponent{ std::move(source) });
         }
     }
+    if (!description.materialAsset.empty())
+    {
+        MaterialComponent component;
+        component.assetPath = description.materialAsset;
+        try
+        {
+            component.material = resources.LoadMaterialAsset(component.assetPath);
+        }
+        catch (const std::exception& error)
+        {
+            component.error = error.what();
+            std::cerr << component.error << '\n';
+        }
+        registry.emplace<MaterialComponent>(entity, std::move(component));
+    }
     if (description.camera) registry.emplace<CameraComponent>(entity, *description.camera);
     if (description.directionalLight) registry.emplace<DirectionalLightComponent>(entity, *description.directionalLight);
     if (description.pointLight) registry.emplace<PointLightComponent>(entity, *description.pointLight);
@@ -663,4 +687,77 @@ void SceneSerializer::Load(World& world, ResourceManager& resources, const std::
     auto data = Read(path);
     world.registry.clear();
     for (const auto& entity : data.entities) CreateEntity(world, resources, entity);
+}
+
+MaterialDesc SceneSerializer::ReadMaterialAsset(const std::filesystem::path& file)
+{
+    try
+    {
+        std::ifstream stream(file, std::ios::binary);
+        if (!stream)
+        {
+            throw std::runtime_error("Cannot open material");
+        }
+        const auto document = json::parse(stream);
+        if (document.at("version") != 1)
+        {
+            throw std::runtime_error("Unsupported material file version");
+        }
+        return ReadMaterial(document.at("material"), AssetPaths::ToUtf8(file.stem()));
+    }
+    catch (const std::exception& error)
+    {
+        throw std::runtime_error(AssetPaths::ToUtf8(file) + ": " + error.what());
+    }
+}
+
+MaterialID ResourceManager::LoadMaterialAsset(const std::string& path)
+{
+    const auto file = AssetPaths::Resolve(mSearch->root, path);
+    const auto key = file.native();
+    const auto cached = mMaterialAssets.find(key);
+    if (cached != mMaterialAssets.end())
+    {
+        return cached->second;
+    }
+    const MaterialID material = CreateTexturedMaterial(SceneSerializer::ReadMaterialAsset(file));
+    mMaterialAssets.emplace(key, material);
+    return material;
+}
+
+void ResourceManager::SaveMaterialAsset(const std::string& path, const MaterialDesc& description)
+{
+    const auto file = AssetPaths::Resolve(mSearch->root, path);
+    const auto document = json{{"version", 1}, {"material", MaterialToJson(description, mSearch->root)}};
+    const auto text = document.dump(2);
+    const auto cached = mMaterialAssets.find(file.native());
+    std::optional<Material> replacement;
+    if (cached != mMaterialAssets.end())
+    {
+        replacement = BuildTexturedMaterial(description);
+    }
+
+    auto temporary = file;
+    temporary += L".tmp-" + std::to_wstring(GetCurrentProcessId());
+    try
+    {
+        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
+        stream.exceptions(std::ios::badbit | std::ios::failbit);
+        stream << text << '\n';
+        stream.close();
+        if (!MoveFileExW(temporary.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            throw std::system_error(GetLastError(), std::system_category(), "Cannot replace material file");
+        }
+    }
+    catch (...)
+    {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        throw;
+    }
+    if (replacement)
+    {
+        GetMaterial(cached->second) = std::move(*replacement);
+    }
 }

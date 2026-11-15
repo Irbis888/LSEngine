@@ -1,5 +1,6 @@
 #include "EditorContext.h"
 #include "EditorLayout.h"
+#include "MaterialEditor.h"
 #include "EditorSceneIO.h"
 #include "EditorProject.h"
 #include "EditorPlayWindow.h"
@@ -237,6 +238,7 @@ static void DrawMainMenu(EditorContext& ctx)
 
         ImGui::MenuItem("Asset Browser", nullptr, &ctx.showAssets);
         ImGui::MenuItem("Console", nullptr, &ctx.showConsole);
+        ImGui::MenuItem("Material Editor", nullptr, &ctx.showMaterialEditor);
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Layout"))
         {
@@ -494,4 +496,5 @@ void Editor_RenderUI(const FrameContext& context)
         ImGui::ShowDemoWindow(&ctx.showDemo);
 
     Editor_DrawAssetsAndConsole(ctx);
+    Editor_DrawMaterialWindow(ctx);
 }

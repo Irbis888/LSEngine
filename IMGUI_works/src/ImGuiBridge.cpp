@@ -279,6 +279,8 @@ void ImGuiBridge::RenderOverlay(D3DRenderAdapter* adapter)
     if (!IsVisible() || !adapter)
         return;
 
+    const auto& context = *Editor_GetContext();
+    adapter->DrawMaterialPreview(context.materialPreviewMesh, context.materialPreviewRotation);
     ImGui::Render();
     ImDrawData* drawData = ImGui::GetDrawData();
     if (!drawData || drawData->TotalVtxCount == 0)

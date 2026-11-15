@@ -212,6 +212,9 @@ public:
         const glm::vec3& color,
         float roughness = 0.5f);
     MaterialID CreateTexturedMaterial(const MaterialDesc& desc);
+    void UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc);
+    MaterialID LoadMaterialAsset(const std::string& path);
+    void SaveMaterialAsset(const std::string& path, const MaterialDesc& description);
     MaterialID CreateTexturedMaterial(
         const std::string& name,
         const std::wstring& albedoTexture,
@@ -250,7 +253,9 @@ private:
     std::unordered_map<MeshID, MaterialID> mMeshMaterialOverrides;
     std::unordered_map<MeshID, std::unordered_map<uint32_t, MaterialID>> mSubmeshMaterialOverrides;
     std::unordered_map<MeshID, Mesh> mMeshes;
+    Material BuildTexturedMaterial(const MaterialDesc& description);
     std::unordered_map<MaterialID, Material> mMaterials;
+    std::unordered_map<std::wstring, MaterialID> mMaterialAssets;
     std::unordered_map<TextureID, Texture> mTextures;
     std::unordered_map<std::wstring, TextureID> mTextureIDsByFilename;
 };

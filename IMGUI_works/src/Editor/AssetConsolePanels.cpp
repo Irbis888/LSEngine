@@ -1,6 +1,7 @@
 #include "EditorContext.h"
 #include "EditorSceneIO.h"
 #include "EditorProject.h"
+#include "MaterialEditor.h"
 #include <Engine.h>
 #include <AssetPaths.h>
 #include <ScriptSystem.h>
@@ -57,7 +58,11 @@ void Editor_DrawAssetsAndConsole(EditorContext& context)
                         break;
                     }
                     const auto path = AssetPaths::ToUtf8(relativePath);
-                    if (entry.path().extension() == L".json" && path.find("Scenes/") != std::string::npos && Editor_CanEditComponents())
+                    if (_wcsicmp(entry.path().extension().c_str(), L".lsmaterial") == 0)
+                    {
+                        Editor_OpenMaterial(context, path);
+                    }
+                    else if (entry.path().extension() == L".json" && path.find("Scenes/") != std::string::npos && Editor_CanEditComponents())
                     {
                         EditorSceneIO::LoadScene(context, path.c_str());
                     }

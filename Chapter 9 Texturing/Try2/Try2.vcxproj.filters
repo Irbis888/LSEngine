@@ -491,4 +491,8 @@
     <None Include="Assets\MaterialDemo\ORM.png"><Filter>Graphics</Filter></None>
     <None Include="Assets\MaterialDemo\Emissive.png"><Filter>Graphics</Filter></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.cpp"><Filter>Editor</Filter></ClCompile>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.h"><Filter>Editor</Filter></ClInclude>
+  </ItemGroup>
 </Project>

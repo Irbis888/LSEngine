@@ -8,6 +8,7 @@
 #include <AssetPaths.h>
 #include <cmath>
 #include "TerrainPanel.h"
+#include "MaterialEditor.h"
 #include "EditorProject.h"
 #include <Terrain.h>
 #include <ResourceManager.h>
@@ -249,7 +250,11 @@ static void DrawInspectorPanel(EditorContext& ctx)
             ImGui::InputInt("Mesh ID", &id, 0, 0, ImGuiInputTextFlags_ReadOnly);
 
         }
-        DrawMaterialEditor(ctx, entity);
+        Editor_DrawMaterialComponent(ctx, entity);
+        if (!ctx.registry->all_of<MaterialComponent>(entity))
+        {
+            DrawMaterialEditor(ctx, entity);
+        }
     }
 
     if (ctx.registry->all_of<DirectionalLightComponent>(entity))

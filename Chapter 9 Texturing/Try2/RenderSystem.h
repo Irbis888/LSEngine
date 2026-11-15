@@ -63,11 +63,19 @@ public:
             });
         mAdapter->SetLights(lights);
 		mAdapter->UpdCB();
-        reg.view<TransformComponent, MeshComponent>().each([this, &context](entt::entity entity, auto& transform, auto& mesh)
+        reg.view<TransformComponent, MeshComponent>().each([this, &reg](entt::entity entity, auto& transform, auto& mesh)
             {
                 mAdapter->SetRenderEntity(entity);
                 mAdapter->SetTransform(transform);
-				mAdapter->DrawMesh(mesh.meshID);
+                const auto* material = reg.try_get<MaterialComponent>(entity);
+                if (material && material->material)
+                {
+                    mAdapter->DrawMeshWithMaterial(mesh.meshID, material->material);
+                }
+                else
+                {
+                    mAdapter->DrawMesh(mesh.meshID);
+                }
             });
         if(mTerrain)mTerrain->Draw(reg);
     }
