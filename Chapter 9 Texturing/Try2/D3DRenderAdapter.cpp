@@ -945,6 +945,17 @@ void D3DRenderAdapter::SetLights(const SceneLightData& lights)
 
         ++lightIndex;
     }
+
+    static_assert(RenderEmissiveLightOffset + RenderEmissiveLightCount <= MaxLights);
+    const size_t emitterCount = std::min(lights.emissiveLights.size(), size_t(RenderEmissiveLightCount));
+    for (size_t index = 0; index < emitterCount; ++index)
+    {
+        const auto& source = lights.emissiveLights[index];
+        auto& target = mMainPassCB.Lights[RenderEmissiveLightOffset + index];
+        target.Strength = {source.strength.x, source.strength.y, source.strength.z};
+        target.Position = {source.position.x, source.position.y, source.position.z};
+        target.FalloffEnd = source.falloffEnd;
+    }
 }
 
 void D3DRenderAdapter::SetMaterial(MaterialID materialId)
@@ -979,6 +990,7 @@ void D3DRenderAdapter::SetMaterial(MaterialID materialId)
         MaterialBase fallback = defaultBase;
         fallback.mode = base.mode == SurfaceMode::Masked ? SurfaceMode::Masked : SurfaceMode::Opaque;
         fallback.twoSided = base.twoSided;
+        fallback.renderState = base.renderState;
         pipeline = FindSurfacePipeline(MakeSurfaceKey(fallback, mEditorScene));
         if (!pipeline)
         {
@@ -1262,10 +1274,15 @@ void D3DRenderAdapter::DrawMeshWithMaterial(MeshID meshId, MaterialID material)
 
 void D3DRenderAdapter::DrawSubmesh(MeshID meshId, uint32_t submeshIndex)
 {
+    DrawSubmeshWithMaterial(meshId, submeshIndex, 0);
+}
+
+void D3DRenderAdapter::DrawSubmeshWithMaterial(MeshID meshId, uint32_t submeshIndex, MaterialID material)
+{
     const MeshGPU* mesh = GetMeshGPU(meshId);
     if (mesh && submeshIndex < mesh->submeshes.size())
     {
-        DrawGpuSubmesh(*mesh, submeshIndex);
+        DrawGpuSubmesh(*mesh, submeshIndex, material);
     }
 }
 

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Blue",
+    "color": [
+      0.04,
+      0.22,
+      0.8
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": true,
+      "alpha": 1,
+      "emissiveLightRange": 0
+    }
+  }
+}

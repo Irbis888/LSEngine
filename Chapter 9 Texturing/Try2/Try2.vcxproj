@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -361,5 +361,50 @@
   <ItemGroup>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.cpp"></ClCompile>
     <ClInclude Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.h"></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MaterialRenderState.h"></ClInclude>
+    <None Include="Scenes\MaterialRenderStatesDemo.json"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddBlue.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddGreen.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddRed.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaBlue.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaGreen.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaRed.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Blue.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Card.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Gray.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Greater.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label1.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label1.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label2.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label2.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label3.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label3.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label4.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label4.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label5.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label5.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label6.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label6.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label7.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label7.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label8.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label8.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label9.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label9.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Mask.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Mask.png"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\NoTest.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\NoWrite.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Orange.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Quad.obj"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Red.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\UnconditionalWrite.lsmaterial"></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Yellow.lsmaterial"></None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MATERIAL_RENDER_STATES.md"></None>
+    <None Include="..\..\tests\RunRenderStateTests.ps1"></None>
   </ItemGroup>
 </Project>

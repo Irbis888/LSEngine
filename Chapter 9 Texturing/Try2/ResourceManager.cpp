@@ -817,6 +817,10 @@ MaterialID ResourceManager::CreateSolidMaterial(
 
 Material ResourceManager::BuildTexturedMaterial(const MaterialDesc& desc)
 {
+    if (desc.surface)
+    {
+        desc.surface->renderState.Validate();
+    }
     Material material(desc.surface ? std::make_shared<const MaterialBase>(*desc.surface) : nullptr);
     material.name = desc.name;
     material.parameters.baseColor = glm::vec4(desc.color, material.parameters.baseColor.a);
@@ -859,6 +863,15 @@ MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
 void ResourceManager::UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc)
 {
     GetMaterial(id) = BuildTexturedMaterial(desc);
+}
+
+void ResourceManager::SetMaterialRenderState(MaterialID id, const MaterialRenderState& state)
+{
+    state.Validate();
+    auto& material = GetMaterial(id);
+    MaterialBase base = material.base ? *material.base : MaterialBase{};
+    base.renderState = state;
+    material.base = std::make_shared<const MaterialBase>(std::move(base));
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "material": {
+    "name": "AddGreen",
+    "color": [
+      0.008,
+      0.38,
+      0.025
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": false,
+      "alpha": 0.65,
+      "emissiveLightRange": 0,
+      "renderState": {
+        "depthWrite": false,
+        "blendEnabled": true,
+        "sourceColor": "SrcAlpha",
+        "destinationColor": "One",
+        "sourceAlpha": "One",
+        "destinationAlpha": "One"
+      }
+    }
+  }
+}

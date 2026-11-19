@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Card",
+    "color": [
+      0.018,
+      0.025,
+      0.04
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": true,
+      "alpha": 1,
+      "emissiveLightRange": 0
+    }
+  }
+}

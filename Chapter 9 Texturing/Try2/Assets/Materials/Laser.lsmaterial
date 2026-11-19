@@ -1,0 +1,40 @@
+{
+  "material": {
+    "color": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "name": "Laser",
+    "roughness": 0.5,
+    "surface": {
+      "alpha": 1.0,
+      "alphaCutoff": 0.5,
+      "aoStrength": 1.0,
+      "editorVariant": true,
+      "emissiveColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissiveIntensity": 0.019999999552965164,
+      "emissiveLightRange": 15.199999809265137,
+      "maskedVariant": true,
+      "mode": "opaque",
+      "normalStrength": 1.0,
+      "pixelEntry": "PS",
+      "shader": "Shaders/Default.hlsl",
+      "twoSided": false,
+      "uvOffset": [
+        0.0,
+        0.0
+      ],
+      "uvScale": [
+        1.0,
+        1.0
+      ],
+      "vertexEntry": "VS"
+    }
+  },
+  "version": 1
+}

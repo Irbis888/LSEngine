@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "material": {
+    "name": "AlphaGreen",
+    "color": [
+      0.025,
+      0.8,
+      0.12
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": true,
+      "alpha": 0.5,
+      "emissiveLightRange": 0,
+      "renderState": {
+        "depthWrite": false,
+        "blendEnabled": true,
+        "sourceColor": "SrcAlpha",
+        "destinationColor": "InvSrcAlpha",
+        "sourceAlpha": "One",
+        "destinationAlpha": "InvSrcAlpha"
+      }
+    }
+  }
+}

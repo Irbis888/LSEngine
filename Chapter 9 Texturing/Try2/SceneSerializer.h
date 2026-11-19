@@ -26,6 +26,7 @@ public:
         TransformComponent transform;
         std::optional<MeshDescription> mesh;
         std::string materialAsset;
+        std::optional<RenderOrderComponent> renderOrder;
         std::optional<CameraComponent> camera;
         std::optional<DirectionalLightComponent> directionalLight;
         std::optional<PointLightComponent> pointLight;

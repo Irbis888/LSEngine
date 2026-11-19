@@ -3,6 +3,7 @@
 #include <optional>
 #include "Commons.h"
 #include "ImageData.h"
+#include "MaterialRenderState.h"
 #include <deque>
 #include <filesystem>
 
@@ -102,6 +103,7 @@ struct MaterialParameters
     float alphaCutoff = 0.5f;
     glm::vec3 emissiveColor{0.0f};
     float emissiveIntensity = 1.0f;
+    float emissiveLightRange = 5.0f;
     glm::vec2 uvScale{1.0f};
     glm::vec2 uvOffset{0.0f};
 };
@@ -111,6 +113,7 @@ struct MaterialBase
     SurfaceProgram program;
     SurfaceMode mode = SurfaceMode::Opaque;
     bool twoSided = false;
+    MaterialRenderState renderState;
     MaterialParameters defaults;
 };
 
@@ -213,6 +216,8 @@ public:
         float roughness = 0.5f);
     MaterialID CreateTexturedMaterial(const MaterialDesc& desc);
     void UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc);
+    // Main thread; preserves parameters, textures, resource ID and all users of it.
+    void SetMaterialRenderState(MaterialID id, const MaterialRenderState& state);
     MaterialID LoadMaterialAsset(const std::string& path);
     void SaveMaterialAsset(const std::string& path, const MaterialDesc& description);
     MaterialID CreateTexturedMaterial(

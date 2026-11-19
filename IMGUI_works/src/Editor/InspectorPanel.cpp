@@ -248,7 +248,13 @@ static void DrawInspectorPanel(EditorContext& ctx)
             auto& mesh = ctx.registry->get<MeshComponent>(entity);
             int id = (int)mesh.meshID;
             ImGui::InputInt("Mesh ID", &id, 0, 0, ImGuiInputTextFlags_ReadOnly);
-
+            const auto* order = ctx.registry->try_get<RenderOrderComponent>(entity);
+            int layer = order ? order->layer : 0;
+            if (ImGui::InputInt("Render order", &layer))
+            {
+                ctx.registry->emplace_or_replace<RenderOrderComponent>(entity, RenderOrderComponent{layer});
+            }
+            ImGui::SetItemTooltip("Lower layers draw first within the opaque or blended queue. Keep 0 for normal sorting; blended objects sort back to front within each layer.");
         }
         Editor_DrawMaterialComponent(ctx, entity);
         if (!ctx.registry->all_of<MaterialComponent>(entity))

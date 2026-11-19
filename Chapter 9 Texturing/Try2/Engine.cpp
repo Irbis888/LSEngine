@@ -87,7 +87,7 @@ void Engine::Init(const GameTimer& gt, const std::string& startupScene, bool sta
     mScripts->SetJobs(&mJobs);
     mTerrain=std::make_unique<TerrainSystem>(mJobs,*mRenderAdapter,mAssetRoot);
 	physicsSystems.push_back(std::make_unique<PhysicsSystem>(mJobs,[this](auto& reg){mTerrain->ResolveContacts(reg);}));
-	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter,mTerrain.get()));
+	renderSystems.push_back(std::make_unique<RenderSystem>(mRenderAdapter, mResourceManager, mTerrain.get()));
 
     if (!startupScene.empty())
     {

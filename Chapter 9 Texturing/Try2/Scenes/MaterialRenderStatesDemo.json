@@ -1,0 +1,1163 @@
+{
+  "version": 1,
+  "name": "Material Render States Demo",
+  "entities": [
+    {
+      "tag": "Camera",
+      "transform": {
+        "position": [
+          0,
+          0,
+          -18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "camera": {
+        "fov": 1.05,
+        "nearZ": 0.1,
+        "farZ": 100,
+        "aspectRatio": 1.6
+      }
+    },
+    {
+      "tag": "01 Card",
+      "transform": {
+        "position": [
+          -6.355555555555556,
+          6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "01 01  OPAQUE",
+      "transform": {
+        "position": [
+          -4.737777777777778,
+          6.304888888888888,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label1.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "02 Card",
+      "transform": {
+        "position": [
+          0.0,
+          6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "02 02  MASKED",
+      "transform": {
+        "position": [
+          0.0,
+          6.304888888888888,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label2.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "03 Card",
+      "transform": {
+        "position": [
+          6.355555555555556,
+          6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "03 03  ALPHA BLEND",
+      "transform": {
+        "position": [
+          4.737777777777778,
+          6.304888888888888,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label3.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "04 Card",
+      "transform": {
+        "position": [
+          -6.355555555555556,
+          0.0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "04 04  ADDITIVE",
+      "transform": {
+        "position": [
+          -4.737777777777778,
+          1.567111111111111,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label4.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "05 Card",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "05 05  DEPTH TEST OFF",
+      "transform": {
+        "position": [
+          0.0,
+          1.567111111111111,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label5.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "06 Card",
+      "transform": {
+        "position": [
+          6.355555555555556,
+          0.0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "06 06  DEPTH WRITE ON",
+      "transform": {
+        "position": [
+          4.737777777777778,
+          1.567111111111111,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label6.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "07 Card",
+      "transform": {
+        "position": [
+          -6.355555555555556,
+          -6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "07 07  DEPTH WRITE OFF",
+      "transform": {
+        "position": [
+          -4.737777777777778,
+          -3.1706666666666665,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label7.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "08 Card",
+      "transform": {
+        "position": [
+          0.0,
+          -6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "08 08  DEPTH COMPARE: GREATER",
+      "transform": {
+        "position": [
+          0.0,
+          -3.1706666666666665,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label8.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "09 Card",
+      "transform": {
+        "position": [
+          6.355555555555556,
+          -6.355555555555556,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.055555555555556,
+          2.994444444444445,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Card.lsmaterial"
+      },
+      "renderOrder": -100
+    },
+    {
+      "tag": "09 09  UNCONDITIONAL WRITE",
+      "transform": {
+        "position": [
+          4.737777777777778,
+          -3.1706666666666665,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.141111111111111,
+          0.40088888888888885,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Label9.lsmaterial"
+      },
+      "renderOrder": 1000
+    },
+    {
+      "tag": "01 Far blue sphere",
+      "transform": {
+        "position": [
+          -5.62,
+          4.8500000000000005,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.3,
+          2.3,
+          2.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Blue.lsmaterial"
+      }
+    },
+    {
+      "tag": "01 Near orange cube",
+      "transform": {
+        "position": [
+          -4.75,
+          4.65,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.65,
+          1.65,
+          1.0
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Orange.lsmaterial"
+      }
+    },
+    {
+      "tag": "02 Blue behind grille",
+      "transform": {
+        "position": [
+          0,
+          4.8,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.6,
+          1.45,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Blue.lsmaterial"
+      }
+    },
+    {
+      "tag": "02 Masked grille",
+      "transform": {
+        "position": [
+          0,
+          4.8,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.6,
+          1.45,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Mask.lsmaterial"
+      }
+    },
+    {
+      "tag": "03 Opaque backdrop",
+      "transform": {
+        "position": [
+          5.2,
+          4.8,
+          2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.8,
+          1.4,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Gray.lsmaterial"
+      }
+    },
+    {
+      "tag": "03 AlphaRed",
+      "transform": {
+        "position": [
+          4.55,
+          5.05,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AlphaRed.lsmaterial"
+      }
+    },
+    {
+      "tag": "03 AlphaGreen",
+      "transform": {
+        "position": [
+          5.2,
+          4.8,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AlphaGreen.lsmaterial"
+      }
+    },
+    {
+      "tag": "03 AlphaBlue",
+      "transform": {
+        "position": [
+          5.8500000000000005,
+          4.55,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AlphaBlue.lsmaterial"
+      }
+    },
+    {
+      "tag": "03 Opaque foreground cube",
+      "transform": {
+        "position": [
+          6.1000000000000005,
+          4.0,
+          -2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.7,
+          0.7,
+          0.7
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Yellow.lsmaterial"
+      }
+    },
+    {
+      "tag": "04 AddRed",
+      "transform": {
+        "position": [
+          -5.8500000000000005,
+          -0.05,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.35,
+          2.35,
+          2.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AddRed.lsmaterial"
+      }
+    },
+    {
+      "tag": "04 AddGreen",
+      "transform": {
+        "position": [
+          -4.55,
+          -0.05,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.35,
+          2.35,
+          2.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AddGreen.lsmaterial"
+      }
+    },
+    {
+      "tag": "04 AddBlue",
+      "transform": {
+        "position": [
+          -5.2,
+          -0.9,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.35,
+          2.35,
+          2.35
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/AddBlue.lsmaterial"
+      }
+    },
+    {
+      "tag": "05 Gray occluder",
+      "transform": {
+        "position": [
+          0,
+          -0.4,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.7,
+          1.4,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Gray.lsmaterial"
+      }
+    },
+    {
+      "tag": "05 Cyan behind occluder - test disabled",
+      "transform": {
+        "position": [
+          0,
+          -0.4,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.0,
+          2.0,
+          2.0
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/NoTest.lsmaterial"
+      },
+      "renderOrder": 20
+    },
+    {
+      "tag": "06 Orange gate draws first",
+      "transform": {
+        "position": [
+          4.7,
+          -0.4,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.4,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Orange.lsmaterial"
+      }
+    },
+    {
+      "tag": "06 Far blue sphere draws second",
+      "transform": {
+        "position": [
+          5.6000000000000005,
+          -0.4,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.3,
+          2.3,
+          2.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Blue.lsmaterial"
+      },
+      "renderOrder": 20
+    },
+    {
+      "tag": "07 Orange gate draws first",
+      "transform": {
+        "position": [
+          -5.7,
+          -5.6000000000000005,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.0,
+          1.4,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/NoWrite.lsmaterial"
+      }
+    },
+    {
+      "tag": "07 Far blue sphere draws second",
+      "transform": {
+        "position": [
+          -4.8,
+          -5.6000000000000005,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          2.3,
+          2.3,
+          2.3
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Blue.lsmaterial"
+      },
+      "renderOrder": 20
+    },
+    {
+      "tag": "08 Gray depth stencil",
+      "transform": {
+        "position": [
+          0,
+          -5.6000000000000005,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.95,
+          1.3,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Gray.lsmaterial"
+      }
+    },
+    {
+      "tag": "08 Green behind gray - Greater",
+      "transform": {
+        "position": [
+          0,
+          -5.6000000000000005,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3.2,
+          3.2,
+          3.2
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Greater.lsmaterial"
+      },
+      "renderOrder": 20
+    },
+    {
+      "tag": "09 Near gray occluder",
+      "transform": {
+        "position": [
+          5.2,
+          -5.6000000000000005,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.7,
+          1.4,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Gray.lsmaterial"
+      }
+    },
+    {
+      "tag": "09 Far red unconditional depth write",
+      "transform": {
+        "position": [
+          5.2,
+          -5.6000000000000005,
+          1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.1,
+          1
+        ]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialRenderStatesDemo/Quad.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/UnconditionalWrite.lsmaterial"
+      },
+      "renderOrder": 10
+    },
+    {
+      "tag": "09 Blue between red and gray",
+      "transform": {
+        "position": [
+          5.2,
+          -5.6000000000000005,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1.75,
+          1.75,
+          1.0
+        ]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialRenderStatesDemo/Blue.lsmaterial"
+      },
+      "renderOrder": 20
+    }
+  ]
+}

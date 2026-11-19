@@ -83,11 +83,12 @@ public:
         mGameScene = path;
     }
 
-    void SetEditorSmoke(bool preview, bool materialTest)
+    void SetEditorSmoke(bool preview, bool materialTest, bool renderStateTest)
     {
         mEditorValidation = std::make_unique<EditorValidation>();
         mEditorValidation->preview = preview;
         mEditorValidation->materialTest = materialTest;
+        mEditorValidation->renderStateTest = renderStateTest;
     }
     void SetProjectSmoke(const std::string& mode) { mProjectSmoke = mode; }
 
@@ -524,6 +525,7 @@ namespace
         bool editorSmoke = false;
         bool editorPreview = false;
         bool materialSmoke = false;
+        bool renderStateSmoke = false;
         std::string projectSmoke;
     };
 
@@ -548,6 +550,10 @@ namespace
             else if (a == L"--game" || a == L"--game-smoke") { o.gameSmoke = a == L"--game-smoke"; o.game = value(i); }
             else if (a == L"--lua-smoke") o.luaSmoke = true;
             else if (a == L"--material-smoke") o.materialSmoke = true;
+            else if (a == L"--render-state-smoke")
+            {
+                o.renderStateSmoke = true;
+            }
             else if (a == L"--editor-preview") o.editorPreview = true;
             else if (a == L"--editor-smoke") o.editorSmoke = true;
             else if (a == L"--terrain-smoke") o.terrainSmoke = true;
@@ -574,7 +580,7 @@ int main(int argc, char** argv)
         std::vector<std::wstring> args(arguments, arguments + argumentCount);
         LocalFree(arguments);
         const Options options = ParseOptions(args);
-        quietErrors = options.materialSmoke || options.editorPreview || options.editorSmoke || options.terrainSmoke || !options.projectSmoke.empty();
+        quietErrors = options.renderStateSmoke || options.materialSmoke || options.editorPreview || options.editorSmoke || options.terrainSmoke || !options.projectSmoke.empty();
 
         // Every run works inside one project; without --project it is the engine's sample project.
         ProjectInfo project;
@@ -606,7 +612,8 @@ int main(int argc, char** argv)
         if (options.play)
         {
             gameScene = options.scene.empty()
-                ? (options.materialSmoke ? "Scenes/MaterialsDemo.json" : project.startupScene)
+                ? (options.renderStateSmoke ? "Scenes/MaterialRenderStatesDemo.json" :
+                    (options.materialSmoke ? "Scenes/MaterialsDemo.json" : project.startupScene))
                 : AssetPaths::ToUtf8(std::filesystem::path(options.scene));
             if (gameScene.empty()) throw std::runtime_error("The project has no startupScene; pass --scene <scene.json>");
             playTitle = AssetPaths::FromUtf8(project.name).wstring() + L" | Play: " +
@@ -616,13 +623,15 @@ int main(int argc, char** argv)
 
         HINSTANCE hInstance = GetModuleHandle(nullptr);
         TestApp theApp(hInstance, options.luaSmoke, gameScene, title, options.gameSmoke, options.terrainSmoke);
-        if (options.editorSmoke || options.editorPreview || options.materialSmoke)
+        if (options.editorSmoke || options.editorPreview || options.materialSmoke || options.renderStateSmoke)
         {
-            theApp.SetEditorSmoke(options.editorPreview, options.materialSmoke);
+            theApp.SetEditorSmoke(options.editorPreview, options.materialSmoke, options.renderStateSmoke);
         }
-        if (!options.play && options.game.empty() && (!options.scene.empty() || options.materialSmoke))
+        if (!options.play && options.game.empty() && (!options.scene.empty() || options.materialSmoke || options.renderStateSmoke))
         {
-            theApp.SetEditorStartupScene(options.scene.empty() ? "Scenes/MaterialsDemo.json" : AssetPaths::ToUtf8(options.scene));
+            const std::string defaultScene = options.renderStateSmoke
+                ? "Scenes/MaterialRenderStatesDemo.json" : "Scenes/MaterialsDemo.json";
+            theApp.SetEditorStartupScene(options.scene.empty() ? defaultScene : AssetPaths::ToUtf8(options.scene));
         }
         if (options.play) theApp.SetPlayWindow(playTitle);
         if (!options.projectSmoke.empty()) theApp.SetProjectSmoke(options.projectSmoke);

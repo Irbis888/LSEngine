@@ -6,6 +6,37 @@
 
 namespace
 {
+    D3D12_COMPARISON_FUNC ToDepthComparison(DepthComparison comparison)
+    {
+        constexpr D3D12_COMPARISON_FUNC values[] = {
+            D3D12_COMPARISON_FUNC_NEVER, D3D12_COMPARISON_FUNC_LESS, D3D12_COMPARISON_FUNC_EQUAL,
+            D3D12_COMPARISON_FUNC_LESS_EQUAL, D3D12_COMPARISON_FUNC_GREATER, D3D12_COMPARISON_FUNC_NOT_EQUAL,
+            D3D12_COMPARISON_FUNC_GREATER_EQUAL, D3D12_COMPARISON_FUNC_ALWAYS};
+        return values[static_cast<size_t>(comparison)];
+    }
+
+    D3D12_BLEND ToBlendFactor(BlendFactor factor, bool alpha = false)
+    {
+        // Color factors on the scalar alpha channel mean their alpha component.
+        constexpr D3D12_BLEND colorValues[] = {
+            D3D12_BLEND_ZERO, D3D12_BLEND_ONE, D3D12_BLEND_SRC_COLOR, D3D12_BLEND_INV_SRC_COLOR,
+            D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_DEST_COLOR,
+            D3D12_BLEND_INV_DEST_COLOR, D3D12_BLEND_DEST_ALPHA, D3D12_BLEND_INV_DEST_ALPHA};
+        constexpr D3D12_BLEND alphaValues[] = {
+            D3D12_BLEND_ZERO, D3D12_BLEND_ONE, D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA,
+            D3D12_BLEND_SRC_ALPHA, D3D12_BLEND_INV_SRC_ALPHA, D3D12_BLEND_DEST_ALPHA,
+            D3D12_BLEND_INV_DEST_ALPHA, D3D12_BLEND_DEST_ALPHA, D3D12_BLEND_INV_DEST_ALPHA};
+        return alpha ? alphaValues[static_cast<size_t>(factor)] : colorValues[static_cast<size_t>(factor)];
+    }
+
+    D3D12_BLEND_OP ToBlendOperation(BlendOperation operation)
+    {
+        constexpr D3D12_BLEND_OP values[] = {
+            D3D12_BLEND_OP_ADD, D3D12_BLEND_OP_SUBTRACT, D3D12_BLEND_OP_REV_SUBTRACT,
+            D3D12_BLEND_OP_MIN, D3D12_BLEND_OP_MAX};
+        return values[static_cast<size_t>(operation)];
+    }
+
     void CheckMaterialLayout(ID3D12ShaderReflectionConstantBuffer& buffer)
     {
         struct Field
@@ -137,6 +168,39 @@ namespace
     }
 }
 
+size_t D3DRenderAdapter::SurfacePipelineHash::operator()(const SurfacePipelineKey& key) const
+{
+    size_t result = 0;
+    const auto combine = [&](const auto& value)
+    {
+        result ^= std::hash<std::decay_t<decltype(value)>>{}(value) + size_t(0x9e3779b9) + (result << 6) + (result >> 2);
+    };
+    combine(key.program.file);
+    combine(key.program.vertexEntry);
+    combine(key.program.pixelEntry);
+    combine(key.program.editorVariant);
+    combine(key.program.maskedVariant);
+    combine(key.mode);
+    combine(key.twoSided);
+    const auto& state = key.renderState;
+    combine(state.depthTest);
+    combine(state.depthWrite);
+    combine(state.depthCompare);
+    combine(state.blendEnabled);
+    combine(state.sourceColor);
+    combine(state.destinationColor);
+    combine(state.colorOperation);
+    combine(state.sourceAlpha);
+    combine(state.destinationAlpha);
+    combine(state.alphaOperation);
+    combine(key.colorFormat);
+    combine(key.identifierFormat);
+    combine(key.depthFormat);
+    combine(key.samples);
+    combine(key.sampleQuality);
+    return result;
+}
+
 D3DRenderAdapter::SurfacePipelineKey D3DRenderAdapter::MakeSurfaceKey(const MaterialBase& base, bool editor) const
 {
     SurfacePipelineKey key;
@@ -146,6 +210,7 @@ D3DRenderAdapter::SurfacePipelineKey D3DRenderAdapter::MakeSurfaceKey(const Mate
     key.program.maskedVariant = true;
     key.mode = base.mode;
     key.twoSided = base.twoSided;
+    key.renderState = base.renderState;
     key.colorFormat = mBackBufferFormat;
     key.identifierFormat = editor ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_UNKNOWN;
     key.depthFormat = mDepthStencilFormat;
@@ -209,6 +274,7 @@ ComPtr<ID3DBlob> D3DRenderAdapter::FindSurfaceShader(const SurfaceShaderKey& key
 
 ComPtr<ID3D12PipelineState> D3DRenderAdapter::BuildSurfacePipeline(const SurfacePipelineKey& key)
 {
+    key.renderState.Validate();
     const bool editor = key.identifierFormat != DXGI_FORMAT_UNKNOWN;
     const auto vertex = FindSurfaceShader({key.program.file, key.program.vertexEntry});
     const auto pixel = FindSurfaceShader({key.program.file, key.program.pixelEntry, true, editor, key.mode == SurfaceMode::Masked});
@@ -221,6 +287,20 @@ ComPtr<ID3D12PipelineState> D3DRenderAdapter::BuildSurfacePipeline(const Surface
     description.RasterizerState.CullMode = key.twoSided ? D3D12_CULL_MODE_NONE : D3D12_CULL_MODE_BACK;
     description.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     description.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    const auto& state = key.renderState;
+    description.BlendState.IndependentBlendEnable = TRUE;
+    auto& colorBlend = description.BlendState.RenderTarget[0];
+    colorBlend.BlendEnable = state.blendEnabled;
+    colorBlend.SrcBlend = ToBlendFactor(state.sourceColor);
+    colorBlend.DestBlend = ToBlendFactor(state.destinationColor);
+    colorBlend.BlendOp = ToBlendOperation(state.colorOperation);
+    colorBlend.SrcBlendAlpha = ToBlendFactor(state.sourceAlpha, true);
+    colorBlend.DestBlendAlpha = ToBlendFactor(state.destinationAlpha, true);
+    colorBlend.BlendOpAlpha = ToBlendOperation(state.alphaOperation);
+    // RT1 is R32_UINT: its default disabled blending must remain independent of RT0.
+    description.DepthStencilState.DepthEnable = state.depthTest || state.depthWrite;
+    description.DepthStencilState.DepthWriteMask = state.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+    description.DepthStencilState.DepthFunc = state.depthTest ? ToDepthComparison(state.depthCompare) : D3D12_COMPARISON_FUNC_ALWAYS;
     description.SampleMask = UINT_MAX;
     description.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     description.NumRenderTargets = editor ? 2 : 1;

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Gray",
+    "color": [
+      0.16,
+      0.2,
+      0.26
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": true,
+      "alpha": 1,
+      "emissiveLightRange": 0
+    }
+  }
+}

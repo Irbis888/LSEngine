@@ -51,6 +51,21 @@ float3 ShadeSurface(SurfaceInterpolants input, bool frontFace, float3 baseColor)
         }
         color += EvaluateBRDF(baseColor, metallic, roughness, normal, view, lightDirection, source.Strength * attenuation);
     }
+    [loop]
+    for (int emitter = 0; emitter < EmissiveLightCount; ++emitter)
+    {
+        const Light source = Lights[EmissiveLightOffset + emitter];
+        if (!any(source.Strength > 0))
+        {
+            break;
+        }
+        float3 lightDirection;
+        const float attenuation = EmissiveAttenuation(source, input.worldPosition, lightDirection);
+        if (attenuation > 0)
+        {
+            color += EvaluateBRDF(baseColor, metallic, roughness, normal, view, lightDirection, source.Strength * attenuation);
+        }
+    }
     return color + ReadEmissive(input.uv);
 }
 

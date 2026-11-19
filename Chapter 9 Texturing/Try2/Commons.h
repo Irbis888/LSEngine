@@ -92,6 +92,12 @@ struct MaterialComponent
     std::string error;
 };
 
+// Within each opaque/blended queue: lower layers first, then camera distance and entity ID.
+struct RenderOrderComponent
+{
+    int layer = 0;
+};
+
 struct CameraComponent
 {
     float fov;           // Field of view in degrees
@@ -157,6 +163,8 @@ struct SpotLightData
 constexpr int RenderDirectionalLightCount = 1;
 constexpr int RenderPointLightCount = 2;
 constexpr int RenderSpotLightCount = 3;
+constexpr int RenderEmissiveLightOffset = RenderDirectionalLightCount + RenderPointLightCount + RenderSpotLightCount;
+constexpr int RenderEmissiveLightCount = 4;
 
 struct SceneLightData
 {
@@ -164,6 +172,7 @@ struct SceneLightData
     std::vector<DirectionalLightData> directionalLights;
     std::vector<PointLightData> pointLights;
     std::vector<SpotLightData> spotLights;
+    std::vector<PointLightData> emissiveLights;
 };
 
 
@@ -225,6 +234,10 @@ public:
     }
     virtual void DrawMaterialPreview(MeshID mesh, float rotation) {}
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
+    virtual void DrawSubmeshWithMaterial(MeshID meshId, uint32_t submeshIndex, MaterialID material)
+    {
+        DrawSubmesh(meshId, submeshIndex);
+    }
     virtual bool PrepareTerrain(const std::shared_ptr<const struct TerrainResource>&) { return false; }
     virtual void DrawTerrain(const struct TerrainResource&, const TransformComponent&,
         const struct TerrainComponent&, const std::vector<struct TerrainDrawChunk>&) {}

@@ -47,6 +47,83 @@ namespace
             reinterpret_cast<const char8_t*>(value.data()), value.size())).wstring();
     }
 
+    MaterialRenderState ReadRenderState(const json& value)
+    {
+        MaterialRenderState state;
+        const auto read = [&](const char* field, auto& destination, const auto& names)
+        {
+            if (!value.contains(field))
+            {
+                return;
+            }
+            const std::string path = std::string("surface.renderState.") + field;
+            if (!value.at(field).is_string())
+            {
+                throw std::runtime_error(path + ": expected an enum name");
+            }
+            const auto name = value.at(field).get<std::string>();
+            const auto found = std::find(names.begin(), names.end(), name);
+            if (found == names.end())
+            {
+                throw std::runtime_error(path + ": unknown value '" + name + "'");
+            }
+            destination = static_cast<std::remove_reference_t<decltype(destination)>>(found - names.begin());
+        };
+        if (!value.is_object())
+        {
+            throw std::runtime_error("surface.renderState: expected an object");
+        }
+        const std::array fields = {"depthTest", "depthWrite", "depthCompare", "blendEnabled",
+            "sourceColor", "destinationColor", "colorOperation", "sourceAlpha", "destinationAlpha", "alphaOperation"};
+        for (auto iterator = value.begin(); iterator != value.end(); ++iterator)
+        {
+            if (std::find(fields.begin(), fields.end(), iterator.key()) == fields.end())
+            {
+                throw std::runtime_error("surface.renderState." + iterator.key() + ": unknown field");
+            }
+        }
+        const auto readBool = [&](const char* field, bool& destination)
+        {
+            if (value.contains(field))
+            {
+                if (!value.at(field).is_boolean())
+                {
+                    throw std::runtime_error(std::string("surface.renderState.") + field + ": expected a boolean");
+                }
+                destination = value.at(field).get<bool>();
+            }
+        };
+        readBool("depthTest", state.depthTest);
+        readBool("depthWrite", state.depthWrite);
+        readBool("blendEnabled", state.blendEnabled);
+        read("depthCompare", state.depthCompare, DepthComparisonNames);
+        read("sourceColor", state.sourceColor, BlendFactorNames);
+        read("destinationColor", state.destinationColor, BlendFactorNames);
+        read("colorOperation", state.colorOperation, BlendOperationNames);
+        read("sourceAlpha", state.sourceAlpha, BlendFactorNames);
+        read("destinationAlpha", state.destinationAlpha, BlendFactorNames);
+        read("alphaOperation", state.alphaOperation, BlendOperationNames);
+        state.Validate();
+        return state;
+    }
+
+    json RenderStateToJson(const MaterialRenderState& state)
+    {
+        state.Validate();
+        return {
+            {"depthTest", state.depthTest},
+            {"depthWrite", state.depthWrite},
+            {"depthCompare", DepthComparisonNames[static_cast<size_t>(state.depthCompare)]},
+            {"blendEnabled", state.blendEnabled},
+            {"sourceColor", BlendFactorNames[static_cast<size_t>(state.sourceColor)]},
+            {"destinationColor", BlendFactorNames[static_cast<size_t>(state.destinationColor)]},
+            {"colorOperation", BlendOperationNames[static_cast<size_t>(state.colorOperation)]},
+            {"sourceAlpha", BlendFactorNames[static_cast<size_t>(state.sourceAlpha)]},
+            {"destinationAlpha", BlendFactorNames[static_cast<size_t>(state.destinationAlpha)]},
+            {"alphaOperation", BlendOperationNames[static_cast<size_t>(state.alphaOperation)]}
+        };
+    }
+
     MaterialDesc ReadMaterial(const json& value, const std::string& fallbackName)
     {
         MaterialDesc material;
@@ -70,6 +147,10 @@ namespace
                 throw std::runtime_error("Unsupported surface mode: " + mode);
             }
             base.twoSided = description.value("twoSided", false);
+            if (description.contains("renderState"))
+            {
+                base.renderState = ReadRenderState(description.at("renderState"));
+            }
             if (description.contains("shader"))
             {
                 base.program.file = StringToWide(description.at("shader").get<std::string>());
@@ -85,6 +166,7 @@ namespace
             parameters.alphaCutoff = description.value("alphaCutoff", 0.5f);
             parameters.emissiveColor = JsonToVec3(description.value("emissiveColor", json::array()));
             parameters.emissiveIntensity = description.value("emissiveIntensity", 1.0f);
+            parameters.emissiveLightRange = description.value("emissiveLightRange", 5.0f);
             if (description.contains("metallic"))
             {
                 parameters.metallic = description.at("metallic").get<float>();
@@ -153,12 +235,14 @@ namespace
                 {"maskedVariant", base.program.maskedVariant},
                 {"mode", base.mode == SurfaceMode::Masked ? "masked" : "opaque"},
                 {"twoSided", base.twoSided},
+                {"renderState", RenderStateToJson(base.renderState)},
                 {"alpha", parameters.baseColor.a},
                 {"normalStrength", parameters.normalStrength},
                 {"aoStrength", parameters.aoStrength},
                 {"alphaCutoff", parameters.alphaCutoff},
                 {"emissiveColor", Vec3ToJson(parameters.emissiveColor)},
                 {"emissiveIntensity", parameters.emissiveIntensity},
+                {"emissiveLightRange", parameters.emissiveLightRange},
                 {"uvScale", {parameters.uvScale.x, parameters.uvScale.y}},
                 {"uvOffset", {parameters.uvOffset.x, parameters.uvOffset.y}}
             };
@@ -468,6 +552,10 @@ namespace
         SceneSerializer::EntityDescription entity;
         entity.tag = value.value("tag", defaultTag);
         entity.transform = JsonToTransform(value.value("transform", json::object()));
+        if (value.contains("renderOrder"))
+        {
+            entity.renderOrder = RenderOrderComponent{value.at("renderOrder").get<int>()};
+        }
         if (value.contains("materialComponent"))
         {
             entity.materialAsset = value.at("materialComponent").at("asset").get<std::string>();
@@ -528,6 +616,10 @@ size_t SceneSerializer::Save(const World& world, const std::string& path, const 
         json serializedEntity;
         serializedEntity["tag"] = tag.tag;
         serializedEntity["transform"] = TransformToJson(transform);
+        if (const auto* order = world.registry.try_get<RenderOrderComponent>(entity))
+        {
+            serializedEntity["renderOrder"] = order->layer;
+        }
 
         if (const auto* mesh = world.registry.try_get<MeshComponent>(entity))
         {
@@ -598,6 +690,7 @@ void SceneSerializer::Load(World& world, const std::string& path)
 }
 
 SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
+try
 {
     ZoneScopedN("Scene CPU read parse and validate");
     std::ifstream in(std::filesystem::path(StringToWide(path)));
@@ -619,8 +712,13 @@ SceneSerializer::SceneData SceneSerializer::Read(const std::string& path)
         { return priority(a) < priority(b); });
     return data; // The large JSON tree is destroyed on the reading worker.
 }
+catch (const std::exception& error)
+{
+    throw std::runtime_error(path + ": " + error.what());
+}
 
 SceneSerializer::EntityDescription SceneSerializer::ReadPrefab(const std::filesystem::path& file, const std::string& defaultTag)
+try
 {
     std::ifstream in(file);
     if (!in) throw std::runtime_error("Failed to open prefab: " + AssetPaths::ToUtf8(file));
@@ -634,12 +732,20 @@ SceneSerializer::EntityDescription SceneSerializer::ReadPrefab(const std::filesy
     if (value.is_object() && value.contains("camera")) throw std::runtime_error("Prefabs cannot contain a camera");
     return ReadEntity(value, defaultTag);
 }
+catch (const std::exception& error)
+{
+    throw std::runtime_error(AssetPaths::ToUtf8(file) + ": " + error.what());
+}
 
 void SceneSerializer::Instantiate(entt::registry& registry, entt::entity entity, ResourceManager& resources,
     const EntityDescription& description)
 {
     registry.emplace<TagComponent>(entity, TagComponent{ description.tag });
     registry.emplace<TransformComponent>(entity, description.transform);
+    if (description.renderOrder)
+    {
+        registry.emplace<RenderOrderComponent>(entity, *description.renderOrder);
+    }
     if (description.mesh)
     {
         registry.emplace<MeshComponent>(entity, MeshComponent{ CreateMesh(resources, *description.mesh) });
@@ -726,6 +832,7 @@ MaterialID ResourceManager::LoadMaterialAsset(const std::string& path)
 }
 
 void ResourceManager::SaveMaterialAsset(const std::string& path, const MaterialDesc& description)
+try
 {
     const auto file = AssetPaths::Resolve(mSearch->root, path);
     const auto document = json{{"version", 1}, {"material", MaterialToJson(description, mSearch->root)}};
@@ -760,4 +867,8 @@ void ResourceManager::SaveMaterialAsset(const std::string& path, const MaterialD
     {
         GetMaterial(cached->second) = std::move(*replacement);
     }
+}
+catch (const std::exception& error)
+{
+    throw std::runtime_error(path + ": " + error.what());
 }

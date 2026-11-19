@@ -16,6 +16,20 @@ struct Light
     float SpotPower;    // spot light only
 };
 
+// Slots 0..5 are reserved for authored directional, point and spot lights.
+static const int EmissiveLightOffset = 6;
+static const int EmissiveLightCount = 4;
+
+float EmissiveAttenuation(Light source, float3 position, out float3 direction)
+{
+    const float3 offset = source.Position - position;
+    const float distanceSquared = dot(offset, offset);
+    direction = offset * rsqrt(max(distanceSquared, 1e-8f));
+    const float rangeSquared = max(source.FalloffEnd * source.FalloffEnd, 1e-8f);
+    const float edge = saturate(1 - distanceSquared / rangeSquared);
+    return edge * edge / (1 + distanceSquared);
+}
+
 struct Material
 {
     float4 DiffuseAlbedo;

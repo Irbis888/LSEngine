@@ -86,6 +86,11 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
         return;
     }
     Check(engine.GetSceneLoadProgress().error.empty(), "Scene loading failed");
+    if (renderStateTest)
+    {
+        CheckRenderStates(engine, renderer);
+        return;
+    }
     if (materialTest)
     {
         CheckMaterials(engine, renderer);
@@ -297,6 +302,11 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
 
 void EditorValidation::AfterOverlay(D3DRenderAdapter& renderer)
 {
+    const bool captureRenderStateEditor = renderStateTest && renderer.mEditorScene && stage == 12 && frames >= 3;
+    if (renderStateTest && stage != 1 && !captureRenderStateEditor)
+    {
+        return;
+    }
     if (stage == 4 && frames == 0)
     {
         auto& registry = Editor_GetContext()->engine->GetRegistry();
@@ -304,25 +314,31 @@ void EditorValidation::AfterOverlay(D3DRenderAdapter& renderer)
     }
     const int captureStage = materialTest ? 31 : (preview ? 1 : 20);
     const bool captureMaterialEditor = materialTest && stage == 39 && frames >= 2 && Editor_GetContext()->materialPreviewMesh;
-    if ((stage != captureStage && !captureMaterialEditor) || capture || output.empty() ||
-        (materialTest && std::filesystem::is_regular_file(output / (captureMaterialEditor ? "material-editor.bmp" : "editor.bmp"))))
+    const bool captureEditor = captureMaterialEditor || captureRenderStateEditor;
+    if ((!renderStateTest && stage != captureStage && !captureMaterialEditor) || capture || output.empty() ||
+        ((materialTest || renderStateTest) && std::filesystem::is_regular_file(output / (captureEditor ? "material-editor.bmp" : "editor.bmp"))))
     {
         return;
     }
     const auto bindings = renderer.GetImGuiBindings();
-    const auto description = renderer.CurrentBackBuffer()->GetDesc();
+    const bool captureScene = renderStateTest && !captureRenderStateEditor;
+    ID3D12Resource* sourceResource = captureScene && renderer.mEditorScene
+        ? renderer.mEditorTarget->color.Get() : renderer.CurrentBackBuffer();
+    const auto sourceState = captureScene && renderer.mEditorScene
+        ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+    const auto description = sourceResource->GetDesc();
     UINT64 bytes = 0;
     bindings.Device->GetCopyableFootprints(&description, 0, 1, 0, &footprint, nullptr, nullptr, &bytes);
     const auto heap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
     const auto buffer = CD3DX12_RESOURCE_DESC::Buffer(bytes);
     ThrowIfFailed(bindings.Device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer,
         D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&capture)));
-    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(renderer.CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(sourceResource, sourceState, D3D12_RESOURCE_STATE_COPY_SOURCE);
     bindings.CommandList->ResourceBarrier(1, &barrier);
-    CD3DX12_TEXTURE_COPY_LOCATION source(renderer.CurrentBackBuffer(), 0);
+    CD3DX12_TEXTURE_COPY_LOCATION source(sourceResource, 0);
     CD3DX12_TEXTURE_COPY_LOCATION destination(capture.Get(), footprint);
     bindings.CommandList->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
-    barrier = CD3DX12_RESOURCE_BARRIER::Transition(renderer.CurrentBackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(sourceResource, D3D12_RESOURCE_STATE_COPY_SOURCE, sourceState);
     bindings.CommandList->ResourceBarrier(1, &barrier);
 }
 
@@ -348,7 +364,8 @@ void EditorValidation::CaptureCompleted(D3DRenderAdapter& renderer)
     imageHeader.biHeight = -LONG(height);
     imageHeader.biPlanes = 1;
     imageHeader.biBitCount = 32;
-    const char* filename = materialTest && stage == 39 ? "material-editor.bmp" : "editor.bmp";
+    const char* filename = (materialTest && stage == 39) || (renderStateTest && stage == 12)
+        ? "material-editor.bmp" : "editor.bmp";
     std::ofstream file(output / filename, std::ios::binary);
     file.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
     file.write(reinterpret_cast<const char*>(&imageHeader), sizeof(imageHeader));
@@ -361,6 +378,12 @@ void EditorValidation::CaptureCompleted(D3DRenderAdapter& renderer)
             std::swap(row[x * 4], row[x * 4 + 2]);
         }
         file.write(reinterpret_cast<const char*>(row.data()), row.size());
+    }
+    file.close();
+    if (renderStateTest && stage == 1)
+    {
+        CheckRenderStatePixels(static_cast<const uint8_t*>(data) + footprint.Offset,
+            footprint.Footprint.RowPitch, width, height);
     }
     capture->Unmap(0, nullptr);
     capture.Reset();
@@ -592,5 +615,297 @@ void EditorValidation::CheckMaterials(Engine& engine, D3DRenderAdapter& renderer
         stage = 40;
         break;
     }
+    }
+}
+
+void EditorValidation::CheckRenderStatePixels(const uint8_t* pixels, uint32_t rowPitch, uint32_t width, uint32_t height)
+{
+    const auto sample = [&](const glm::vec3& position)
+    {
+        const float distance = position.z + 18.0f;
+        const float tangent = std::tan(1.05f * 0.5f);
+        const float aspect = float(width) / height;
+        const int pixelX = std::clamp(int((0.5f + position.x / (2 * distance * tangent * aspect)) * width), 0, int(width) - 1);
+        const int pixelY = std::clamp(int((0.5f - position.y / (2 * distance * tangent)) * height), 0, int(height) - 1);
+        const auto* color = pixels + pixelY * rowPitch + pixelX * 4;
+        return glm::ivec3(color[0], color[1], color[2]);
+    };
+    const auto orange = sample({-4.75f, 4.65f, -1.5f});
+    Check(orange.r > orange.b + 80, "Opaque near orange did not occlude blue");
+    const auto cyan = sample({0, -0.4f, 1});
+    Check(cyan.g > cyan.r + 80 && cyan.b > cyan.r + 80, "Depth Test Off did not show cyan behind gray");
+    const auto writeOn = sample({5.0f, -0.4f, -1});
+    const auto writeOff = sample({-5.0f, -5.0f, -1});
+    Check(writeOn.r > writeOn.b + 80, "Depth Write On failed to occlude the later far sphere");
+    Check(writeOff.b > writeOff.r + 80, "Depth Write Off still occluded the later far sphere");
+    const auto greater = sample({0, -5.6f, 0});
+    Check(greater.g > greater.r + 80, "Greater depth comparison did not show the occluded green surface");
+    const auto unconditional = sample({5.2f, -5.6f, 0});
+    Check(unconditional.b > unconditional.r + 80, "Test Off + Write On did not unconditionally replace near depth");
+    const auto additive = sample({-5.2f, -0.05f, 0});
+    Check(additive.r > 90 && additive.g > 90, "Additive overlap did not accumulate red and green");
+    const auto alpha = sample({4.9f, 4.8f, -1});
+    // Encoded gray, then straight-alpha red, green, blue at alpha 0.5; allow UNORM rounding.
+    Check(std::abs(alpha.r - 83) <= 5 && std::abs(alpha.g - 138) <= 5 && std::abs(alpha.b - 174) <= 5,
+        "Alpha layers did not blend back to front over their opaque backdrop");
+    const auto foreground = sample({6.1f, 4.0f, -2});
+    Check(foreground.r > 200 && foreground.g > 180 && foreground.b < 100,
+        "Transparent layers ignored the opaque foreground depth");
+    const auto hole = sample({0.3f, 4.5f, -1});
+    const auto bar = sample({0, 4.8f, -1});
+    Check(hole.b > hole.r + 80 && bar.r > 200 && bar.g > 200 && bar.b > 200,
+        "Masked clip did not preserve holes and opaque bars");
+    std::cout << "RENDER_STATE_GPU_PIXELS_PASS " << width << "x" << height << std::endl;
+}
+
+void EditorValidation::CheckRenderStates(Engine& engine, D3DRenderAdapter& renderer)
+{
+    auto& resources = engine.GetResources();
+    auto& registry = engine.GetRegistry();
+    auto& context = *Editor_GetContext();
+    const auto pick = [&](const glm::vec3& position, const char* name)
+    {
+        const float distance = position.z + 18;
+        const float tangent = std::tan(1.05f * 0.5f);
+        const float aspect = float(context.viewport.width) / context.viewport.height;
+        expected = Find(registry, name);
+        Pick(context, 0.5f + position.x / (2 * distance * tangent * aspect),
+            0.5f - position.y / (2 * distance * tangent));
+    };
+    if (stage == 0)
+    {
+        if (++frames < 120 || resources.HasPendingLoads())
+        {
+            return;
+        }
+        output = std::filesystem::temp_directory_path() / ("LSRenderStates-" + std::to_string(GetCurrentProcessId()));
+        std::filesystem::create_directories(output);
+        Check(renderer.GetSurfaceDiagnostic().empty(), "Demo material pipeline failed");
+        stage = 1;
+        return;
+    }
+    if (stage == 1)
+    {
+        Check(std::filesystem::is_regular_file(output / "editor.bmp"), "Render-state scene capture missing");
+        if (!engine.IsStandalone())
+        {
+            pick({-4.75f, 4.65f, -1.5f}, "01 Near orange cube");
+            stage = 2;
+            return;
+        }
+        stage = 10;
+    }
+    if (stage >= 2 && stage <= 6)
+    {
+        if (context.viewport.pendingPick)
+        {
+            return;
+        }
+        Check(context.selected == expected, "Render-state demo picking selected the wrong entity");
+        if (stage == 2)
+        {
+            pick({0.3f, 4.5f, -1}, "02 Blue behind grille");
+        }
+        else if (stage == 3)
+        {
+            pick({0, 4.8f, -1}, "02 Masked grille");
+        }
+        else if (stage == 4)
+        {
+            pick({4.9f, 4.8f, -1}, "03 AlphaBlue");
+        }
+        else if (stage == 5)
+        {
+            pick({6.1f, 4.0f, -2}, "03 Opaque foreground cube");
+        }
+        else
+        {
+            std::cout << "RENDER_STATE_PICK_OPAQUE_MASK_ALPHA_PASS" << std::endl;
+            stage = 10;
+        }
+        if (stage < 10)
+        {
+            ++stage;
+        }
+        return;
+    }
+    if (stage == 10)
+    {
+        const auto entity = Find(registry, "01 Near orange cube");
+        renderStateMaterial = registry.get<MaterialComponent>(entity).material;
+        originalMaterial = SceneSerializer::ReadMaterialAsset(resources.ResolveAssetPath("Assets/MaterialRenderStatesDemo/Orange.lsmaterial"));
+        MaterialDesc probe = originalMaterial;
+        probe.roughness = 0.2f;
+        probe.albedoTexture = L"Assets/MaterialRenderStatesDemo/Mask.png";
+        const auto shaderDirectory = std::filesystem::absolute("Shaders");
+        for (const char* include : {"Surface.hlsli", "SurfaceOutput.hlsli", "LightingUtil.hlsl", "Unlit.hlsl"})
+        {
+            std::filesystem::copy_file(shaderDirectory / include, output / include,
+                std::filesystem::copy_options::overwrite_existing);
+        }
+        probe.surface->program.file = (output / "Unlit.hlsl").wstring();
+        resources.UpdateTexturedMaterial(renderStateMaterial, probe);
+        const auto append = [&](const MaterialRenderState& state)
+        {
+            if (std::find(renderStates.begin(), renderStates.end(), state) == renderStates.end())
+            {
+                renderStates.push_back(state);
+            }
+        };
+        append({});
+        MaterialRenderState state;
+        state.depthTest = false;
+        append(state);
+        state.depthWrite = false;
+        append(state);
+        state = {};
+        state.depthWrite = false;
+        append(state);
+        for (size_t index = 0; index < DepthComparisonNames.size(); ++index)
+        {
+            state = {};
+            state.depthCompare = static_cast<DepthComparison>(index);
+            append(state);
+        }
+        append(MaterialRenderState::AlphaBlend());
+        append(MaterialRenderState::Additive());
+        for (size_t index = 0; index < BlendFactorNames.size(); ++index)
+        {
+            state = MaterialRenderState::AlphaBlend();
+            state.sourceColor = static_cast<BlendFactor>(index);
+            append(state);
+            state = MaterialRenderState::AlphaBlend();
+            state.destinationColor = static_cast<BlendFactor>(index);
+            append(state);
+            state = MaterialRenderState::AlphaBlend();
+            state.sourceAlpha = static_cast<BlendFactor>(index);
+            append(state);
+            state = MaterialRenderState::AlphaBlend();
+            state.destinationAlpha = static_cast<BlendFactor>(index);
+            append(state);
+        }
+        for (size_t index = 0; index < BlendOperationNames.size(); ++index)
+        {
+            state = MaterialRenderState::AlphaBlend();
+            state.colorOperation = static_cast<BlendOperation>(index);
+            append(state);
+            state = MaterialRenderState::AlphaBlend();
+            state.alphaOperation = static_cast<BlendOperation>(index);
+            append(state);
+        }
+        expectedPipelines = renderer.GetSurfaceCacheStats().created;
+        renderStateIndex = 0;
+        frames = 0;
+        stage = 11;
+        // The first probe is drawn after this Tick.
+        resources.SetMaterialRenderState(renderStateMaterial, renderStates.front());
+        ++expectedPipelines;
+        return;
+    }
+    if (stage == 11)
+    {
+        Check(renderer.GetSurfaceCacheStats().created == expectedPipelines,
+            "Changing one state field did not create exactly one PSO, or returning to a cached state created another");
+        Check(renderer.GetSurfaceDiagnostic().empty(), "Render-state combination failed D3D12 pipeline validation");
+        const auto& state = renderStates[renderStateIndex % renderStates.size()];
+        MaterialDesc description = originalMaterial;
+        description.surface->renderState = state;
+        const auto path = AssetPaths::ToUtf8(output / "RoundTrip.lsmaterial");
+        resources.SaveMaterialAsset(path, description);
+        const MaterialID asset = resources.LoadMaterialAsset(path);
+        Check(SceneSerializer::ReadMaterialAsset(AssetPaths::FromUtf8(path)).surface->renderState == state,
+            "Render-state material file round trip lost fields");
+        description.roughness = 0.37f;
+        resources.SaveMaterialAsset(path, description);
+        Check(resources.LoadMaterialAsset(path) == asset && resources.GetMaterial(asset).base->renderState == state &&
+            resources.GetMaterial(asset).parameters.roughness == 0.37f, "Live file save did not update the cached material");
+        ++renderStateIndex;
+        if (renderStateIndex < renderStates.size() * 2)
+        {
+            resources.SetMaterialRenderState(renderStateMaterial, renderStates[renderStateIndex % renderStates.size()]);
+            Check(resources.GetMaterial(renderStateMaterial).parameters.roughness == 0.2f &&
+                resources.GetMaterial(renderStateMaterial).parameters.albedo != 0,
+                "Render-state API discarded constants or texture bindings");
+            if (renderStateIndex < renderStates.size())
+            {
+                ++expectedPipelines;
+            }
+            resources.GetMaterial(renderStateMaterial).parameters.roughness = 0.2f;
+            return;
+        }
+        resources.UpdateTexturedMaterial(renderStateMaterial, originalMaterial);
+        World roundTripWorld;
+        SceneSerializer::EntityDescription entity;
+        entity.tag = "Inline render state";
+        entity.transform = {{0, 0, 0}, {0, 0, 0}, {1, 1, 1}};
+        entity.mesh.emplace();
+        entity.mesh->source = "primitive";
+        entity.mesh->primitive = "cube";
+        entity.mesh->material = description;
+        entity.renderOrder = RenderOrderComponent{17};
+        SceneSerializer::CreateEntity(roundTripWorld, resources, entity);
+        const auto scenePath = AssetPaths::ToUtf8(output / "Inline.json");
+        SceneSerializer::Save(roundTripWorld, scenePath, engine.GetAssetRoot());
+        const auto restored = SceneSerializer::Read(scenePath);
+        Check(restored.entities.front().mesh->material->surface->renderState == state &&
+            restored.entities.front().renderOrder->layer == 17, "Inline state or submission order did not survive scene save/load");
+        const auto invalidPath = output / "Invalid.lsmaterial";
+        for (const char* field : {"depthCompare", "sourceColor", "destinationColor", "colorOperation", "sourceAlpha", "destinationAlpha", "alphaOperation"})
+        {
+            std::ofstream file(invalidPath);
+            file << "{\"version\":1,\"material\":{\"surface\":{\"renderState\":{\"" << field << "\":\"InvalidValue\"}}}}";
+            file.close();
+            bool rejected = false;
+            try
+            {
+                SceneSerializer::ReadMaterialAsset(invalidPath);
+            }
+            catch (const std::exception& error)
+            {
+                const std::string diagnostic = error.what();
+                rejected = diagnostic.find("Invalid.lsmaterial") != std::string::npos && diagnostic.find(field) != std::string::npos;
+            }
+            Check(rejected, "Invalid enum diagnostic omitted its file or field");
+        }
+        MaterialRenderState invalid;
+        invalid.sourceAlpha = static_cast<BlendFactor>(999);
+        bool rejected = false;
+        try
+        {
+            resources.SetMaterialRenderState(renderStateMaterial, invalid);
+        }
+        catch (const std::invalid_argument&)
+        {
+            rejected = true;
+        }
+        Check(rejected && resources.GetMaterial(renderStateMaterial).base->renderState == originalMaterial.surface->renderState,
+            "Invalid API state was accepted or mutated the material");
+        CheckDebugLayer(renderer);
+        std::cout << "RENDER_STATE_CACHE_ROUNDTRIP_LIVE_PASS unique=" << renderStates.size()
+            << " passes=2 created=" << expectedPipelines << std::endl;
+        if (!engine.IsStandalone())
+        {
+            Editor_OpenMaterial(context, "Assets/MaterialRenderStatesDemo/AlphaBlue.lsmaterial");
+        }
+        stage = 12;
+        frames = 0;
+        return;
+    }
+    if (stage == 12 && ++frames >= 10)
+    {
+        CheckDebugLayer(renderer);
+        ComPtr<ID3D12InfoQueue> debugQueue;
+        const bool debugLayerAvailable = SUCCEEDED(renderer.GetImGuiBindings().Device->QueryInterface(IID_PPV_ARGS(&debugQueue)));
+        std::cout << "RENDER_STATE_D3D12_VALIDATION " << (debugLayerAvailable ? "available, errors=0" : "unavailable") << std::endl;
+        if (!engine.IsStandalone())
+        {
+            Check(context.materialPreviewMesh != 0, "Material Editor preview did not draw the blended material");
+            Check(std::filesystem::is_regular_file(output / "material-editor.bmp"), "Render State editor preview capture missing");
+            std::cout << "RENDER_STATE_MATERIAL_EDITOR_PASS " << AssetPaths::ToUtf8(output / "material-editor.bmp") << std::endl;
+        }
+        std::cout << (engine.IsStandalone() ? "RENDER_STATES_STANDALONE_PASS " : "RENDER_STATES_EDITOR_PASS ")
+            << AssetPaths::ToUtf8(output / "editor.bmp") << std::endl;
+        PostQuitMessage(0);
+        stage = 13;
     }
 }

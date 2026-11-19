@@ -181,6 +181,64 @@ namespace
         return changed;
     }
 
+    bool DrawRenderState(MaterialRenderState& state)
+    {
+        if (!ImGui::CollapsingHeader("Render State", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            return false;
+        }
+        int preset = state == MaterialRenderState{} ? 0 :
+            (state == MaterialRenderState::AlphaBlend() ? 1 : (state == MaterialRenderState::Additive() ? 2 : 3));
+        const char* presets[] = {"Opaque", "Alpha Blend", "Additive", "Custom"};
+        bool changed = false;
+        const auto setControlWidth = [](const char* label)
+        {
+            const float labelWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().ItemInnerSpacing.x;
+            ImGui::SetNextItemWidth(std::max(70.0f, ImGui::GetContentRegionAvail().x - labelWidth));
+        };
+        setControlWidth("Preset");
+        if (ImGui::Combo("Preset", &preset, presets, IM_ARRAYSIZE(presets)) && preset != 3)
+        {
+            state = preset == 0 ? MaterialRenderState{} :
+                (preset == 1 ? MaterialRenderState::AlphaBlend() : MaterialRenderState::Additive());
+            changed = true;
+        }
+        ImGui::SetItemTooltip("Opaque: replace + write depth. Alpha Blend: RGB = S * Sa + D * (1 - Sa), A = Sa + Da * (1 - Sa).\nAdditive: RGB = S * Sa + D, A = Sa + Da. Blended presets test depth and do not write it.\nPresets fill the fields below. Manual differences are Custom.");
+        changed |= ImGui::Checkbox("Depth Test", &state.depthTest);
+        ImGui::SetItemTooltip("Compare fragment depth to existing depth. Disabled + Write enabled means unconditional depth writes.");
+        changed |= ImGui::Checkbox("Depth Write", &state.depthWrite);
+        ImGui::SetItemTooltip("Write passing fragments to depth. Usually disabled for transparency; independent of Depth Test.");
+        const auto combo = [&](const char* label, auto& value, const auto& names, const char* tooltip)
+        {
+            int index = static_cast<int>(value);
+            setControlWidth(label);
+            const bool edited = ImGui::Combo(label, &index, names.data(), static_cast<int>(names.size()));
+            ImGui::SetItemTooltip("%s", tooltip);
+            if (edited)
+            {
+                value = static_cast<std::remove_reference_t<decltype(value)>>(index);
+            }
+            return edited;
+        };
+        changed |= combo("Depth Compare", state.depthCompare, DepthComparisonNames,
+            "Compare incoming depth against stored depth. Less is nearer with this engine's normal depth buffer. Ignored when testing is disabled.");
+        changed |= ImGui::Checkbox("Blend Enabled", &state.blendEnabled);
+        ImGui::SetItemTooltip("Blend color after opaque/masked geometry. Objects in the same render-order layer draw back to front. Entity IDs never blend.");
+        ImGui::BeginDisabled(!state.blendEnabled);
+        changed |= combo("RGB Source", state.sourceColor, BlendFactorNames, "Multiply source RGB by this factor before the operation.");
+        changed |= combo("RGB Destination", state.destinationColor, BlendFactorNames, "Multiply existing RGB by this factor before the operation.");
+        changed |= combo("RGB Operation", state.colorOperation, BlendOperationNames,
+            "Add: S + D; Subtract: S - D; ReverseSubtract: D - S. Min/Max compare unfactored values (factors ignored).");
+        changed |= combo("Alpha Source", state.sourceAlpha, BlendFactorNames,
+            "Source alpha factor. Color factors use their alpha component on this scalar channel.");
+        changed |= combo("Alpha Destination", state.destinationAlpha, BlendFactorNames,
+            "Destination alpha factor. Color factors use their alpha component on this scalar channel.");
+        changed |= combo("Alpha Operation", state.alphaOperation, BlendOperationNames,
+            "Operation on alpha independent of RGB. Min/Max ignore factors.");
+        ImGui::EndDisabled();
+        return changed;
+    }
+
     bool DrawProperties(EditorContext& context)
     {
         auto& description = document.description;
@@ -258,6 +316,8 @@ namespace
             }
         }
 
+        changed |= DrawRenderState(base.renderState);
+
         if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
         {
             glm::vec4 color(description.color, parameters.baseColor.a);
@@ -294,6 +354,9 @@ namespace
             changed |= ImGui::ColorEdit3("Emissive color", &parameters.emissiveColor.x);
             changed |= ImGui::DragFloat("Emissive intensity", &parameters.emissiveIntensity, 0.05f, 0, 100, "%.2f",
                 ImGuiSliderFlags_AlwaysClamp);
+            changed |= ImGui::DragFloat("Emissive light range", &parameters.emissiveLightRange, 0.1f, 0, 1000,
+                "%.1f", ImGuiSliderFlags_AlwaysClamp);
+            ImGui::SetItemTooltip("World units. Set to zero to keep surface emission only.");
             changed |= DrawMap(context, "Emissive map", description.emissiveTexture, applied.emissive);
             changed |= ImGui::DragFloat2("UV scale", &parameters.uvScale.x, 0.02f);
             changed |= ImGui::DragFloat2("UV offset", &parameters.uvOffset.x, 0.01f);

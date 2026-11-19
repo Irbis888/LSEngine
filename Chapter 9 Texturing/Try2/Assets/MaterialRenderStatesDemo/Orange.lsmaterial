@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Orange",
+    "color": [
+      0.95,
+      0.24,
+      0.025
+    ],
+    "roughness": 0.5,
+    "surface": {
+      "shader": "Shaders/Unlit.hlsl",
+      "mode": "opaque",
+      "twoSided": true,
+      "alpha": 1,
+      "emissiveLightRange": 0
+    }
+  }
+}

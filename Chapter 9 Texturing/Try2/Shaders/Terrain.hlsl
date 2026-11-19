@@ -142,7 +142,23 @@ float4 ShadeSurface(TerrainVertexOutput input)
 
     Material material = {float4(albedo, 1), float3(0.04, 0.04, 0.04), 1 - roughness};
     float4 lighting = ComputeLighting(gLights, material, input.worldPosition, worldNormal, normalize(gEyePosW - input.worldPosition), 1);
-    return float4(gAmbientLight.rgb * albedo + lighting.rgb, 1);
+    float3 emissiveLighting = 0;
+    [loop]
+    for (int emitter = 0; emitter < EmissiveLightCount; ++emitter)
+    {
+        const Light source = gLights[EmissiveLightOffset + emitter];
+        if (!any(source.Strength > 0))
+        {
+            break;
+        }
+        float3 lightDirection;
+        const float attenuation = EmissiveAttenuation(source, input.worldPosition, lightDirection);
+        if (attenuation > 0)
+        {
+            emissiveLighting += albedo * source.Strength * attenuation * saturate(dot(worldNormal, lightDirection)) / 3.14159265f;
+        }
+    }
+    return float4(gAmbientLight.rgb * albedo + lighting.rgb + emissiveLighting, 1);
 }
 
 float4 VSBounds(uint vertexIndex : SV_VertexID) : SV_POSITION

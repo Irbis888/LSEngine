@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="JobSystem.cpp">
@@ -494,5 +494,50 @@
   <ItemGroup>
     <ClCompile Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.cpp"><Filter>Editor</Filter></ClCompile>
     <ClInclude Include="$(IMGUI_WORKS)\src\Editor\MaterialEditor.h"><Filter>Editor</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MaterialRenderState.h"><Filter>Graphics</Filter></ClInclude>
+    <None Include="Scenes\MaterialRenderStatesDemo.json"><Filter>Serializer\Scenes</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddBlue.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddGreen.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AddRed.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaBlue.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaGreen.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\AlphaRed.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Blue.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Card.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Gray.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Greater.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label1.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label1.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label2.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label2.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label3.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label3.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label4.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label4.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label5.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label5.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label6.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label6.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label7.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label7.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label8.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label8.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label9.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Label9.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Mask.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Mask.png"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\NoTest.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\NoWrite.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Orange.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Quad.obj"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Red.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\UnconditionalWrite.lsmaterial"><Filter>Graphics</Filter></None>
+    <None Include="Assets\MaterialRenderStatesDemo\Yellow.lsmaterial"><Filter>Graphics</Filter></None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MATERIAL_RENDER_STATES.md"><Filter>Graphics</Filter></None>
+    <None Include="..\..\tests\RunRenderStateTests.ps1"><Filter>Engine\Profiling</Filter></None>
   </ItemGroup>
 </Project>

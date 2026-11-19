@@ -74,6 +74,7 @@ public:
 
     // Draw a specific submesh from a mesh
     void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) override;
+    void DrawSubmeshWithMaterial(MeshID meshId, uint32_t submeshIndex, MaterialID material) override;
     bool PrepareTerrain(const std::shared_ptr<const TerrainResource>&) override;
     void DrawTerrain(const TerrainResource&,const TransformComponent&,const TerrainComponent&,
         const std::vector<TerrainDrawChunk>&) override;
@@ -107,11 +108,13 @@ public:
     Dx12ImGuiBindings GetImGuiBindings() const;
 
 private:
+    friend class EditorValidation;
     struct SurfacePipelineKey
     {
         SurfaceProgram program;
         SurfaceMode mode = SurfaceMode::Opaque;
         bool twoSided = false;
+        MaterialRenderState renderState;
         DXGI_FORMAT colorFormat = DXGI_FORMAT_UNKNOWN;
         DXGI_FORMAT identifierFormat = DXGI_FORMAT_UNKNOWN;
         DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
@@ -136,9 +139,13 @@ private:
         std::vector<ComPtr<ID3D12PipelineState>> pipelines;
         std::vector<ComPtr<ID3D12RootSignature>> rootSignatures;
     };
-    std::map<SurfacePipelineKey, ComPtr<ID3D12PipelineState>> mSurfacePipelines;
+    struct SurfacePipelineHash
+    {
+        size_t operator()(const SurfacePipelineKey& key) const;
+    };
+    std::unordered_map<SurfacePipelineKey, ComPtr<ID3D12PipelineState>, SurfacePipelineHash> mSurfacePipelines;
     std::map<SurfaceShaderKey, ComPtr<ID3DBlob>> mSurfaceShaders;
-    std::map<SurfacePipelineKey, std::string> mSurfaceFailures;
+    std::unordered_map<SurfacePipelineKey, std::string, SurfacePipelineHash> mSurfaceFailures;
     std::deque<RetiredSurfacePipelines> mRetiredSurfacePipelines;
     std::unordered_set<TextureID> mReportedSurfaceTextures;
     SurfaceCacheStats mSurfaceCacheStats;
