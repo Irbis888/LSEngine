@@ -44,6 +44,34 @@
 
 Результат лежит в `tests/.build/renderdoc/<before|after>-<сцена>/`: `capture_frame*.rdc` и `thumbnail.png`. Открывать в `qrenderdoc`. Снятые 2026-11-20 захваты весят 3.5–4.7 МБ.
 
+### GPU-разметка проходов (RenderDoc + Tracy)
+
+`IRenderAdapter::BeginGpuRegion/EndGpuRegion` и RAII-обёртка `GpuRegion` (`Commons.h`) размечают командный список. D3D12-реализация делает два действия: пишет `BeginEvent/EndEvent` (формат PIX, его читают RenderDoc и PIX) и открывает GPU-зону Tracy через контекст `TracyD3D12` очереди `Direct queue` с временными метками на GPU. Регионы:
+
+```
+Frame
+  Resource uploads
+  Clear back buffer
+  Scene | Scene (editor viewport: color + entity ID)
+    Opaque and masked
+    Terrain
+    Transparent (back to front)        — только если в кадре есть blend
+    Picking readback (entity ID pixel) — только в редакторе при запросе выбора
+  Material editor preview              — когда открыт Material Editor
+  Editor UI (ImGui)
+```
+
+`CaptureRenderDoc.ps1` после каждого захвата открывает его встроенным Python RenderDoc (`tests/RenderDocMarkers.py`) и пишет `markers.txt`: дерево регионов с числом отрисовок в каждом. В захватах 2026-11-20:
+
+| Сцена | Отрисовок «до» | Отрисовок «после» | Регионы «после» |
+|---|---:|---:|---|
+| MaterialsBaseline | 9 | 9 | Frame → Scene → Opaque and masked: 9 |
+| RenderBenchmark4096 | 4097 | 4097 | Frame → Scene → Opaque and masked: 4097 |
+
+Число вызовов совпадает: материальная система не добавила и не потеряла отрисовок, разница во времени — в стоимости каждого вызова. У ревизии «до» разметки нет. Регионы прозрачной очереди, пикинга, превью и ImGui в режиме `--play` не возникают. Их баланс проверяют `RunRenderStateTests.ps1` и `RunMaterialTests.ps1` в редакторе: debug layer D3D12 там без ошибок. Незакрытые регионы `EndFrame` закрывает сам и пишет предупреждение в отладочный вывод.
+
+Таблица замеров выше снята до появления разметки. Контекст Tracy добавляет несколько timestamp-запросов и одно чтение readback-буфера на кадр; при повторном замере эта цена войдёт в «после».
+
 Картинка «до» и «после» различается: новая ревизия считает свет по GGX в линейном пространстве с одним явным sRGB-кодированием на выходе (см. `MATERIALS.md`), старая давала пересвеченные цвета. Это изменение шейдинга вместе с материальной системой, а не ошибка захвата.
 
 ## Конфигурации

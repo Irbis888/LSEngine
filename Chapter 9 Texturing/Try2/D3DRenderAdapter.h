@@ -7,6 +7,7 @@
 #include <map>
 #include <deque>
 #include <unordered_set>
+#include <tracy/TracyD3D12.hpp>
 
 using Microsoft::WRL::ComPtr;
 struct MeshGeometry;
@@ -105,6 +106,8 @@ public:
 
     void OnResize(int width, int height) override;
 	void FlushCommandQueue();
+    void BeginGpuRegion(const char* name) override;
+    void EndGpuRegion() override;
 
     Dx12ImGuiBindings GetImGuiBindings() const;
 
@@ -177,6 +180,11 @@ private:
         ViewportPickResult result;
         UINT64 fence = 0;
     };
+#ifdef TRACY_ENABLE
+    tracy::D3D12QueueCtx* mTracyContext = nullptr;
+    std::vector<std::unique_ptr<tracy::D3D12ZoneScope>> mTracyGpuZones;
+#endif
+    int mGpuRegionDepth = 0;
     std::unique_ptr<EditorTarget> CreateEditorTarget(uint32_t width, uint32_t height, UINT srvIndex, bool picking);
     std::unique_ptr<EditorTarget> mEditorTarget;
     std::unique_ptr<EditorTarget> mMaterialPreview;

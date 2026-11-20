@@ -49,5 +49,23 @@ foreach ($scene in $Scenes) {
         }
         & $renderDoc thumb -o (Join-Path $directory 'thumbnail.png') $capture.FullName | Out-Null
         Write-Output ('{0}: {1} ({2:N1} MB)' -f $name, $capture.FullName, ($capture.Length / 1MB))
+
+        # Marker tree with draw counts per region, read back through RenderDoc's own replay.
+        $markers = Join-Path $directory 'markers.txt'
+        $env:LS_RDC_INPUT = $capture.FullName
+        $env:LS_RDC_OUTPUT = $markers
+        try {
+            $viewer = Start-Process -FilePath (Join-Path $env:ProgramFiles 'RenderDoc\qrenderdoc.exe') `
+                -ArgumentList @('--python', "`"$(Join-Path $PSScriptRoot 'RenderDocMarkers.py')`"") -PassThru -WindowStyle Minimized
+            if (!$viewer.WaitForExit(180000)) {
+                $viewer.Kill()
+                Write-Output "  markers: qrenderdoc timed out"
+            }
+        } finally {
+            Remove-Item Env:LS_RDC_INPUT, Env:LS_RDC_OUTPUT -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $markers) {
+            Get-Content $markers | ForEach-Object { "  $_" }
+        }
     }
 }

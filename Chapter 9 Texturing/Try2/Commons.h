@@ -250,7 +250,36 @@ public:
     virtual size_t TerrainGpuBytes() const { return 0; }
     virtual void OnResize(int width, int height) = 0;
 
+    // Named GPU region around the commands recorded until the matching EndGpuRegion.
+    // Visible as nested events in RenderDoc/PIX and as GPU zones in Tracy. Regions must nest.
+    virtual void BeginGpuRegion(const char* name)
+    {
+    }
+    virtual void EndGpuRegion()
+    {
+    }
+};
 
+// Scoped GPU region: closes on every exit path of the enclosing block.
+class GpuRegion
+{
+public:
+    GpuRegion(IRenderAdapter& adapter, const char* name)
+        : mAdapter(adapter)
+    {
+        mAdapter.BeginGpuRegion(name);
+    }
+
+    ~GpuRegion()
+    {
+        mAdapter.EndGpuRegion();
+    }
+
+    GpuRegion(const GpuRegion&) = delete;
+    GpuRegion& operator=(const GpuRegion&) = delete;
+
+private:
+    IRenderAdapter& mAdapter;
 };
 
 class ISystem

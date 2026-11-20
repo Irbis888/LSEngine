@@ -287,6 +287,7 @@ void ImGuiBridge::RenderOverlay(D3DRenderAdapter* adapter)
         return;
 
     const Dx12ImGuiBindings bindings = adapter->GetImGuiBindings();
+    GpuRegion editorInterface(*adapter, "Editor UI (ImGui)");
     ImGui_ImplDX12_RenderDrawData(drawData, bindings.CommandList);
 }
 

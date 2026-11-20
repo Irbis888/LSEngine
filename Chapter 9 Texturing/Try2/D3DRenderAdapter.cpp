@@ -84,6 +84,51 @@ D3DRenderAdapter::~D3DRenderAdapter()
         try { FlushCommandQueue(); }
         catch (...) { OutputDebugStringA("GPU flush failed during renderer shutdown\n"); }
     }
+#ifdef TRACY_ENABLE
+    mTracyGpuZones.clear();
+    if (mTracyContext != nullptr)
+    {
+        TracyD3D12Destroy(mTracyContext);
+        mTracyContext = nullptr;
+    }
+#endif
+}
+
+void D3DRenderAdapter::BeginGpuRegion(const char* name)
+{
+    if (!mCommandList)
+    {
+        return;
+    }
+    // Metadata 0 is the PIX/RenderDoc convention for a null-terminated UTF-16 event name.
+    const std::wstring wideName(name, name + std::strlen(name));
+    mCommandList->BeginEvent(0, wideName.c_str(), static_cast<UINT>((wideName.size() + 1) * sizeof(wchar_t)));
+#ifdef TRACY_ENABLE
+    if (mTracyContext != nullptr)
+    {
+        mTracyGpuZones.push_back(std::make_unique<tracy::D3D12ZoneScope>(mTracyContext, __LINE__,
+            __FILE__, std::strlen(__FILE__), __FUNCTION__, std::strlen(__FUNCTION__),
+            name, std::strlen(name), mCommandList.Get(), true));
+    }
+#endif
+    ++mGpuRegionDepth;
+}
+
+void D3DRenderAdapter::EndGpuRegion()
+{
+    if (mGpuRegionDepth == 0)
+    {
+        OutputDebugStringA("EndGpuRegion without a matching BeginGpuRegion\n");
+        return;
+    }
+    --mGpuRegionDepth;
+#ifdef TRACY_ENABLE
+    if (!mTracyGpuZones.empty())
+    {
+        mTracyGpuZones.pop_back();
+    }
+#endif
+    mCommandList->EndEvent();
 }
 
 void D3DRenderAdapter::SetUploadBudget(const UploadBudget& budget)
@@ -208,6 +253,10 @@ void D3DRenderAdapter::Init(void* windowHandle, uint32_t width, uint32_t height)
     mNextCbvSrvIndex = 1024;
 
     CreateCommandObjects();
+#ifdef TRACY_ENABLE
+    mTracyContext = TracyD3D12Context(md3dDevice.Get(), mCommandQueue.Get());
+    TracyD3D12ContextName(mTracyContext, "Direct queue", 12);
+#endif
     CreateSwapChain();
     CreateRtvAndDsvDescriptorHeaps();
     BuildRootSignatures();
@@ -402,13 +451,19 @@ void D3DRenderAdapter::BeginFrame()
     ThrowIfFailed(mCommandList->Reset(mCurrFrameResource->CmdListAlloc.Get(), nullptr));
     ID3D12DescriptorHeap* frameHeaps[]={mCbvSrvUavHeap.Get()};
     mCommandList->SetDescriptorHeaps(1,frameHeaps);
+    // Spans the whole command list; closed in EndFrame before the Present barrier.
+    BeginGpuRegion("Frame");
     CollectEditorTargets();
     CollectTerrainResources();
-    PumpResourceUploads();
+    {
+        GpuRegion uploads(*this, "Resource uploads");
+        PumpResourceUploads();
+    }
 
     // Update pass constants for this frame
     //UpdateMainPassCB();
 
+    GpuRegion clear(*this, "Clear back buffer");
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_PRESENT,
@@ -455,6 +510,15 @@ Dx12ImGuiBindings D3DRenderAdapter::GetImGuiBindings() const
 
 void D3DRenderAdapter::EndFrame()
 {
+    // Only the "Frame" region may remain open here; anything deeper is an unbalanced region.
+    if (mGpuRegionDepth > 1)
+    {
+        OutputDebugStringA("Unbalanced GPU regions closed at EndFrame\n");
+    }
+    while (mGpuRegionDepth > 0)
+    {
+        EndGpuRegion();
+    }
     // Transition → Present
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -467,6 +531,13 @@ void D3DRenderAdapter::EndFrame()
 
     ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
     mCommandQueue->ExecuteCommandLists(1, cmdsLists);
+#ifdef TRACY_ENABLE
+    if (mTracyContext != nullptr)
+    {
+        TracyD3D12NewFrame(mTracyContext);
+        TracyD3D12Collect(mTracyContext);
+    }
+#endif
 
     ThrowIfFailed(mSwapChain->Present(0, 0));
 

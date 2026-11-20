@@ -101,24 +101,34 @@ private:
     {
         CollectSubmissions(registry, eyePosition, viewDirection);
         ZoneScopedN("Render submit (bind material + draw)");
-        bool terrainDrawn = false;
-        for (const auto& submission : mSubmissions)
+        // Submissions are sorted opaque/masked first, then blended back to front.
+        const auto firstBlended = std::find_if(mSubmissions.begin(), mSubmissions.end(), [](const Submission& submission)
         {
-            if (submission.blended && !terrainDrawn)
-            {
-                if (mTerrain)
-                {
-                    mTerrain->Draw(registry);
-                }
-                terrainDrawn = true;
-            }
-            mAdapter->SetRenderEntity(submission.entity);
-            mAdapter->SetTransform(*submission.transform);
-            mAdapter->DrawSubmeshWithMaterial(submission.mesh, submission.submesh, submission.material);
+            return submission.blended;
+        });
+        {
+            GpuRegion opaqueRegion(*mAdapter, "Opaque and masked");
+            DrawSubmissions(mSubmissions.begin(), firstBlended);
         }
-        if (!terrainDrawn && mTerrain)
+        if (mTerrain)
         {
+            GpuRegion terrainRegion(*mAdapter, "Terrain");
             mTerrain->Draw(registry);
+        }
+        if (firstBlended != mSubmissions.end())
+        {
+            GpuRegion transparentRegion(*mAdapter, "Transparent (back to front)");
+            DrawSubmissions(firstBlended, mSubmissions.end());
+        }
+    }
+
+    void DrawSubmissions(std::vector<Submission>::const_iterator begin, std::vector<Submission>::const_iterator end)
+    {
+        for (auto submission = begin; submission != end; ++submission)
+        {
+            mAdapter->SetRenderEntity(submission->entity);
+            mAdapter->SetTransform(*submission->transform);
+            mAdapter->DrawSubmeshWithMaterial(submission->mesh, submission->submesh, submission->material);
         }
     }
 

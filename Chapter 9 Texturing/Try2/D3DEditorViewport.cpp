@@ -117,6 +117,11 @@ void D3DRenderAdapter::BeginScene(bool editor, bool visible)
     mFrameEntities.clear();
     mFrameEntities.push_back(entt::null);
     mRenderEntityID = 0;
+    if (mSceneVisible)
+    {
+        // Closed in EndScene.
+        BeginGpuRegion(editor ? "Scene (editor viewport: color + entity ID)" : "Scene");
+    }
     if (!mSceneVisible || !editor)
     {
         return;
@@ -164,6 +169,7 @@ void D3DRenderAdapter::EndScene()
         mCommandList->ResourceBarrier(1, &colorBarrier);
         if (mPendingPick.request && mPickReadbacks.size() < 4)
         {
+            GpuRegion pickRegion(*this, "Picking readback (entity ID pixel)");
             PickReadback readback;
             readback.result = mPendingPick;
             readback.entities = mFrameEntities;
@@ -191,6 +197,10 @@ void D3DRenderAdapter::EndScene()
             mCommandList->ResourceBarrier(1, &identifierBarrier);
             mPickReadbacks.push_back(std::move(readback));
         }
+    }
+    if (mSceneVisible)
+    {
+        EndGpuRegion();
     }
     mPendingPick = {};
     auto renderView = CurrentBackBufferView();
@@ -244,6 +254,7 @@ void D3DRenderAdapter::DrawMaterialPreview(MeshID mesh, float rotation)
         return;
     }
 
+    GpuRegion previewRegion(*this, "Material editor preview");
     const bool editorScene = mEditorScene;
     const PassConstants sceneConstants = mMainPassCB;
     mEditorScene = false;
