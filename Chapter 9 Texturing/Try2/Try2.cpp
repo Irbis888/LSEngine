@@ -4,6 +4,7 @@
 #include <iostream>
 #include <entt/entt.hpp>
 #include "Application.h"
+#include "FrameBenchmark.h"
 #include "ImGuiBridge.h"
 #include "ScriptSystem.h"
 #include "Editor/EditorContext.h"
@@ -212,7 +213,11 @@ void TestApp::Update(const FrameContext& context)
 void TestApp::Draw(const FrameContext& context)
 {
 	ZoneScopedN("Draw");
+	FrameBenchmark& benchmark = FrameBenchmark::Instance();
+	benchmark.SetSceneReady(!mEngine->IsSceneLoading() && !mEngine->GetResources().HasPendingLoads());
+	benchmark.BeginDraw();
 	mEngine->Draw(context);
+	benchmark.EndDraw();
     if(mTerrainValidation)mTerrainValidation->AfterDraw(*static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
 }
 

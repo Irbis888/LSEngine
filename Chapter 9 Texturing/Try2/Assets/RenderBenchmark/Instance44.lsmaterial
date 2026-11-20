@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Benchmark 44",
+    "parent": "Assets/RenderBenchmark/Base.lsmaterial",
+    "overrides": { "color": [0.8595, 0.3456, 0.7673], "roughness": 0.5111, "albedo": "Assets/MaterialDemo/Emissive.png" }
+  }
+}

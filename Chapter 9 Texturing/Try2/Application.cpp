@@ -1,5 +1,6 @@
 #include "Application.h"
 #include "TextureBenchmark.h"
+#include "FrameBenchmark.h"
 #include "ImGuiBridge.h"
 #include "Editor/EditorContext.h"
 #include <WindowsX.h>
@@ -107,6 +108,7 @@ int Application::Run()
 		else
 		{
 			ZoneScopedN("Engine frame CPU");
+			FrameBenchmark::Instance().FrameBoundary();
 			mTimer.Tick();
             const auto frameNow = std::chrono::steady_clock::now();
             if (previousFrame.time_since_epoch().count())
@@ -153,6 +155,7 @@ int Application::Run()
 				ImGuiBridge::RenderOverlay(static_cast<D3DRenderAdapter*>(mRenderAdapter.get()));
                 AfterOverlay();
 				mRenderAdapter->EndFrame();
+				FrameBenchmark::Instance().EndCpuFrame();
 				memset(mInput.keysPressed, 0, sizeof(bool) * 256);
 				memset(mInput.keysReleased, 0, sizeof(bool) * 256);
 				memset(mInput.mouseButtonsPressed, 0, sizeof(bool) * 8);

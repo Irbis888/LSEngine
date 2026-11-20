@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Benchmark 49",
+    "parent": "Assets/RenderBenchmark/Base.lsmaterial",
+    "overrides": { "color": [0.8855, 0.6758, 0.4753], "roughness": 0.4333, "normal": "Assets/MaterialDemo/Normal.png" }
+  }
+}
