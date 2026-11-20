@@ -99,6 +99,32 @@ private:
 
     void SubmitMeshes(entt::registry& registry, const glm::vec3& eyePosition, const glm::vec3& viewDirection)
     {
+        CollectSubmissions(registry, eyePosition, viewDirection);
+        ZoneScopedN("Render submit (bind material + draw)");
+        bool terrainDrawn = false;
+        for (const auto& submission : mSubmissions)
+        {
+            if (submission.blended && !terrainDrawn)
+            {
+                if (mTerrain)
+                {
+                    mTerrain->Draw(registry);
+                }
+                terrainDrawn = true;
+            }
+            mAdapter->SetRenderEntity(submission.entity);
+            mAdapter->SetTransform(*submission.transform);
+            mAdapter->DrawSubmeshWithMaterial(submission.mesh, submission.submesh, submission.material);
+        }
+        if (!terrainDrawn && mTerrain)
+        {
+            mTerrain->Draw(registry);
+        }
+    }
+
+    void CollectSubmissions(entt::registry& registry, const glm::vec3& eyePosition, const glm::vec3& viewDirection)
+    {
+        ZoneScopedN("Render collect and sort");
         mSubmissions.clear();
         for (auto entity : registry.view<TransformComponent, MeshComponent>())
         {
@@ -138,25 +164,6 @@ private:
             }
             return left.submesh < right.submesh;
         });
-        bool terrainDrawn = false;
-        for (const auto& submission : mSubmissions)
-        {
-            if (submission.blended && !terrainDrawn)
-            {
-                if (mTerrain)
-                {
-                    mTerrain->Draw(registry);
-                }
-                terrainDrawn = true;
-            }
-            mAdapter->SetRenderEntity(submission.entity);
-            mAdapter->SetTransform(*submission.transform);
-            mAdapter->DrawSubmeshWithMaterial(submission.mesh, submission.submesh, submission.material);
-        }
-        if (!terrainDrawn && mTerrain)
-        {
-            mTerrain->Draw(registry);
-        }
     }
 
     void CollectEmissiveLights(entt::registry& registry, const glm::vec3& eyePosition, SceneLightData& lights)
