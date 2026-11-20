@@ -5,7 +5,9 @@
 #include "ResourceManager.h"
 #include "JobSystem.h"
 #include "Project.h"
+#include <chrono>
 #include <filesystem>
+#include <utility>
 
 class PhysicsSystem;
 class ScriptSystem;
@@ -99,8 +101,23 @@ public:
     const std::string& GetScenePath() const { return mScenePath; }
     // After "Save As": later saves of the current scene go to the new file.
     void SetScenePath(const std::string& path) { mScenePath = path; }
+    // Material hot reload runs with the same switch as script hot reload (toolbar "Hot reload",
+    // --no-hot-reload). The last change or rejection, for the editor's status line.
+    std::string TakeMaterialReloadNotice()
+    {
+        return std::exchange(mMaterialReloadNotice, {});
+    }
+    uint64_t GetMaterialReloadCount() const
+    {
+        return mMaterialReloadCount;
+    }
+    // One pass right now, independent of the polling interval (used by tests).
+    void PumpMaterialHotReload();
 private:
     bool RequestScene(const std::string& path, std::string& outError, bool restore);
+    std::chrono::steady_clock::time_point mNextMaterialScan{};
+    std::string mMaterialReloadNotice;
+    uint64_t mMaterialReloadCount = 0;
     std::string mScenePath;
     SceneLoadProgress mSceneProgress;
     SceneLoadingBudget mSceneLoadingBudget;

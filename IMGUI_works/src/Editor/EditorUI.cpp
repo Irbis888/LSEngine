@@ -374,7 +374,7 @@ static void DrawToolbar(EditorContext& ctx)
         bool hotReload = scripts.IsHotReloadEnabled();
         ImGui::SameLine();
         if (ImGui::Checkbox("Hot reload##toolbar", &hotReload)) scripts.SetHotReload(hotReload);
-        ImGui::SetItemTooltip("Watch Lua scripts and prefabs on a JobSystem worker. In Play, a saved script restarts its instances (reset state); a saved prefab applies to the next spawn.");
+        ImGui::SetItemTooltip("Watch Lua scripts and prefabs on a JobSystem worker. In Play, a saved script restarts its instances (reset state); a saved prefab applies to the next spawn.\nAlso watches loaded .lsmaterial files: a saved material updates every user and instance at once; a broken file keeps the running version.");
     }
 
     ImGui::SameLine();
@@ -448,7 +448,16 @@ void Editor_BeginFrame(const FrameContext& context)
     }
     wasLoading = loading;
     if (ctx.engine)
-        if (auto notice = ctx.engine->GetScripts().TakeHotReloadNotice(); !notice.empty()) ctx.statusMessage = std::move(notice);
+    {
+        if (auto notice = ctx.engine->GetScripts().TakeHotReloadNotice(); !notice.empty())
+        {
+            ctx.statusMessage = std::move(notice);
+        }
+        if (auto notice = ctx.engine->TakeMaterialReloadNotice(); !notice.empty())
+        {
+            ctx.statusMessage = std::move(notice);
+        }
+    }
     EditorPlayWindow::Update(ctx);
     if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false) && ctx.mode == EditorMode::Edit &&
         ctx.engine && !ctx.engine->GetScenePath().empty())

@@ -134,6 +134,15 @@ void Engine::Update(const FrameContext& context)
     if(mTerrain)mTerrain->Update(world.registry,context);
     // Before the systems run, so a restarted script instance initializes in this frame's Sync.
     if (mScripts && !IsSceneLoading()) mScripts->PumpHotReload();
+    if (mScripts && mScripts->IsHotReloadEnabled() && !IsSceneLoading())
+    {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= mNextMaterialScan)
+        {
+            mNextMaterialScan = now + std::chrono::milliseconds(250);
+            PumpMaterialHotReload();
+        }
+    }
 	if (context.input.keysPressed[VK_F5])
 	{
 		mRenderAdapter->ReloadShaders();
@@ -145,6 +154,53 @@ void Engine::Update(const FrameContext& context)
 		system->Update(world.registry, context);
 	}
 }
+void Engine::PumpMaterialHotReload()
+{
+    const auto result = mResourceManager.ReloadChangedMaterialAssets();
+    for (const auto& file : result.reloaded)
+    {
+        std::cout << "[Material] Hot reload: " << file << std::endl;
+        mMaterialReloadNotice = "Material reloaded: " + file;
+        ++mMaterialReloadCount;
+    }
+    for (const auto& error : result.errors)
+    {
+        std::cerr << "[Material] Hot reload rejected (running version kept): " << error << std::endl;
+        mMaterialReloadNotice = "Material reload rejected (running version kept): " + error;
+    }
+    // Components show the state of their file; one whose first load failed retries, so fixing
+    // a broken file (or creating its missing parent) brings the material in without a restart.
+    for (auto entity : world.registry.view<MaterialComponent>())
+    {
+        auto& component = world.registry.get<MaterialComponent>(entity);
+        if (component.assetPath.empty())
+        {
+            continue;
+        }
+        if (component.material != 0)
+        {
+            component.error = mResourceManager.GetMaterialAssetError(component.assetPath);
+            continue;
+        }
+        try
+        {
+            component.material = mResourceManager.LoadMaterialAsset(component.assetPath);
+            component.error.clear();
+            std::cout << "[Material] Loaded after fix: " << component.assetPath << std::endl;
+            mMaterialReloadNotice = "Material loaded after fix: " + component.assetPath;
+            ++mMaterialReloadCount;
+        }
+        catch (const std::exception& error)
+        {
+            if (component.error != error.what())
+            {
+                component.error = error.what();
+                std::cerr << "[Material] " << component.error << std::endl;
+            }
+        }
+    }
+}
+
 void Engine::PhysicsUpdate(const FrameContext& context)
 {
 	if (IsSceneLoading() || (!IsPlaying() && (mStandalone || !Editor_IsPhysicsEnabled())))

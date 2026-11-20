@@ -7,6 +7,7 @@
 #include <D3DRenderAdapter.h>
 #include <SceneSerializer.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -26,9 +27,23 @@ namespace
         float rotation = 0.0f;
         bool dirty = false;
         bool previewChanged = true;
+        // Last seen write time of the open file; an external edit reloads a clean document.
+        std::filesystem::file_time_type diskTime{};
+        std::chrono::steady_clock::time_point nextDiskCheck{};
     };
 
     MaterialDocument document;
+
+    std::filesystem::file_time_type DiskTime(EditorContext& context, const std::string& path)
+    {
+        if (path.empty())
+        {
+            return {};
+        }
+        std::error_code error;
+        const auto time = std::filesystem::last_write_time(AssetPaths::Resolve(context.engine->GetAssetRoot(), path), error);
+        return error ? std::filesystem::file_time_type{} : time;
+    }
 
     std::string MaterialPath(EditorContext& context, const std::filesystem::path& file)
     {
@@ -46,10 +61,12 @@ namespace
         {
             MaterialDesc next;
             next.name = "New Material";
+            const auto diskTime = DiskTime(context, path);
             if (!path.empty())
             {
                 next = SceneSerializer::ReadMaterialAsset(AssetPaths::Resolve(context.engine->GetAssetRoot(), path));
             }
+            document.diskTime = diskTime;
             if (!next.surface && !next.IsInstance())
             {
                 next.surface.emplace();
@@ -84,6 +101,7 @@ namespace
                 path = MaterialPath(context, file);
             }
             context.resources->SaveMaterialAsset(path, document.description);
+            document.diskTime = DiskTime(context, path);
             document.path = std::move(path);
             document.message = "Saved " + document.path;
             document.dirty = false;
@@ -585,6 +603,29 @@ void Editor_DrawMaterialWindow(EditorContext& context)
     if (!document.description.surface && !document.description.IsInstance())
     {
         ReplaceDocument(context, {});
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (!document.path.empty() && now >= document.nextDiskCheck)
+    {
+        document.nextDiskCheck = now + std::chrono::milliseconds(250);
+        const auto diskTime = DiskTime(context, document.path);
+        if (diskTime != std::filesystem::file_time_type{} && diskTime != document.diskTime)
+        {
+            document.diskTime = diskTime;
+            if (document.dirty)
+            {
+                document.message = document.path + " changed on disk. Save overwrites it; reopen it to see the file.";
+            }
+            else
+            {
+                // A broken file leaves the previous values here, with the parse error as the message.
+                ReplaceDocument(context, document.path);
+                if (document.message.empty())
+                {
+                    document.message = "Reloaded " + document.path + " from disk";
+                }
+            }
+        }
     }
 
     if (ImGui::Button("New"))

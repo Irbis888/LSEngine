@@ -257,6 +257,17 @@ public:
     MaterialID LoadMaterialAsset(const std::string& path);
     // Validates the parent chain before writing; the cached material and all its instances update.
     void SaveMaterialAsset(const std::string& path, const MaterialDesc& description);
+    // Hot reload (main thread): re-reads every loaded .lsmaterial whose time or size changed on
+    // disk and rebuilds it in place with all its instances. A file that fails to parse or resolve
+    // keeps the running version; its error stays available until the file is fixed.
+    struct MaterialReloadResult
+    {
+        std::vector<std::string> reloaded;
+        std::vector<std::string> errors;
+    };
+    MaterialReloadResult ReloadChangedMaterialAssets();
+    // Empty when the file's last load or reload succeeded.
+    std::string GetMaterialAssetError(const std::string& path) const;
     // 0 for a base material, otherwise the direct parent of the instance.
     MaterialID GetMaterialParent(MaterialID id) const;
     size_t GetMaterialInstanceCount() const
@@ -321,6 +332,15 @@ private:
     std::unordered_map<MaterialID, Material> mMaterials;
     std::unordered_map<std::wstring, MaterialID> mMaterialAssets;
     std::unordered_map<MaterialID, MaterialInstanceSource> mMaterialInstances;
+    struct MaterialFileStamp
+    {
+        std::filesystem::file_time_type time{};
+        uintmax_t size = 0;
+        std::string error;
+    };
+    // Keyed like mMaterialAssets: what the last load, save or reload saw on disk.
+    std::unordered_map<std::wstring, MaterialFileStamp> mMaterialStamps;
+    void RecordMaterialStamp(const std::filesystem::path& file);
     // Material files whose parent chain is being resolved; detects inheritance cycles.
     std::vector<std::filesystem::path> mMaterialLoadChain;
     std::unordered_map<TextureID, Texture> mTextures;

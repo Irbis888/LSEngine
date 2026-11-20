@@ -1069,6 +1069,8 @@ MaterialID ResourceManager::LoadMaterialAsset(const std::string& path)
     {
         return cached->second;
     }
+    // Stamped before reading: an edit that lands during the read is seen by the next reload pass.
+    RecordMaterialStamp(file);
     const MaterialDesc description = SceneSerializer::ReadMaterialAsset(file);
     MaterialID material = 0;
     try
@@ -1081,6 +1083,75 @@ MaterialID ResourceManager::LoadMaterialAsset(const std::string& path)
     }
     mMaterialAssets.emplace(key, material);
     return material;
+}
+
+void ResourceManager::RecordMaterialStamp(const std::filesystem::path& file)
+{
+    MaterialFileStamp stamp;
+    std::error_code error;
+    stamp.time = std::filesystem::last_write_time(file, error);
+    if (!error)
+    {
+        stamp.size = std::filesystem::file_size(file, error);
+    }
+    mMaterialStamps[file.native()] = stamp;
+}
+
+std::string ResourceManager::GetMaterialAssetError(const std::string& path) const
+{
+    const auto stamp = mMaterialStamps.find(AssetPaths::Resolve(mSearch->root, path).native());
+    return stamp == mMaterialStamps.end() ? std::string() : stamp->second.error;
+}
+
+ResourceManager::MaterialReloadResult ResourceManager::ReloadChangedMaterialAssets()
+{
+    ZoneScopedN("Material hot reload scan");
+    MaterialReloadResult result;
+    // Rebuilding may load new parent files into mMaterialAssets: iterate over a snapshot.
+    const std::vector<std::pair<std::wstring, MaterialID>> assets(mMaterialAssets.begin(), mMaterialAssets.end());
+    for (const auto& [key, material] : assets)
+    {
+        const std::filesystem::path file(key);
+        std::error_code error;
+        const auto time = std::filesystem::last_write_time(file, error);
+        if (error)
+        {
+            continue; // Missing or locked by an editor mid-save: keep the running version, try again later.
+        }
+        const auto size = std::filesystem::file_size(file, error);
+        if (error)
+        {
+            continue;
+        }
+        MaterialFileStamp& stamp = mMaterialStamps[key];
+        if (stamp.time == time && stamp.size == size)
+        {
+            continue;
+        }
+        stamp.time = time;
+        stamp.size = size;
+        const std::string name = AssetPaths::ToUtf8(file);
+        try
+        {
+            const MaterialDesc description = SceneSerializer::ReadMaterialAsset(file);
+            std::optional<BuiltMaterial> replacement;
+            {
+                MaterialLoadChainEntry chainEntry(mMaterialLoadChain, file);
+                replacement = BuildTexturedMaterial(description);
+            }
+            // Rejects a new parent that would close a cycle before anything is replaced.
+            StoreMaterial(material, std::move(*replacement), description);
+            stamp.error.clear();
+            result.reloaded.push_back(name);
+        }
+        catch (const std::exception& reloadError)
+        {
+            const std::string message = reloadError.what();
+            stamp.error = message.rfind(name, 0) == 0 ? message : name + ": " + message;
+            result.errors.push_back(stamp.error);
+        }
+    }
+    return result;
 }
 
 void ResourceManager::SaveMaterialAsset(const std::string& path, const MaterialDesc& description)
@@ -1125,6 +1196,8 @@ try
     {
         // Every entity using this file and every instance inheriting from it see the change.
         StoreMaterial(cached->second, std::move(*replacement), description);
+        // The engine's own write is not an external edit: hot reload must not apply it again.
+        RecordMaterialStamp(file);
     }
 }
 catch (const std::exception& error)

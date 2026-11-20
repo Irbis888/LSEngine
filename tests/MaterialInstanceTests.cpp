@@ -2,6 +2,7 @@
 #include "AssetPaths.h"
 #include "ResourceManager.h"
 #include "SceneSerializer.h"
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -288,6 +289,108 @@ namespace
     }
 }
 
+namespace
+{
+    // Writes the file and moves its time forward, so the change is visible regardless of timestamp resolution.
+    void EditOnDisk(ResourceManager& resources, const std::string& path, const std::string& text)
+    {
+        static int edit = 0;
+        const fs::path file = resources.ResolveAssetPath(path);
+        WriteText(file, text);
+        fs::last_write_time(file, fs::file_time_type::clock::now() + std::chrono::seconds(++edit));
+    }
+
+    bool Contains(const std::vector<std::string>& lines, const std::string& fragment)
+    {
+        for (const auto& line : lines)
+        {
+            if (line.find(fragment) != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void TestHotReload(ResourceManager& resources)
+    {
+        const MaterialID base = resources.LoadMaterialAsset("Materials/Base.lsmaterial");
+        const MaterialID child = resources.LoadMaterialAsset("Materials/Child.lsmaterial");
+        const MaterialID grandChild = resources.LoadMaterialAsset("Materials/GrandChild.lsmaterial");
+
+        auto idle = resources.ReloadChangedMaterialAssets();
+        Check(idle.reloaded.empty() && idle.errors.empty(), "Reload without disk changes touched materials");
+
+        // External edit of the base: users and every instance update in place, overrides survive.
+        EditOnDisk(resources, "Materials/Base.lsmaterial", R"({
+  "version": 1,
+  "material": {
+    "name": "Base",
+    "color": [0.1, 0.6, 0.2],
+    "roughness": 0.7,
+    "surface": { "mode": "masked", "alphaCutoff": 0.25, "uvScale": [5, 5], "emissiveLightRange": 0 }
+  }
+})");
+        auto edited = resources.ReloadChangedMaterialAssets();
+        Check(edited.errors.empty() && Contains(edited.reloaded, "Base.lsmaterial") && edited.reloaded.size() == 1,
+            "Base edit was not reloaded exactly once");
+        Check(resources.LoadMaterialAsset("Materials/Base.lsmaterial") == base, "Hot reload replaced the MaterialID");
+        Check(resources.GetMaterial(base).parameters.baseColor == glm::vec4(0.1f, 0.6f, 0.2f, 1.0f),
+            "Base parameters did not reload");
+        Check(resources.GetMaterial(grandChild).parameters.uvScale == glm::vec2(5.0f) &&
+            resources.GetMaterial(grandChild).parameters.alphaCutoff == 0.25f, "Instances did not inherit the reloaded base");
+        Check(resources.GetMaterial(grandChild).parameters.baseColor == glm::vec4(0.9f, 0.1f, 0.1f, 1.0f) &&
+            resources.GetMaterial(grandChild).parameters.roughness == 0.1f, "Reload overwrote instance overrides");
+        Check(resources.GetMaterial(grandChild).base.get() == resources.GetMaterial(base).base.get(),
+            "Instances lost the shared base after reload");
+
+        // A broken edit keeps the running version and reports the file.
+        const MaterialParameters childBefore = resources.GetMaterial(child).parameters;
+        EditOnDisk(resources, "Materials/Child.lsmaterial", R"({ "version": 1, "material": { "parent": )");
+        auto broken = resources.ReloadChangedMaterialAssets();
+        Check(Contains(broken.errors, "Child.lsmaterial") && broken.reloaded.empty(), "Broken edit was not reported");
+        Check(resources.GetMaterial(child).parameters.roughness == childBefore.roughness &&
+            resources.GetMaterial(child).parameters.baseColor == childBefore.baseColor, "Broken edit replaced the running material");
+        Check(resources.GetMaterialAssetError("Materials/Child.lsmaterial").find("Child.lsmaterial") != std::string::npos,
+            "Broken file has no stored error");
+        auto repeated = resources.ReloadChangedMaterialAssets();
+        Check(repeated.errors.empty() && repeated.reloaded.empty(), "An unchanged broken file was retried every pass");
+
+        // Fixing it applies the new overrides and clears the error.
+        EditOnDisk(resources, "Materials/Child.lsmaterial", R"({
+  "version": 1,
+  "material": { "name": "Child", "parent": "Materials/Base.lsmaterial", "overrides": { "color": [0.2, 0.2, 0.9] } }
+})");
+        auto fixed = resources.ReloadChangedMaterialAssets();
+        Check(fixed.errors.empty() && Contains(fixed.reloaded, "Child.lsmaterial"), "Fixed file was not reloaded");
+        Check(resources.GetMaterialAssetError("Materials/Child.lsmaterial").empty(), "Fixed file kept its error");
+        Check(resources.GetMaterial(child).parameters.baseColor == glm::vec4(0.2f, 0.2f, 0.9f, 1.0f) &&
+            resources.GetMaterial(child).parameters.roughness == 0.7f, "Fixed instance resolved incorrectly");
+        Check(resources.GetMaterial(grandChild).parameters.baseColor == glm::vec4(0.2f, 0.2f, 0.9f, 1.0f),
+            "Grandchild did not follow the reloaded middle of the chain");
+
+        // An edit that closes a cycle is rejected; the running chain stays.
+        EditOnDisk(resources, "Materials/Base.lsmaterial", R"({
+  "version": 1,
+  "material": { "name": "Base", "parent": "Materials/GrandChild.lsmaterial" }
+})");
+        auto cycle = resources.ReloadChangedMaterialAssets();
+        Check(Contains(cycle.errors, "inheritance cycle") && resources.GetMaterialParent(base) == 0,
+            "Cyclic hot reload was accepted");
+
+        // The engine's own save is not an external edit.
+        MaterialDesc restoredBase;
+        restoredBase.name = "Base";
+        restoredBase.color = glm::vec3(0.5f);
+        restoredBase.surface.emplace();
+        resources.SaveMaterialAsset("Materials/Base.lsmaterial", restoredBase);
+        auto afterSave = resources.ReloadChangedMaterialAssets();
+        Check(afterSave.reloaded.empty() && afterSave.errors.empty(), "Own save was reloaded again");
+        Check(resources.GetMaterialAssetError("Materials/Base.lsmaterial").empty(),
+            "A successful save did not clear the previous reload error");
+    }
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -300,6 +403,7 @@ int main(int argc, char** argv)
         TestChainResolution(resources);
         TestLivePropagation(resources);
         TestDiagnostics(resources);
+        TestHotReload(resources);
     }
     catch (const std::exception& error)
     {
