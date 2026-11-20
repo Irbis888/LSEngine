@@ -49,7 +49,7 @@ namespace
             {
                 next = SceneSerializer::ReadMaterialAsset(AssetPaths::Resolve(context.engine->GetAssetRoot(), path));
             }
-            if (!next.surface)
+            if (!next.surface && !next.IsInstance())
             {
                 next.surface.emplace();
             }
@@ -239,8 +239,194 @@ namespace
         return changed;
     }
 
+    void CreateInstanceDocument()
+    {
+        MaterialDesc instance;
+        instance.name = document.description.name + " Instance";
+        instance.parent = document.path;
+        document.message = "Unsaved instance of " + document.path + ". Use Save As to create its file.";
+        document.description = std::move(instance);
+        document.path.clear();
+        document.dirty = true;
+        document.previewChanged = true;
+    }
+
+    // UE-style row: a checkbox decides whether the instance overrides the parent's value.
+    template <typename Value, typename DrawWidget>
+    bool DrawOverride(const char* label, std::optional<Value>& overrideValue, const Value& inherited, DrawWidget&& drawWidget)
+    {
+        ImGui::PushID(label);
+        bool overridden = overrideValue.has_value();
+        bool changed = false;
+        if (ImGui::Checkbox("##Override", &overridden))
+        {
+            if (overridden)
+            {
+                overrideValue = inherited;
+            }
+            else
+            {
+                overrideValue.reset();
+            }
+            changed = true;
+        }
+        ImGui::SetItemTooltip("%s", overridden ? "Overridden by this instance. Clear to inherit the parent's value." :
+            "Inherited from the parent. Check to override it in this instance.");
+        ImGui::SameLine();
+        Value shown = overrideValue ? *overrideValue : inherited;
+        ImGui::BeginDisabled(!overridden);
+        if (drawWidget(label, shown) && overridden)
+        {
+            overrideValue = shown;
+            changed = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::PopID();
+        return changed;
+    }
+
+    std::wstring TexturePath(EditorContext& context, TextureID texture)
+    {
+        if (texture == 0)
+        {
+            return {};
+        }
+        return context.resources->GetTexture(texture).filename;
+    }
+
+    bool DrawInstanceProperties(EditorContext& context)
+    {
+        auto& description = document.description;
+        auto& overrides = description.overrides;
+        const MaterialParameters applied = document.previewMaterial
+            ? context.resources->GetMaterial(document.previewMaterial).parameters : MaterialParameters{};
+
+        bool changed = EditString("Name", description.name);
+        ImGui::Text("Instance of %s", description.parent.c_str());
+        if (ImGui::Button("Open parent"))
+        {
+            Editor_OpenMaterial(context, description.parent);
+            return changed;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Change parent..."))
+        {
+            const auto file = PickMaterial(context);
+            if (!file.empty())
+            {
+                try
+                {
+                    const std::string parent = MaterialPath(context, file);
+                    if (!document.path.empty() && _stricmp(parent.c_str(), document.path.c_str()) == 0)
+                    {
+                        throw std::runtime_error("A material cannot inherit from itself.");
+                    }
+                    description.parent = parent;
+                    changed = true;
+                }
+                catch (const std::exception& error)
+                {
+                    document.message = error.what();
+                }
+            }
+        }
+
+        MaterialID parentMaterial = 0;
+        try
+        {
+            parentMaterial = context.resources->LoadMaterialAsset(description.parent);
+        }
+        catch (const std::exception& error)
+        {
+            ImGui::TextWrapped("Parent cannot be loaded: %s", error.what());
+            return changed;
+        }
+        const Material& parent = context.resources->GetMaterial(parentMaterial);
+        const MaterialParameters& inherited = parent.parameters;
+        static const MaterialBase defaultBase;
+        const MaterialBase& base = parent.base ? *parent.base : defaultBase;
+
+        if (ImGui::CollapsingHeader("Inherited from the base material", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextDisabled("Shader: %s (%s / %s)", AssetPaths::ToUtf8(base.program.file).c_str(),
+                base.program.vertexEntry.c_str(), base.program.pixelEntry.c_str());
+            ImGui::TextDisabled("Mode: %s, %s, blending %s, depth write %s",
+                base.mode == SurfaceMode::Masked ? "Masked" : "Opaque", base.twoSided ? "two sided" : "one sided",
+                base.renderState.blendEnabled ? "on" : "off", base.renderState.depthWrite ? "on" : "off");
+            ImGui::TextDisabled("Shared by every instance: one PSO. Edit the parent to change it.");
+        }
+
+        if (ImGui::CollapsingHeader("Overrides", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const auto colorWidget = [](const char* label, glm::vec3& value)
+            {
+                return ImGui::ColorEdit3(label, &value.x);
+            };
+            const auto unitWidget = [](const char* label, float& value)
+            {
+                return ImGui::SliderFloat(label, &value, 0, 1);
+            };
+            const auto mapWidget = [&](TextureID previewTexture)
+            {
+                return [&context, previewTexture](const char* label, std::wstring& path)
+                {
+                    return DrawMap(context, label, path, previewTexture);
+                };
+            };
+            changed |= DrawOverride("Base color", overrides.color, glm::vec3(inherited.baseColor), colorWidget);
+            changed |= DrawOverride("Alpha", overrides.alpha, inherited.baseColor.a, unitWidget);
+            changed |= DrawOverride("Base color map", overrides.albedoTexture, TexturePath(context, inherited.albedo),
+                mapWidget(applied.albedo));
+            changed |= DrawOverride("Roughness", overrides.roughness, inherited.roughness, unitWidget);
+            const float inheritedMetallic = inherited.metallic.value_or(inherited.orm != 0 ? 1.0f : 0.0f);
+            changed |= DrawOverride("Metallic", overrides.metallic, inheritedMetallic, unitWidget);
+            changed |= DrawOverride("AO strength", overrides.aoStrength, inherited.aoStrength, unitWidget);
+            changed |= DrawOverride("ORM map", overrides.ormTexture, TexturePath(context, inherited.orm),
+                mapWidget(applied.orm));
+            changed |= DrawOverride("Normal strength", overrides.normalStrength, inherited.normalStrength,
+                [](const char* label, float& value)
+                {
+                    return ImGui::SliderFloat(label, &value, 0, 8);
+                });
+            changed |= DrawOverride("Normal map", overrides.normalTexture, TexturePath(context, inherited.normal),
+                mapWidget(applied.normal));
+            if (base.mode == SurfaceMode::Masked)
+            {
+                changed |= DrawOverride("Alpha cutoff", overrides.alphaCutoff, inherited.alphaCutoff, unitWidget);
+            }
+            changed |= DrawOverride("Emissive color", overrides.emissiveColor, inherited.emissiveColor, colorWidget);
+            changed |= DrawOverride("Emissive intensity", overrides.emissiveIntensity, inherited.emissiveIntensity,
+                [](const char* label, float& value)
+                {
+                    return ImGui::DragFloat(label, &value, 0.05f, 0, 100, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+                });
+            changed |= DrawOverride("Emissive light range", overrides.emissiveLightRange, inherited.emissiveLightRange,
+                [](const char* label, float& value)
+                {
+                    return ImGui::DragFloat(label, &value, 0.1f, 0, 1000, "%.1f", ImGuiSliderFlags_AlwaysClamp);
+                });
+            changed |= DrawOverride("Emissive map", overrides.emissiveTexture, TexturePath(context, inherited.emissive),
+                mapWidget(applied.emissive));
+            changed |= DrawOverride("UV scale", overrides.uvScale, inherited.uvScale,
+                [](const char* label, glm::vec2& value)
+                {
+                    return ImGui::DragFloat2(label, &value.x, 0.02f);
+                });
+            changed |= DrawOverride("UV offset", overrides.uvOffset, inherited.uvOffset,
+                [](const char* label, glm::vec2& value)
+                {
+                    return ImGui::DragFloat2(label, &value.x, 0.01f);
+                });
+        }
+        return changed;
+    }
+
     bool DrawProperties(EditorContext& context)
     {
+        if (document.description.IsInstance())
+        {
+            return DrawInstanceProperties(context);
+        }
         auto& description = document.description;
         auto& base = *description.surface;
         auto& parameters = base.defaults;
@@ -394,7 +580,7 @@ void Editor_DrawMaterialWindow(EditorContext& context)
         ImGui::End();
         return;
     }
-    if (!document.description.surface)
+    if (!document.description.surface && !document.description.IsInstance())
     {
         ReplaceDocument(context, {});
     }
@@ -429,6 +615,14 @@ void Editor_DrawMaterialWindow(EditorContext& context)
     {
         SaveDocument(context, true);
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(document.path.empty() || document.dirty);
+    if (ImGui::Button("Create instance"))
+    {
+        CreateInstanceDocument();
+    }
+    ImGui::SetItemTooltip("New material that inherits this saved file and overrides only chosen parameters.\nIt shares the parent's shader, mode, render state and PSO.");
+    ImGui::EndDisabled();
     ImGui::SameLine();
     const bool canAssign = Editor_CanEditComponents() && !document.path.empty() && !document.dirty &&
         context.registry && context.registry->valid(context.selected) && context.registry->all_of<MeshComponent>(context.selected);
@@ -533,6 +727,14 @@ void Editor_DrawMaterialComponent(EditorContext& context, entt::entity entity)
             return;
         }
         ImGui::TextWrapped("%s", material->assetPath.c_str());
+        if (material->material != 0)
+        {
+            const MaterialID parent = context.resources->GetMaterialParent(material->material);
+            if (parent != 0)
+            {
+                ImGui::TextDisabled("Instance of %s", context.resources->GetMaterial(parent).name.c_str());
+            }
+        }
         if (!material->error.empty())
         {
             ImGui::TextWrapped("%s", material->error.c_str());

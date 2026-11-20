@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Painted",
+    "color": [
+      0.82,
+      0.8,
+      0.76
+    ],
+    "roughness": 0.6,
+    "normal": "Assets/MaterialDemo/Normal.png",
+    "surface": {
+      "shader": "Shaders/Default.hlsl",
+      "mode": "opaque",
+      "metallic": 0.0,
+      "normalStrength": 0.8,
+      "aoStrength": 0.8,
+      "orm": "Assets/MaterialDemo/ORM.png",
+      "emissiveLightRange": 0,
+      "uvScale": [
+        2.0,
+        2.0
+      ]
+    }
+  }
+}

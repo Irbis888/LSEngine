@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Painted Red Glossy",
+    "parent": "Assets/MaterialInstancesDemo/PaintedRed.lsmaterial",
+    "overrides": {
+      "roughness": 0.12,
+      "normal": ""
+    }
+  }
+}

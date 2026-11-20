@@ -5,6 +5,7 @@
 #include <fstream>
 #include <filesystem>
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
@@ -124,8 +125,200 @@ namespace
         };
     }
 
+    constexpr std::array MaterialBaseOnlyFields = {"shader", "vertexEntry", "pixelEntry", "editorVariant",
+        "maskedVariant", "mode", "twoSided", "renderState"};
+
+    float ReadOverrideNumber(const json& value, const std::string& field)
+    {
+        if (!value.is_number())
+        {
+            throw std::runtime_error("overrides." + field + ": expected a number");
+        }
+        const float number = value.get<float>();
+        if (!std::isfinite(number))
+        {
+            throw std::runtime_error("overrides." + field + ": expected a finite number");
+        }
+        return number;
+    }
+
+    template <size_t ComponentCount>
+    glm::vec<ComponentCount, float> ReadOverrideVector(const json& value, const std::string& field)
+    {
+        if (!value.is_array() || value.size() != ComponentCount)
+        {
+            throw std::runtime_error("overrides." + field + ": expected an array of " +
+                std::to_string(ComponentCount) + " numbers");
+        }
+        glm::vec<ComponentCount, float> result(0.0f);
+        for (size_t component = 0; component < ComponentCount; ++component)
+        {
+            result[static_cast<glm::length_t>(component)] = ReadOverrideNumber(value.at(component), field);
+        }
+        return result;
+    }
+
+    template <typename Value>
+    struct OverrideField
+    {
+        const char* name;
+        std::optional<Value> MaterialOverrides::* member;
+    };
+
+    constexpr std::array ScalarOverrideFields = {
+        OverrideField<float>{"alpha", &MaterialOverrides::alpha},
+        OverrideField<float>{"roughness", &MaterialOverrides::roughness},
+        OverrideField<float>{"metallic", &MaterialOverrides::metallic},
+        OverrideField<float>{"normalStrength", &MaterialOverrides::normalStrength},
+        OverrideField<float>{"aoStrength", &MaterialOverrides::aoStrength},
+        OverrideField<float>{"alphaCutoff", &MaterialOverrides::alphaCutoff},
+        OverrideField<float>{"emissiveIntensity", &MaterialOverrides::emissiveIntensity},
+        OverrideField<float>{"emissiveLightRange", &MaterialOverrides::emissiveLightRange}};
+    constexpr std::array ColorOverrideFields = {
+        OverrideField<glm::vec3>{"color", &MaterialOverrides::color},
+        OverrideField<glm::vec3>{"emissiveColor", &MaterialOverrides::emissiveColor}};
+    constexpr std::array UVOverrideFields = {
+        OverrideField<glm::vec2>{"uvScale", &MaterialOverrides::uvScale},
+        OverrideField<glm::vec2>{"uvOffset", &MaterialOverrides::uvOffset}};
+    constexpr std::array MapOverrideFields = {
+        OverrideField<std::wstring>{"albedo", &MaterialOverrides::albedoTexture},
+        OverrideField<std::wstring>{"normal", &MaterialOverrides::normalTexture},
+        OverrideField<std::wstring>{"orm", &MaterialOverrides::ormTexture},
+        OverrideField<std::wstring>{"emissive", &MaterialOverrides::emissiveTexture}};
+
+    template <typename Field, size_t FieldCount, typename Reader>
+    bool ReadOverrideField(const std::array<Field, FieldCount>& fields, const std::string& name,
+        MaterialOverrides& overrides, Reader&& read)
+    {
+        for (const auto& field : fields)
+        {
+            if (name == field.name)
+            {
+                overrides.*(field.member) = read();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    MaterialOverrides ReadMaterialOverrides(const json& value)
+    {
+        if (!value.is_object())
+        {
+            throw std::runtime_error("overrides: expected an object");
+        }
+        MaterialOverrides overrides;
+        for (auto iterator = value.begin(); iterator != value.end(); ++iterator)
+        {
+            const std::string& field = iterator.key();
+            const json& entry = iterator.value();
+            const auto readNumber = [&]()
+            {
+                return ReadOverrideNumber(entry, field);
+            };
+            const auto readColor = [&]()
+            {
+                return ReadOverrideVector<3>(entry, field);
+            };
+            const auto readUV = [&]()
+            {
+                return ReadOverrideVector<2>(entry, field);
+            };
+            const auto readMap = [&]()
+            {
+                if (!entry.is_string())
+                {
+                    throw std::runtime_error("overrides." + field + ": expected a texture path or \"\" to clear it");
+                }
+                return StringToWide(entry.get<std::string>());
+            };
+            const bool known = ReadOverrideField(ScalarOverrideFields, field, overrides, readNumber) ||
+                ReadOverrideField(ColorOverrideFields, field, overrides, readColor) ||
+                ReadOverrideField(UVOverrideFields, field, overrides, readUV) ||
+                ReadOverrideField(MapOverrideFields, field, overrides, readMap);
+            if (known)
+            {
+                continue;
+            }
+            if (std::find(MaterialBaseOnlyFields.begin(), MaterialBaseOnlyFields.end(), field) != MaterialBaseOnlyFields.end())
+            {
+                throw std::runtime_error("overrides." + field +
+                    ": belongs to the base material (shader, mode and render state are shared by all instances)");
+            }
+            throw std::runtime_error("overrides." + field + ": unknown parameter");
+        }
+        return overrides;
+    }
+
+    MaterialDesc ReadMaterialInstance(const json& value, const std::string& fallbackName)
+    {
+        for (auto iterator = value.begin(); iterator != value.end(); ++iterator)
+        {
+            const std::string& field = iterator.key();
+            if (field != "name" && field != "parent" && field != "overrides")
+            {
+                throw std::runtime_error(field + ": a material instance only sets 'name', 'parent' and 'overrides'");
+            }
+        }
+        if (!value.at("parent").is_string() || value.at("parent").get<std::string>().empty())
+        {
+            throw std::runtime_error("parent: expected a .lsmaterial path relative to the project");
+        }
+        MaterialDesc material;
+        material.name = value.value("name", fallbackName);
+        material.parent = value.at("parent").get<std::string>();
+        if (value.contains("overrides"))
+        {
+            material.overrides = ReadMaterialOverrides(value.at("overrides"));
+        }
+        return material;
+    }
+
+    json MaterialOverridesToJson(const MaterialOverrides& overrides, const std::filesystem::path& root)
+    {
+        json value = json::object();
+        for (const auto& field : ScalarOverrideFields)
+        {
+            if (const auto& number = overrides.*(field.member))
+            {
+                value[field.name] = *number;
+            }
+        }
+        for (const auto& field : ColorOverrideFields)
+        {
+            if (const auto& color = overrides.*(field.member))
+            {
+                value[field.name] = Vec3ToJson(*color);
+            }
+        }
+        for (const auto& field : UVOverrideFields)
+        {
+            if (const auto& uv = overrides.*(field.member))
+            {
+                value[field.name] = {uv->x, uv->y};
+            }
+        }
+        for (const auto& field : MapOverrideFields)
+        {
+            if (const auto& path = overrides.*(field.member))
+            {
+                value[field.name] = path->empty() ? std::string() :
+                    AssetPaths::MakeProjectRelative(root, AssetPaths::ToUtf8(*path));
+            }
+        }
+        return value;
+    }
+
     MaterialDesc ReadMaterial(const json& value, const std::string& fallbackName)
     {
+        if (value.is_object() && value.contains("parent"))
+        {
+            return ReadMaterialInstance(value, fallbackName);
+        }
+        if (value.is_object() && value.contains("overrides"))
+        {
+            throw std::runtime_error("overrides: only a material instance with a 'parent' can override parameters");
+        }
         MaterialDesc material;
         material.name = value.value("name", fallbackName);
         material.color = JsonToVec3(value.value("color", json::array()), glm::vec3(1.0f));
@@ -219,6 +412,14 @@ namespace
 
     json MaterialToJson(const MaterialDesc& material, const std::filesystem::path& root)
     {
+        if (material.IsInstance())
+        {
+            return json{
+                {"name", material.name},
+                {"parent", ProjectPath(root, material.parent)},
+                {"overrides", MaterialOverridesToJson(material.overrides, root)}
+            };
+        }
         json value{ { "name", material.name }, { "color", Vec3ToJson(material.color) }, { "roughness", material.roughness } };
         if (!material.albedoTexture.empty()) value["albedo"] = ProjectPath(root, AssetPaths::ToUtf8(material.albedoTexture));
         if (!material.normalTexture.empty()) value["normal"] = ProjectPath(root, AssetPaths::ToUtf8(material.normalTexture));
@@ -817,16 +1018,67 @@ MaterialDesc SceneSerializer::ReadMaterialAsset(const std::filesystem::path& fil
     }
 }
 
+namespace
+{
+    // Keeps a material file on the inheritance chain while its parents resolve.
+    class MaterialLoadChainEntry
+    {
+    public:
+        MaterialLoadChainEntry(std::vector<std::filesystem::path>& chain, const std::filesystem::path& file)
+            : mChain(chain)
+        {
+            const auto equivalent = [&](const std::filesystem::path& entry)
+            {
+                return _wcsicmp(entry.lexically_normal().c_str(), file.lexically_normal().c_str()) == 0;
+            };
+            const auto repeated = std::find_if(mChain.begin(), mChain.end(), equivalent);
+            if (repeated != mChain.end())
+            {
+                std::string cycle;
+                for (auto entry = repeated; entry != mChain.end(); ++entry)
+                {
+                    cycle += AssetPaths::ToUtf8(entry->filename()) + " -> ";
+                }
+                cycle += AssetPaths::ToUtf8(file.filename());
+                throw std::runtime_error("Material inheritance cycle: " + cycle);
+            }
+            mChain.push_back(file);
+        }
+
+        ~MaterialLoadChainEntry()
+        {
+            mChain.pop_back();
+        }
+
+        MaterialLoadChainEntry(const MaterialLoadChainEntry&) = delete;
+        MaterialLoadChainEntry& operator=(const MaterialLoadChainEntry&) = delete;
+
+    private:
+        std::vector<std::filesystem::path>& mChain;
+    };
+}
+
 MaterialID ResourceManager::LoadMaterialAsset(const std::string& path)
 {
     const auto file = AssetPaths::Resolve(mSearch->root, path);
+    // The chain is checked before the cache: a file that is being saved is never reused stale.
+    MaterialLoadChainEntry chainEntry(mMaterialLoadChain, file);
     const auto key = file.native();
     const auto cached = mMaterialAssets.find(key);
     if (cached != mMaterialAssets.end())
     {
         return cached->second;
     }
-    const MaterialID material = CreateTexturedMaterial(SceneSerializer::ReadMaterialAsset(file));
+    const MaterialDesc description = SceneSerializer::ReadMaterialAsset(file);
+    MaterialID material = 0;
+    try
+    {
+        material = CreateTexturedMaterial(description);
+    }
+    catch (const std::exception& error)
+    {
+        throw std::runtime_error(AssetPaths::ToUtf8(file) + ": " + error.what());
+    }
     mMaterialAssets.emplace(key, material);
     return material;
 }
@@ -837,11 +1089,17 @@ try
     const auto file = AssetPaths::Resolve(mSearch->root, path);
     const auto document = json{{"version", 1}, {"material", MaterialToJson(description, mSearch->root)}};
     const auto text = document.dump(2);
-    const auto cached = mMaterialAssets.find(file.native());
-    std::optional<Material> replacement;
-    if (cached != mMaterialAssets.end())
+    // Resolving the parents before writing rejects missing parents and cycles through this file.
+    std::optional<BuiltMaterial> replacement;
     {
+        MaterialLoadChainEntry chainEntry(mMaterialLoadChain, file);
         replacement = BuildTexturedMaterial(description);
+    }
+    const auto cached = mMaterialAssets.find(file.native());
+    if (cached != mMaterialAssets.end() && replacement->parent != 0 &&
+        (replacement->parent == cached->second || IsMaterialAncestor(cached->second, replacement->parent)))
+    {
+        throw std::runtime_error("Material inheritance cycle: '" + description.parent + "' already inherits from this file");
     }
 
     auto temporary = file;
@@ -863,9 +1121,10 @@ try
         std::filesystem::remove(temporary, ignored);
         throw;
     }
-    if (replacement)
+    if (cached != mMaterialAssets.end())
     {
-        GetMaterial(cached->second) = std::move(*replacement);
+        // Every entity using this file and every instance inheriting from it see the change.
+        StoreMaterial(cached->second, std::move(*replacement), description);
     }
 }
 catch (const std::exception& error)

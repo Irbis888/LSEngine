@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Painted Gold",
+    "parent": "Assets/MaterialInstancesDemo/Painted.lsmaterial",
+    "overrides": {
+      "color": [
+        0.95,
+        0.68,
+        0.22
+      ],
+      "metallic": 1.0,
+      "roughness": 0.45
+    }
+  }
+}

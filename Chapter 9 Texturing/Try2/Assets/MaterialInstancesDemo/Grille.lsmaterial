@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Grille",
+    "albedo": "Assets/MaterialDemo/Grille.png",
+    "color": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roughness": 0.65,
+    "surface": {
+      "mode": "masked",
+      "twoSided": true,
+      "alphaCutoff": 0.5,
+      "emissiveLightRange": 0
+    }
+  }
+}

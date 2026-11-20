@@ -14,6 +14,8 @@ foreach ($mode in @('editor', 'standalone')) {
     $stderr = Join-Path $output "$mode-errors.log"
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    # Windows PowerShell 5.1 reports a null ExitCode unless the handle is opened before exit.
+    $null = $process.Handle
     try {
         if (!$process.WaitForExit(45000)) {
             throw "$mode render-state validation timed out"

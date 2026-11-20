@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Painted Red",
+    "parent": "Assets/MaterialInstancesDemo/Painted.lsmaterial",
+    "overrides": {
+      "color": [
+        0.78,
+        0.12,
+        0.08
+      ]
+    }
+  }
+}

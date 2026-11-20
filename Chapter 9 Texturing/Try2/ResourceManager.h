@@ -117,6 +117,30 @@ struct MaterialBase
     MaterialParameters defaults;
 };
 
+// Parameters a material instance changes on top of its parent. Unset fields inherit the
+// parent's resolved value; an empty texture path clears the inherited map.
+struct MaterialOverrides
+{
+    std::optional<glm::vec3> color;
+    std::optional<float> alpha;
+    std::optional<float> roughness;
+    std::optional<float> metallic;
+    std::optional<float> normalStrength;
+    std::optional<float> aoStrength;
+    std::optional<float> alphaCutoff;
+    std::optional<glm::vec3> emissiveColor;
+    std::optional<float> emissiveIntensity;
+    std::optional<float> emissiveLightRange;
+    std::optional<glm::vec2> uvScale;
+    std::optional<glm::vec2> uvOffset;
+    std::optional<std::wstring> albedoTexture;
+    std::optional<std::wstring> normalTexture;
+    std::optional<std::wstring> ormTexture;
+    std::optional<std::wstring> emissiveTexture;
+
+    bool operator==(const MaterialOverrides&) const = default;
+};
+
 struct MaterialDesc
 {
     std::string name;
@@ -127,6 +151,16 @@ struct MaterialDesc
     std::optional<MaterialBase> surface;
     std::wstring ormTexture;
     std::wstring emissiveTexture;
+    // Non-empty: this is an instance of the .lsmaterial at this project path. It shares the
+    // parent's MaterialBase (shader, mode, render state, PSO) and only applies overrides;
+    // the base fields above are ignored.
+    std::string parent;
+    MaterialOverrides overrides;
+
+    bool IsInstance() const
+    {
+        return !parent.empty();
+    }
 };
 
 struct Material
@@ -217,9 +251,18 @@ public:
     MaterialID CreateTexturedMaterial(const MaterialDesc& desc);
     void UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc);
     // Main thread; preserves parameters, textures, resource ID and all users of it.
+    // Instances inherit render state from their base material, so they reject this call.
     void SetMaterialRenderState(MaterialID id, const MaterialRenderState& state);
+    // Instances load their parent chain first; a cycle or a broken parent throws with the file chain.
     MaterialID LoadMaterialAsset(const std::string& path);
+    // Validates the parent chain before writing; the cached material and all its instances update.
     void SaveMaterialAsset(const std::string& path, const MaterialDesc& description);
+    // 0 for a base material, otherwise the direct parent of the instance.
+    MaterialID GetMaterialParent(MaterialID id) const;
+    size_t GetMaterialInstanceCount() const
+    {
+        return mMaterialInstances.size();
+    }
     MaterialID CreateTexturedMaterial(
         const std::string& name,
         const std::wstring& albedoTexture,
@@ -258,9 +301,28 @@ private:
     std::unordered_map<MeshID, MaterialID> mMeshMaterialOverrides;
     std::unordered_map<MeshID, std::unordered_map<uint32_t, MaterialID>> mSubmeshMaterialOverrides;
     std::unordered_map<MeshID, Mesh> mMeshes;
-    Material BuildTexturedMaterial(const MaterialDesc& description);
+    struct BuiltMaterial
+    {
+        Material material;
+        MaterialID parent = 0;
+    };
+    struct MaterialInstanceSource
+    {
+        MaterialID parent = 0;
+        MaterialDesc description;
+    };
+    BuiltMaterial BuildTexturedMaterial(const MaterialDesc& description);
+    Material BuildMaterialInstance(const Material& parent, const MaterialDesc& description);
+    TextureID LoadMaterialMap(const std::wstring& filename, TextureID fallback);
+    // Replaces the material, records or clears its parent link and refreshes its instances.
+    void StoreMaterial(MaterialID id, BuiltMaterial built, const MaterialDesc& description);
+    void RefreshMaterialInstances(MaterialID parent);
+    bool IsMaterialAncestor(MaterialID ancestor, MaterialID material) const;
     std::unordered_map<MaterialID, Material> mMaterials;
     std::unordered_map<std::wstring, MaterialID> mMaterialAssets;
+    std::unordered_map<MaterialID, MaterialInstanceSource> mMaterialInstances;
+    // Material files whose parent chain is being resolved; detects inheritance cycles.
+    std::vector<std::filesystem::path> mMaterialLoadChain;
     std::unordered_map<TextureID, Texture> mTextures;
     std::unordered_map<std::wstring, TextureID> mTextureIDsByFilename;
 };

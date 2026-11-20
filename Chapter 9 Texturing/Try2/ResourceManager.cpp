@@ -815,8 +815,122 @@ MaterialID ResourceManager::CreateSolidMaterial(
     return CreateMaterial(mat);
 }
 
-Material ResourceManager::BuildTexturedMaterial(const MaterialDesc& desc)
+TextureID ResourceManager::LoadMaterialMap(const std::wstring& filename, TextureID fallback)
 {
+    if (filename.empty())
+    {
+        return fallback;
+    }
+    try
+    {
+        return LoadTexture(filename);
+    }
+    catch (const std::exception& error)
+    {
+        Texture failed;
+        failed.filename = filename;
+        failed.name = WideToUtf8(filename);
+        failed.state = ResourceState::Failed;
+        failed.error = error.what();
+        const TextureID id = gNextTextureID++;
+        mTextures.emplace(id, std::move(failed));
+        return id;
+    }
+}
+
+Material ResourceManager::BuildMaterialInstance(const Material& parent, const MaterialDesc& description)
+{
+    // Sharing the parent's immutable base keeps the PSO key identical: instances never add pipelines.
+    Material material(parent.base);
+    material.name = description.name;
+    material.parameters = parent.parameters;
+    const MaterialOverrides& overrides = description.overrides;
+    auto& parameters = material.parameters;
+    if (overrides.color)
+    {
+        parameters.baseColor = glm::vec4(*overrides.color, parameters.baseColor.a);
+    }
+    if (overrides.alpha)
+    {
+        parameters.baseColor.a = *overrides.alpha;
+    }
+    if (overrides.roughness)
+    {
+        parameters.roughness = *overrides.roughness;
+    }
+    if (overrides.metallic)
+    {
+        parameters.metallic = *overrides.metallic;
+    }
+    if (overrides.normalStrength)
+    {
+        parameters.normalStrength = *overrides.normalStrength;
+    }
+    if (overrides.aoStrength)
+    {
+        parameters.aoStrength = *overrides.aoStrength;
+    }
+    if (overrides.alphaCutoff)
+    {
+        parameters.alphaCutoff = *overrides.alphaCutoff;
+    }
+    if (overrides.emissiveColor)
+    {
+        parameters.emissiveColor = *overrides.emissiveColor;
+    }
+    if (overrides.emissiveIntensity)
+    {
+        parameters.emissiveIntensity = *overrides.emissiveIntensity;
+    }
+    if (overrides.emissiveLightRange)
+    {
+        parameters.emissiveLightRange = *overrides.emissiveLightRange;
+    }
+    if (overrides.uvScale)
+    {
+        parameters.uvScale = *overrides.uvScale;
+    }
+    if (overrides.uvOffset)
+    {
+        parameters.uvOffset = *overrides.uvOffset;
+    }
+    // An empty override path clears the inherited map back to the neutral default (TextureID 0).
+    if (overrides.albedoTexture)
+    {
+        parameters.albedo = LoadMaterialMap(*overrides.albedoTexture, 0);
+    }
+    if (overrides.normalTexture)
+    {
+        parameters.normal = LoadMaterialMap(*overrides.normalTexture, 0);
+    }
+    if (overrides.ormTexture)
+    {
+        parameters.orm = LoadMaterialMap(*overrides.ormTexture, 0);
+    }
+    if (overrides.emissiveTexture)
+    {
+        parameters.emissive = LoadMaterialMap(*overrides.emissiveTexture, 0);
+    }
+    return material;
+}
+
+ResourceManager::BuiltMaterial ResourceManager::BuildTexturedMaterial(const MaterialDesc& desc)
+{
+    BuiltMaterial built;
+    if (desc.IsInstance())
+    {
+        try
+        {
+            built.parent = LoadMaterialAsset(desc.parent);
+        }
+        catch (const std::exception& error)
+        {
+            throw std::runtime_error("parent '" + desc.parent + "': " + error.what());
+        }
+        built.material = BuildMaterialInstance(GetMaterial(built.parent), desc);
+        return built;
+    }
+
     if (desc.surface)
     {
         desc.surface->renderState.Validate();
@@ -825,53 +939,99 @@ Material ResourceManager::BuildTexturedMaterial(const MaterialDesc& desc)
     material.name = desc.name;
     material.parameters.baseColor = glm::vec4(desc.color, material.parameters.baseColor.a);
     material.parameters.roughness = desc.roughness;
-    const auto loadMap = [&](const std::wstring& filename, TextureID inherited)
-    {
-        if (filename.empty())
-        {
-            return inherited;
-        }
-        try
-        {
-            return LoadTexture(filename);
-        }
-        catch (const std::exception& error)
-        {
-            Texture failed;
-            failed.filename = filename;
-            failed.name = WideToUtf8(filename);
-            failed.state = ResourceState::Failed;
-            failed.error = error.what();
-            const TextureID id = gNextTextureID++;
-            mTextures.emplace(id, std::move(failed));
-            return id;
-        }
-    };
     auto& parameters = material.parameters;
-    parameters.albedo = loadMap(desc.albedoTexture, parameters.albedo);
-    parameters.normal = loadMap(desc.normalTexture, parameters.normal);
-    parameters.orm = loadMap(desc.ormTexture, parameters.orm);
-    parameters.emissive = loadMap(desc.emissiveTexture, parameters.emissive);
-    return material;
+    parameters.albedo = LoadMaterialMap(desc.albedoTexture, parameters.albedo);
+    parameters.normal = LoadMaterialMap(desc.normalTexture, parameters.normal);
+    parameters.orm = LoadMaterialMap(desc.ormTexture, parameters.orm);
+    parameters.emissive = LoadMaterialMap(desc.emissiveTexture, parameters.emissive);
+    built.material = std::move(material);
+    return built;
+}
+
+bool ResourceManager::IsMaterialAncestor(MaterialID ancestor, MaterialID material) const
+{
+    auto link = mMaterialInstances.find(material);
+    while (link != mMaterialInstances.end())
+    {
+        if (link->second.parent == ancestor)
+        {
+            return true;
+        }
+        link = mMaterialInstances.find(link->second.parent);
+    }
+    return false;
+}
+
+MaterialID ResourceManager::GetMaterialParent(MaterialID id) const
+{
+    const auto link = mMaterialInstances.find(id);
+    return link == mMaterialInstances.end() ? 0 : link->second.parent;
+}
+
+void ResourceManager::StoreMaterial(MaterialID id, BuiltMaterial built, const MaterialDesc& description)
+{
+    if (built.parent != 0 && (built.parent == id || IsMaterialAncestor(id, built.parent)))
+    {
+        throw std::runtime_error("Material inheritance cycle: '" + description.parent +
+            "' already inherits from '" + GetMaterial(id).name + "'");
+    }
+    GetMaterial(id) = std::move(built.material);
+    if (built.parent != 0)
+    {
+        mMaterialInstances[id] = MaterialInstanceSource{built.parent, description};
+    }
+    else
+    {
+        mMaterialInstances.erase(id);
+    }
+    RefreshMaterialInstances(id);
+}
+
+void ResourceManager::RefreshMaterialInstances(MaterialID parent)
+{
+    std::vector<MaterialID> children;
+    for (const auto& [child, source] : mMaterialInstances)
+    {
+        if (source.parent == parent)
+        {
+            children.push_back(child);
+        }
+    }
+    for (const MaterialID child : children)
+    {
+        GetMaterial(child) = BuildMaterialInstance(GetMaterial(parent), mMaterialInstances.at(child).description);
+        RefreshMaterialInstances(child);
+    }
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(const MaterialDesc& desc)
 {
-    return CreateMaterial(BuildTexturedMaterial(desc));
+    BuiltMaterial built = BuildTexturedMaterial(desc);
+    const MaterialID id = CreateMaterial(built.material);
+    if (built.parent != 0)
+    {
+        mMaterialInstances[id] = MaterialInstanceSource{built.parent, desc};
+    }
+    return id;
 }
 
 void ResourceManager::UpdateTexturedMaterial(MaterialID id, const MaterialDesc& desc)
 {
-    GetMaterial(id) = BuildTexturedMaterial(desc);
+    StoreMaterial(id, BuildTexturedMaterial(desc), desc);
 }
 
 void ResourceManager::SetMaterialRenderState(MaterialID id, const MaterialRenderState& state)
 {
     state.Validate();
     auto& material = GetMaterial(id);
+    if (mMaterialInstances.contains(id))
+    {
+        throw std::invalid_argument(material.name + " is a material instance; render state belongs to its base material");
+    }
     MaterialBase base = material.base ? *material.base : MaterialBase{};
     base.renderState = state;
     material.base = std::make_shared<const MaterialBase>(std::move(base));
+    RefreshMaterialInstances(id);
 }
 
 MaterialID ResourceManager::CreateTexturedMaterial(

@@ -10,6 +10,8 @@ function Invoke-Check([string]$name, [string[]]$arguments, [string]$marker) {
     $stderr = Join-Path $output "$name-errors.log"
     $process = Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    # Windows PowerShell 5.1 reports a null ExitCode unless the handle is opened before exit.
+    $null = $process.Handle
     try {
         if (!$process.WaitForExit(45000)) { throw "$name timed out" }
         $process.WaitForExit()
@@ -28,4 +30,5 @@ function Invoke-Check([string]$name, [string[]]$arguments, [string]$marker) {
 Invoke-Check 'editor' @('--material-smoke') 'MATERIAL_SMOKE_PASS'
 Invoke-Check 'standalone' @('--play', '--material-smoke') 'MATERIAL_STANDALONE_PASS'
 Invoke-Check 'baseline' @('--scene', 'Scenes/MaterialsBaseline.json', '--editor-preview') 'EDITOR_PREVIEW_PASS'
+Invoke-Check 'instances' @('--scene', 'Scenes/MaterialInstancesDemo.json', '--editor-preview') 'EDITOR_PREVIEW_PASS'
 Invoke-Check 'terrain' @('--scene', 'Scenes/TerrainDemo.json', '--editor-preview') 'EDITOR_PREVIEW_PASS'

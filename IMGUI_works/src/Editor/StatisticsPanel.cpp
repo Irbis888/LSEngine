@@ -67,6 +67,11 @@ static void DrawStatisticsPanel(EditorContext& ctx, const FrameContext& frame)
             ImGui::Text("Material PSOs: %llu created, %llu hits, %llu misses",
                 static_cast<unsigned long long>(stats.created), static_cast<unsigned long long>(stats.hits),
                 static_cast<unsigned long long>(stats.misses));
+            if (ctx.resources)
+            {
+                ImGui::Text("Material instances: %llu (share their base PSO)",
+                    static_cast<unsigned long long>(ctx.resources->GetMaterialInstanceCount()));
+            }
             if (!renderer->GetSurfaceDiagnostic().empty())
             {
                 ImGui::TextWrapped("%s", renderer->GetSurfaceDiagnostic().c_str());

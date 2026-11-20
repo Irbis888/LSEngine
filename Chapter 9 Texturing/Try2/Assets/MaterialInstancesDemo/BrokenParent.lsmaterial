@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Broken parent",
+    "parent": "Assets/MaterialInstancesDemo/DoesNotExist.lsmaterial",
+    "overrides": {
+      "color": [
+        0.2,
+        0.9,
+        0.2
+      ]
+    }
+  }
+}

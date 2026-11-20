@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "name": "Material instances demo",
+  "entities": [
+    {
+      "tag": "Camera",
+      "transform": {
+        "position": [0, 2.6, -13],
+        "scale": [1, 1, 1],
+        "rotation": [0, 0, 0]
+      },
+      "camera": {
+        "fov": 1.05,
+        "nearZ": 0.1,
+        "farZ": 100,
+        "aspectRatio": 1.6
+      }
+    },
+    {
+      "tag": "Sun",
+      "transform": {
+        "position": [1, 5, -3],
+        "scale": [1, 1, 1],
+        "rotation": [0.65, -0.35, 0]
+      },
+      "directionalLight": {
+        "intensity": 2.6,
+        "color": [1, 0.91, 0.79]
+      }
+    },
+    {
+      "tag": "Fill",
+      "transform": {
+        "position": [-5, 4, -4],
+        "scale": [1, 1, 1],
+        "rotation": [0, 0, 0]
+      },
+      "pointLight": {
+        "intensity": 2.4,
+        "color": [0.55, 0.75, 1],
+        "falloffStart": 2,
+        "falloffEnd": 20
+      }
+    },
+    {
+      "tag": "1 Base Painted",
+      "transform": {
+        "position": [-6, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/Painted.lsmaterial"
+      }
+    },
+    {
+      "tag": "2 Instance Red",
+      "transform": {
+        "position": [-3.6, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/PaintedRed.lsmaterial"
+      }
+    },
+    {
+      "tag": "3 Instance of instance Red Glossy",
+      "transform": {
+        "position": [-1.2, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/PaintedRedGlossy.lsmaterial"
+      }
+    },
+    {
+      "tag": "4 Instance Gold",
+      "transform": {
+        "position": [1.2, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/PaintedGold.lsmaterial"
+      }
+    },
+    {
+      "tag": "5 Instance Glow",
+      "transform": {
+        "position": [3.6, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/PaintedGlow.lsmaterial"
+      }
+    },
+    {
+      "tag": "6 Broken parent (fallback)",
+      "transform": {
+        "position": [6, 4, 0],
+        "scale": [2, 2, 2],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "sphere",
+        "material": {
+          "name": "Fallback gray",
+          "color": [0.35, 0.35, 0.38],
+          "roughness": 0.7
+        }
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/BrokenParent.lsmaterial"
+      }
+    },
+    {
+      "tag": "7 Base Grille",
+      "transform": {
+        "position": [-2.6, 1.2, 0],
+        "scale": [2.4, 1.7, 1],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialDemo/Grille.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/Grille.lsmaterial"
+      }
+    },
+    {
+      "tag": "8 Instance Grille Dense",
+      "transform": {
+        "position": [2.6, 1.2, 0],
+        "scale": [2.4, 1.7, 1],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "model",
+        "path": "Assets/MaterialDemo/Grille.obj"
+      },
+      "materialComponent": {
+        "asset": "Assets/MaterialInstancesDemo/GrilleDense.lsmaterial"
+      }
+    },
+    {
+      "tag": "Behind grilles",
+      "transform": {
+        "position": [0, 1.2, 3],
+        "scale": [9, 2.2, 1],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "cube",
+        "material": {
+          "name": "Behind grilles",
+          "color": [0.48, 0.09, 0.65],
+          "roughness": 0.45
+        }
+      }
+    },
+    {
+      "tag": "Ground",
+      "transform": {
+        "position": [0, -0.75, 1],
+        "scale": [22, 1, 18],
+        "rotation": [0, 0, 0]
+      },
+      "mesh": {
+        "source": "primitive",
+        "primitive": "plane",
+        "material": {
+          "name": "Ground",
+          "color": [0.16, 0.18, 0.21],
+          "roughness": 0.84
+        }
+      }
+    }
+  ]
+}

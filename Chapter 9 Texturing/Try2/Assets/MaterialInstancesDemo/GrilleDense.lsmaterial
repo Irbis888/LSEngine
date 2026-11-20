@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Grille Dense",
+    "parent": "Assets/MaterialInstancesDemo/Grille.lsmaterial",
+    "overrides": {
+      "color": [
+        0.35,
+        0.35,
+        0.35
+      ],
+      "uvScale": [
+        2.0,
+        2.0
+      ]
+    }
+  }
+}

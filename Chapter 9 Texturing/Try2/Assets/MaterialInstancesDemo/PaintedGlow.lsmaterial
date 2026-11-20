@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "material": {
+    "name": "Painted Glow",
+    "parent": "Assets/MaterialInstancesDemo/Painted.lsmaterial",
+    "overrides": {
+      "color": [
+        0.05,
+        0.06,
+        0.08
+      ],
+      "emissive": "Assets/MaterialDemo/Emissive.png",
+      "emissiveColor": [
+        0.3,
+        0.85,
+        1.0
+      ],
+      "emissiveIntensity": 1.6,
+      "uvScale": [
+        1.0,
+        1.0
+      ]
+    }
+  }
+}
