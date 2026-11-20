@@ -717,10 +717,12 @@ MeshID ResourceManager::CreateCube(MaterialID material)
     {
         const uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
 
-        mesh.vertices.emplace_back(positions[face.a], face.normal, face.tangent, glm::vec2(0.0f, 1.0f));
-        mesh.vertices.emplace_back(positions[face.b], face.normal, face.tangent, glm::vec2(0.0f, 0.0f));
-        mesh.vertices.emplace_back(positions[face.c], face.normal, face.tangent, glm::vec2(1.0f, 0.0f));
-        mesh.vertices.emplace_back(positions[face.d], face.normal, face.tangent, glm::vec2(1.0f, 1.0f));
+        // U increases to the right when viewing the face from outside.
+        const glm::vec3 tangent = glm::normalize(positions[face.a] - positions[face.d]);
+        mesh.vertices.emplace_back(positions[face.a], face.normal, tangent, glm::vec2(1.0f, 1.0f));
+        mesh.vertices.emplace_back(positions[face.b], face.normal, tangent, glm::vec2(1.0f, 0.0f));
+        mesh.vertices.emplace_back(positions[face.c], face.normal, tangent, glm::vec2(0.0f, 0.0f));
+        mesh.vertices.emplace_back(positions[face.d], face.normal, tangent, glm::vec2(0.0f, 1.0f));
 
         mesh.indices.insert(mesh.indices.end(), { base, base + 2, base + 1, base, base + 3, base + 2 });
     }
@@ -758,9 +760,9 @@ MeshID ResourceManager::CreateSphere(MaterialID material, uint32_t slices, uint3
                 ringRadius * std::cos(theta));
 
             glm::vec3 normal = glm::normalize(position);
-            glm::vec3 tangent(std::cos(theta), 0.0f, -std::sin(theta));
+            glm::vec3 tangent(-std::cos(theta), 0.0f, std::sin(theta));
 
-            mesh.vertices.emplace_back(position, normal, tangent, glm::vec2(u, v));
+            mesh.vertices.emplace_back(position, normal, tangent, glm::vec2(1.0f - u, v));
         }
     }
 
