@@ -1,11 +1,12 @@
 {
-  "version": 1,
   "material": {
     "name": "Painted Red Glossy",
-    "parent": "Assets/MaterialInstancesDemo/PaintedRed.lsmaterial",
     "overrides": {
-      "roughness": 0.12,
-      "normal": ""
-    }
-  }
+      "albedo": "Assets/Textures/bearPic.jpg",
+      "normal": "",
+      "roughness": 0.11999999731779099
+    },
+    "parent": "Assets/MaterialInstancesDemo/PaintedRed.lsmaterial"
+  },
+  "version": 1
 }

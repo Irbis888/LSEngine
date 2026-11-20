@@ -540,4 +540,7 @@
     <None Include="MATERIAL_RENDER_STATES.md"><Filter>Graphics</Filter></None>
     <None Include="..\..\tests\RunRenderStateTests.ps1"><Filter>Engine\Profiling</Filter></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\TextureThumbnails.h"><Filter>Editor</Filter></ClInclude>
+  </ItemGroup>
 </Project>

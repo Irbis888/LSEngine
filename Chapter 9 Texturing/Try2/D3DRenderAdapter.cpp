@@ -112,6 +112,7 @@ void D3DRenderAdapter::PumpResourceUploads()
     ZoneScopedN("Bounded GPU resource finalization");
     const auto start = std::chrono::steady_clock::now();
     mResourceManager->PumpLoading(mUploadBudget.maxMilliseconds * 0.5);
+    PumpTexturePreviews();
     size_t uploadedBytes = 0;
     uint32_t textures = 0, meshes = 0;
     bool textureTurn = mTextureUploadTurn;
@@ -1430,6 +1431,14 @@ int D3DRenderAdapter::UploadTexture(TextureID textureId)
 
 void D3DRenderAdapter::CleanupMeshUploadBuffers()
 {
+    for (auto& [textureID, preview] : mTexturePreviews)
+    {
+        if (preview && preview->uploadCompleteFence && mFence->GetCompletedValue() >= preview->uploadCompleteFence)
+        {
+            preview->UploadHeap.Reset();
+            preview->uploadCompleteFence = 0;
+        }
+    }
     // Dispose upload buffers once GPU has finished processing them
     for (auto& [meshId, meshGPU] : mGeometries)
     {

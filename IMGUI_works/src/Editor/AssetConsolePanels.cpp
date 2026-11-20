@@ -2,6 +2,7 @@
 #include "EditorSceneIO.h"
 #include "EditorProject.h"
 #include "MaterialEditor.h"
+#include "TextureThumbnails.h"
 #include <Engine.h>
 #include <AssetPaths.h>
 #include <ScriptSystem.h>
@@ -45,26 +46,42 @@ void Editor_DrawAssetsAndConsole(EditorContext& context)
             {
                 ImGui::TextDisabled("This folder is empty.");
             }
-            for (const auto& entry : entries)
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(entries.size()), 72.0f + ImGui::GetStyle().ItemSpacing.y);
+            bool directoryChanged = false;
+            while (!directoryChanged && clipper.Step())
             {
-                const auto relativePath = entry.path().lexically_relative(root);
-                const std::string label = (entry.is_directory() ? "[Folder] " : "") + AssetPaths::ToUtf8(entry.path().filename());
-                ImGui::Selectable(label.c_str());
-                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                for (int entryIndex = clipper.DisplayStart; entryIndex < clipper.DisplayEnd; ++entryIndex)
                 {
-                    if (entry.is_directory())
+                    const auto& entry = entries[entryIndex];
+                    const auto relativePath = entry.path().lexically_relative(root);
+                    const std::string label = (entry.is_directory() ? "[Folder] " : "") + AssetPaths::ToUtf8(entry.path().filename());
+                    ImGui::PushID(entryIndex);
+                    const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
+                    if (!entry.is_directory() && Editor_IsTextureAsset(entry.path()))
                     {
-                        relativeDirectory = relativePath;
-                        break;
+                        Editor_DrawTextureThumbnail(context, entry.path().wstring());
                     }
-                    const auto path = AssetPaths::ToUtf8(relativePath);
-                    if (_wcsicmp(entry.path().extension().c_str(), L".lsmaterial") == 0)
+                    ImGui::SetCursorScreenPos(ImVec2(rowOrigin.x + 76, rowOrigin.y));
+                    ImGui::Selectable(label.c_str(), false, ImGuiSelectableFlags_None, ImVec2(0, 72));
+                    ImGui::PopID();
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                     {
-                        Editor_OpenMaterial(context, path);
-                    }
-                    else if (entry.path().extension() == L".json" && path.find("Scenes/") != std::string::npos && Editor_CanEditComponents())
-                    {
-                        EditorSceneIO::LoadScene(context, path.c_str());
+                        if (entry.is_directory())
+                        {
+                            relativeDirectory = relativePath;
+                            directoryChanged = true;
+                            break;
+                        }
+                        const auto path = AssetPaths::ToUtf8(relativePath);
+                        if (_wcsicmp(entry.path().extension().c_str(), L".lsmaterial") == 0)
+                        {
+                            Editor_OpenMaterial(context, path);
+                        }
+                        else if (entry.path().extension() == L".json" && path.find("Scenes/") != std::string::npos && Editor_CanEditComponents())
+                        {
+                            EditorSceneIO::LoadScene(context, path.c_str());
+                        }
                     }
                 }
             }

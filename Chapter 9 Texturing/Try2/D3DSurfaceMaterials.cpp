@@ -428,3 +428,133 @@ MaterialGPU* D3DRenderAdapter::GetOrLoadMaterial(MaterialID materialId)
     }
     return gpu.get();
 }
+
+uint64_t D3DRenderAdapter::TexturePreview(TextureID texture)
+{
+    if (!texture || !mResourceManager)
+    {
+        return 0;
+    }
+    const auto existing = mTextures.find(std::to_string(texture));
+    if (existing != mTextures.end() && existing->second->surfaceTexture)
+    {
+        const auto& gpu = *existing->second;
+        const int descriptor = IsSrgbView(gpu.viewFormat) && gpu.alternateSrvIndex >= 0
+            ? gpu.alternateSrvIndex : gpu.SrvHeapIndex;
+        return GetGPUDescriptorHandle(descriptor).ptr;
+    }
+    const auto preview = mTexturePreviews.find(texture);
+    if (preview != mTexturePreviews.end())
+    {
+        return preview->second ? GetGPUDescriptorHandle(preview->second->SrvHeapIndex).ptr : 0;
+    }
+    mPendingTexturePreviews.insert(texture);
+    return 0;
+}
+
+void D3DRenderAdapter::PumpTexturePreviews()
+{
+    // UI requests arrive before BeginFrame. Record uploads only on the reset frame list.
+    size_t uploaded = 0;
+    for (auto iterator = mPendingTexturePreviews.begin(); iterator != mPendingTexturePreviews.end() && uploaded < 2;)
+    {
+        const TextureID textureID = *iterator;
+        const auto& texture = mResourceManager->GetTexture(textureID);
+        if (texture.state == ResourceState::Loading)
+        {
+            ++iterator;
+            continue;
+        }
+        iterator = mPendingTexturePreviews.erase(iterator);
+        const auto& image = texture.imageData;
+        if (texture.state == ResourceState::Failed || image.subresources.empty() || image.pixels.empty())
+        {
+            continue;
+        }
+        const auto existing = mTextures.find(std::to_string(textureID));
+        if (existing != mTextures.end() && existing->second->surfaceTexture)
+        {
+            continue;
+        }
+        if (image.dimension == ImageDimension::Texture2D && image.arraySize == 1 && !image.isCubeMap)
+        {
+            continue; // The normal upload queue supplies the shared 2D SRV.
+        }
+        ++uploaded;
+        DXGI_FORMAT format = image.format;
+        switch (format)
+        {
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+            format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            break;
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+            format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            break;
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+            format = DXGI_FORMAT_B8G8R8X8_UNORM;
+            break;
+        case DXGI_FORMAT_BC1_UNORM_SRGB:
+            format = DXGI_FORMAT_BC1_UNORM;
+            break;
+        case DXGI_FORMAT_BC2_UNORM_SRGB:
+            format = DXGI_FORMAT_BC2_UNORM;
+            break;
+        case DXGI_FORMAT_BC3_UNORM_SRGB:
+            format = DXGI_FORMAT_BC3_UNORM;
+            break;
+        case DXGI_FORMAT_BC7_UNORM_SRGB:
+            format = DXGI_FORMAT_BC7_UNORM;
+            break;
+        default:
+            break;
+        }
+        D3D12_FEATURE_DATA_FORMAT_SUPPORT support{format};
+        if (mNextCbvSrvIndex >= mCbvSrvUavDescriptorCount ||
+            FAILED(md3dDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))) ||
+            !(support.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE))
+        {
+            mTexturePreviews.emplace(textureID, nullptr);
+            continue;
+        }
+        uint32_t mip = 0;
+        while (mip + 1 < image.mipLevels && std::max(image.width >> mip, image.height >> mip) > 128)
+        {
+            ++mip;
+        }
+        const auto& source = image.subresources.at(mip);
+        // The first array element/cubemap face or volume slice is a regular 2D thumbnail.
+        const auto description = CD3DX12_RESOURCE_DESC::Tex2D(format,
+            std::max(1u, image.width >> mip), std::max(1u, image.height >> mip), 1, 1);
+        auto preview = std::make_unique<TextureGPU>();
+        const auto defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        if (FAILED(md3dDevice->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &description,
+            D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&preview->Resource))))
+        {
+            continue;
+        }
+        const auto uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        const auto uploadDescription = CD3DX12_RESOURCE_DESC::Buffer(GetRequiredIntermediateSize(preview->Resource.Get(), 0, 1));
+        if (FAILED(md3dDevice->CreateCommittedResource(&uploadHeap, D3D12_HEAP_FLAG_NONE, &uploadDescription,
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&preview->UploadHeap))))
+        {
+            continue;
+        }
+        D3D12_SUBRESOURCE_DATA data{image.pixels.data() + source.offset,
+            static_cast<LONG_PTR>(source.rowPitch), static_cast<LONG_PTR>(source.slicePitch)};
+        UpdateSubresources(mCommandList.Get(), preview->Resource.Get(), preview->UploadHeap.Get(), 0, 0, 1, &data);
+        const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(preview->Resource.Get(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        mCommandList->ResourceBarrier(1, &barrier);
+        D3D12_SHADER_RESOURCE_VIEW_DESC view{};
+        view.Format = format;
+        view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        view.Texture2D.MipLevels = 1;
+        const auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
+            mNextCbvSrvIndex, mCbvSrvUavDescriptorSize);
+        md3dDevice->CreateShaderResourceView(preview->Resource.Get(), &view, handle);
+        preview->SrvHeapIndex = static_cast<int>(mNextCbvSrvIndex++);
+        preview->uploadCompleteFence = mCurrentFence + 1;
+        mTexturePreviews.emplace(textureID, std::move(preview));
+    }
+}

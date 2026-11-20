@@ -232,6 +232,10 @@ public:
     {
         return 0;
     }
+    virtual uint64_t TexturePreview(TextureID texture)
+    {
+        return 0;
+    }
     virtual void DrawMaterialPreview(MeshID mesh, float rotation) {}
     virtual void DrawSubmesh(MeshID meshId, uint32_t submeshIndex) = 0;
     virtual void DrawSubmeshWithMaterial(MeshID meshId, uint32_t submeshIndex, MaterialID material)

@@ -1,0 +1,54 @@
+{
+  "material": {
+    "albedo": "Assets/Textures/bearPic.jpg",
+    "color": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "name": "BearMeme",
+    "roughness": 0.5720000267028809,
+    "surface": {
+      "alpha": 1.0,
+      "alphaCutoff": 0.5,
+      "aoStrength": 0.4480000138282776,
+      "editorVariant": true,
+      "emissiveColor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "emissiveIntensity": 1.0,
+      "emissiveLightRange": 5.0,
+      "maskedVariant": true,
+      "metallic": 0.34200000762939453,
+      "mode": "opaque",
+      "normalStrength": 1.0,
+      "pixelEntry": "PS",
+      "renderState": {
+        "alphaOperation": "Add",
+        "blendEnabled": false,
+        "colorOperation": "Add",
+        "depthCompare": "Less",
+        "depthTest": true,
+        "depthWrite": true,
+        "destinationAlpha": "Zero",
+        "destinationColor": "Zero",
+        "sourceAlpha": "One",
+        "sourceColor": "One"
+      },
+      "shader": "Shaders/Default.hlsl",
+      "twoSided": false,
+      "uvOffset": [
+        0.0,
+        0.0
+      ],
+      "uvScale": [
+        1.0,
+        1.0
+      ],
+      "vertexEntry": "VS"
+    }
+  },
+  "version": 1
+}

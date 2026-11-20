@@ -6,6 +6,7 @@
 #include <Editor/EditorContext.h>
 #include <Editor/EditorLayout.h>
 #include <Editor/MaterialEditor.h>
+#include <Editor/TextureThumbnails.h>
 #include <SceneSerializer.h>
 #include <Editor/EditorPlayWindow.h>
 #include <imgui_internal.h>
@@ -98,6 +99,45 @@ void EditorValidation::Tick(Engine& engine, D3DRenderAdapter& renderer)
     }
     if (preview)
     {
+        wchar_t thumbnailDirectory[32768]{};
+        if (GetEnvironmentVariableW(L"LSENGINE_TEST_THUMBNAILS", thumbnailDirectory, 32768))
+        {
+            static std::vector<TextureID> thumbnails;
+            if (thumbnails.empty())
+            {
+                for (const auto& entry : std::filesystem::directory_iterator(thumbnailDirectory))
+                {
+                    if (Editor_IsTextureAsset(entry.path()))
+                    {
+                        thumbnails.push_back(engine.GetResources().LoadTexture(entry.path().wstring()));
+                    }
+                }
+            }
+            ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Texture thumbnails validation"))
+            {
+                ImGui::BeginTable("Thumbnails", 4);
+                for (TextureID textureID : thumbnails)
+                {
+                    ImGui::TableNextColumn();
+                    ImGui::PushID(static_cast<int>(textureID));
+                    Editor_DrawTextureThumbnail(context, {}, textureID);
+                    const auto filename = AssetPaths::ToUtf8(AssetPaths::FromUtf8(engine.GetResources().GetTexture(textureID).name).filename());
+                    ImGui::TextUnformatted(filename.c_str());
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
+            ImGui::End();
+            if (frames >= 149)
+            {
+                for (TextureID textureID : thumbnails)
+                {
+                    Check(renderer.TexturePreview(textureID) != 0, "Texture thumbnail did not become available");
+                }
+                Check(!thumbnails.empty(), "Thumbnail validation folder was empty");
+            }
+        }
         if (stage == 0 && ++frames >= 150)
         {
             output = std::filesystem::temp_directory_path() / ("LSEditorPreview-" + std::to_string(GetCurrentProcessId()));

@@ -9,6 +9,7 @@
 #include <cmath>
 #include "TerrainPanel.h"
 #include "MaterialEditor.h"
+#include "TextureThumbnails.h"
 #include "EditorProject.h"
 #include <Terrain.h>
 #include <ResourceManager.h>
@@ -19,6 +20,7 @@ static bool DrawTexturePath(EditorContext& ctx, const char* label, std::wstring&
 {
     bool changed = false;
     ImGui::PushID(label);
+    Editor_DrawTextureThumbnail(ctx, texture);
     char text[4097]{};
     strncpy_s(text, AssetPaths::ToUtf8(texture).c_str(), sizeof(text) - 1);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);

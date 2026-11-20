@@ -23,7 +23,19 @@
       "mode": "opaque",
       "normalStrength": 1.0,
       "pixelEntry": "PS",
-      "shader": "Shaders/Default.hlsl",
+      "renderState": {
+        "alphaOperation": "Add",
+        "blendEnabled": false,
+        "colorOperation": "Add",
+        "depthCompare": "Less",
+        "depthTest": true,
+        "depthWrite": true,
+        "destinationAlpha": "Zero",
+        "destinationColor": "Zero",
+        "sourceAlpha": "One",
+        "sourceColor": "One"
+      },
+      "shader": "Shaders/Unlit.hlsl",
       "twoSided": false,
       "uvOffset": [
         0.0,

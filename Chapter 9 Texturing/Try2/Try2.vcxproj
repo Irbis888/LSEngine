@@ -407,4 +407,7 @@
     <None Include="MATERIAL_RENDER_STATES.md"></None>
     <None Include="..\..\tests\RunRenderStateTests.ps1"></None>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(IMGUI_WORKS)\src\Editor\TextureThumbnails.h"></ClInclude>
+  </ItemGroup>
 </Project>

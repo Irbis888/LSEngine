@@ -1,4 +1,5 @@
 #include "MaterialEditor.h"
+#include "TextureThumbnails.h"
 #include "EditorContext.h"
 #include "EditorProject.h"
 #include <AssetPaths.h>
@@ -131,6 +132,7 @@ namespace
     {
         ImGui::PushID(label);
         ImGui::TextUnformatted(label);
+        Editor_DrawTextureThumbnail(context, path, path.empty() ? 0 : previewTexture);
         char buffer[4096]{};
         strncpy_s(buffer, AssetPaths::ToUtf8(path).c_str(), _TRUNCATE);
         ImGui::SetNextItemWidth(-ImGui::GetFontSize() * 9);
@@ -145,7 +147,7 @@ namespace
         if (ImGui::Button("Browse"))
         {
             const auto file = EditorProject::PickOpenFile(L"Choose texture", context.engine->GetAssetRoot() / "Assets/Textures",
-                L"Images", L"*.png;*.tga;*.dds;*.jpg;*.jpeg;*.bmp");
+                L"Images", L"*.dds;*.png;*.tga;*.jpg;*.jpeg;*.jpe;*.jfif;*.bmp;*.dib;*.psd;*.gif;*.hdr;*.pic;*.pnm;*.ppm;*.pgm");
             if (!file.empty())
             {
                 try

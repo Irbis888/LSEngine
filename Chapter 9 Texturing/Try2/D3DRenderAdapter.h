@@ -70,6 +70,7 @@ public:
     void DrawMesh(MeshID meshId) override;
     void DrawMeshWithMaterial(MeshID meshId, MaterialID material) override;
     uint64_t MaterialPreviewTexture() override;
+    uint64_t TexturePreview(TextureID texture) override;
     void DrawMaterialPreview(MeshID mesh, float rotation) override;
 
     // Draw a specific submesh from a mesh
@@ -209,6 +210,9 @@ private:
     double mTerrainUploadMs = 0;
     void PumpResourceUploads();
     void EnsureDefaultTextures();
+    void PumpTexturePreviews();
+    std::unordered_set<TextureID> mPendingTexturePreviews;
+    std::unordered_map<TextureID, std::unique_ptr<TextureGPU>> mTexturePreviews;
     UploadBudget mUploadBudget;
     bool mTextureUploadTurn = true;
     std::deque<MeshID> mMeshUploads;
